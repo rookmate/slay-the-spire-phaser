@@ -123,6 +123,8 @@ export class Engine {
         // remove card from hand: take first match
         const idx = this.state.player.hand.findIndex(c => c === card)
         if (idx >= 0) this.state.player.hand.splice(idx, 1)
+        // by default, played cards go to discard pile (no exhaust mechanic yet)
+        this.state.player.discardPile.push(card)
         if (def.onPlay) {
             def.onPlay({ engine: this as unknown as any, source: this.state.player.id, targets: targetIds, card })
         } else {
