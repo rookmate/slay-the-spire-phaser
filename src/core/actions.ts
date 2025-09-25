@@ -7,6 +7,7 @@ export type Action =
     | { kind: 'GainBlock'; target: EntityId; amount: number }
     | { kind: 'DiscardHand' }
     | { kind: 'EndTurn' }
+    | { kind: 'ApplyPower'; target: EntityId; powerId: 'VULNERABLE'; stacks: number }
 
 export type EmittedEvent =
     | { kind: 'EnergyChanged'; energy: number }
@@ -17,5 +18,6 @@ export type EmittedEvent =
     | { kind: 'CardPlayed'; cardId: string }
     | { kind: 'Victory' }
     | { kind: 'Defeat' }
+    | { kind: 'PowerApplied'; target: EntityId; powerId: 'VULNERABLE'; stacks: number }
 
 

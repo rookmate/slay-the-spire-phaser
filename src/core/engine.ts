@@ -1,7 +1,7 @@
 import { RNG } from './rng'
 import { CARD_DEFS } from './cards'
 import type { Action, EmittedEvent, EntityId } from './actions'
-import type { CombatState, CardInstance, PlayerState, EnemyState } from './state'
+import type { CombatState, CardInstance, PlayerState, EnemyState, PowerInstance } from './state'
 
 export class Engine {
     readonly rng: RNG
@@ -40,12 +40,15 @@ export class Engine {
             case 'DealDamage': {
                 const target = this.getEntity(action.target)
                 if (!target) break
-                let remaining = action.amount
+                let damage = action.amount
+                // apply Vulnerable if target is player? Vulnerable increases damage taken by 50%
+                damage = this.modifyIncomingDamage(target, damage)
+                let remaining = damage
                 const blockUsed = Math.min(target.block, remaining)
                 target.block -= blockUsed
                 remaining -= blockUsed
                 if (remaining > 0) target.hp = Math.max(0, target.hp - remaining)
-                evts.push({ kind: 'DamageApplied', source: action.source, target: action.target, amount: action.amount, resultingHp: target.hp, resultingBlock: target.block })
+                evts.push({ kind: 'DamageApplied', source: action.source, target: action.target, amount: Math.round(damage), resultingHp: target.hp, resultingBlock: target.block })
                 this.checkWinLose(evts)
                 break
             }
@@ -54,6 +57,15 @@ export class Engine {
                 if (!target) break
                 target.block += action.amount
                 evts.push({ kind: 'BlockGained', target: action.target, amount: action.amount, resultingBlock: target.block })
+                break
+            }
+            case 'ApplyPower': {
+                const target = this.getEntity(action.target)
+                if (!target) break
+                const existing = target.powers.find(p => p.id === action.powerId)
+                if (existing) existing.stacks += action.stacks
+                else target.powers.push({ id: action.powerId, stacks: action.stacks } as PowerInstance)
+                evts.push({ kind: 'PowerApplied', target: action.target, powerId: action.powerId, stacks: action.stacks })
                 break
             }
             case 'DiscardHand': {
@@ -66,10 +78,11 @@ export class Engine {
                     this.enqueue({ kind: 'DiscardHand' })
                     this.state.turn = 'enemy'
                     evts.push({ kind: 'TurnChanged', turn: 'enemy' })
-                    // simple enemy: all enemies attack for fixed damage if alive
+                    // simple enemy: all enemies attack for their intent amount if alive
                     for (const enemy of this.state.enemies) {
                         if (enemy.hp > 0) {
-                            this.enqueue({ kind: 'DealDamage', source: enemy.id, target: this.state.player.id, amount: 5 })
+                            const dmg = enemy.intent?.kind === 'attack' ? enemy.intent.amount : 5
+                            this.enqueue({ kind: 'DealDamage', source: enemy.id, target: this.state.player.id, amount: dmg })
                         }
                     }
                     // end enemy turn
@@ -78,6 +91,11 @@ export class Engine {
                     this.state.turn = 'player'
                     this.state.player.energy = 3
                     for (const enemy of this.state.enemies) enemy.block = 0
+                    // roll next intents (attack for 5-10)
+                    for (const enemy of this.state.enemies) {
+                        const amt = this.rng.int(5, 10)
+                        enemy.intent = { kind: 'attack', amount: amt }
+                    }
                     this.enqueue({ kind: 'DrawCards', count: 5 })
                     evts.push({ kind: 'TurnChanged', turn: 'player' })
                 }
@@ -105,12 +123,16 @@ export class Engine {
         // remove card from hand: take first match
         const idx = this.state.player.hand.findIndex(c => c === card)
         if (idx >= 0) this.state.player.hand.splice(idx, 1)
-        if (def.baseDamage) {
-            const target = targetIds[0]
-            this.enqueue({ kind: 'DealDamage', source: this.state.player.id, target, amount: def.baseDamage })
-        }
-        if (def.baseBlock) {
-            this.enqueue({ kind: 'GainBlock', target: this.state.player.id, amount: def.baseBlock })
+        if (def.onPlay) {
+            def.onPlay({ engine: this as unknown as any, source: this.state.player.id, targets: targetIds, card })
+        } else {
+            if (def.baseDamage) {
+                const target = targetIds[0]
+                this.enqueue({ kind: 'DealDamage', source: this.state.player.id, target, amount: def.baseDamage })
+            }
+            if (def.baseBlock) {
+                this.enqueue({ kind: 'GainBlock', target: this.state.player.id, amount: def.baseBlock })
+            }
         }
         return events
     }
@@ -143,6 +165,21 @@ export class Engine {
             events.push({ kind: 'Victory' })
         }
     }
+
+    computeDamage(target: EntityId, base: number): number {
+        const t = this.getEntity(target)
+        if (!t) return base
+        let amount = base
+        const vulnerable = t.powers.find(p => p.id === 'VULNERABLE')?.stacks ?? 0
+        if (vulnerable > 0) amount = Math.round(amount * 1.5)
+        return amount
+    }
+
+    private modifyIncomingDamage(target: PlayerState | EnemyState, amount: number): number {
+        const vulnerable = target.powers.find(p => p.id === 'VULNERABLE')?.stacks ?? 0
+        if (vulnerable > 0) return Math.round(amount * 1.5)
+        return amount
+    }
 }
 
 export function createSimplePlayer(seed: string): PlayerState {
@@ -164,12 +201,13 @@ export function createSimplePlayer(seed: string): PlayerState {
         discardPile: [],
         exhaustPile: [],
         hand: [],
+        powers: [],
     }
     return player
 }
 
 export function createDummyEnemy(id: string): EnemyState {
-    return { id, name: 'Slime', maxHp: 40, hp: 40, block: 0 }
+    return { id, name: 'Slime', maxHp: 40, hp: 40, block: 0, powers: [], intent: { kind: 'attack', amount: 5 } }
 }
 
 

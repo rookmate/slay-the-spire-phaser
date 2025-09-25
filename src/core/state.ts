@@ -2,6 +2,13 @@ import type { EntityId } from './actions'
 
 export type CardType = 'attack' | 'skill' | 'power'
 
+export type PowerId = 'VULNERABLE'
+
+export interface PowerInstance {
+    id: PowerId
+    stacks: number
+}
+
 export interface CardDef {
     id: string
     name: string
@@ -9,6 +16,12 @@ export interface CardDef {
     cost: number
     baseDamage?: number
     baseBlock?: number
+    onPlay?: (ctx: {
+        engine: { enqueue: (a: any) => void; state: CombatState }
+        source: EntityId
+        targets: EntityId[]
+        card: CardInstance
+    }) => void
 }
 
 export interface CardInstance {
@@ -27,6 +40,7 @@ export interface PlayerState {
     discardPile: CardInstance[]
     exhaustPile: CardInstance[]
     hand: CardInstance[]
+    powers: PowerInstance[]
 }
 
 export interface EnemyState {
@@ -35,6 +49,8 @@ export interface EnemyState {
     maxHp: number
     hp: number
     block: number
+    powers: PowerInstance[]
+    intent?: { kind: 'attack'; amount: number }
 }
 
 export interface CombatState {

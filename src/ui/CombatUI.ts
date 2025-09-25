@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
 import type { Engine } from '../core/engine'
+import type { EmittedEvent } from '../core/actions'
 import { CARD_DEFS } from '../core/cards'
 import type { CardInstance, EnemyState } from '../core/state'
 
@@ -75,11 +76,34 @@ export class CombatUI {
     }
 
     private enemyText(e: EnemyState): string {
-        return `${e.name}  HP ${e.hp}/${e.maxHp}  Block ${e.block}`
+        const intent = e.intent?.kind === 'attack' ? `  Intent: ${e.intent.amount} ⚔` : ''
+        return `${e.name}  HP ${e.hp}/${e.maxHp}  Block ${e.block}${intent}`
     }
 
     private refreshEnemies(): void {
         this.enemyTexts.forEach((t, i) => t.setText(this.enemyText(this.engine.state.enemies[i])))
+    }
+
+    apply(events: EmittedEvent[]): void {
+        if (events.length === 0) return
+        // Simple feedback: flash red when damage applied, update labels
+        for (const e of events) {
+            if (e.kind === 'DamageApplied') {
+                const idx = this.engine.state.enemies.findIndex(en => en.id === e.target)
+                if (idx >= 0) {
+                    const txt = this.enemyTexts[idx]
+                    this.scene.tweens.add({
+                        targets: txt,
+                        tint: 0xff4444,
+                        duration: 60,
+                        yoyo: true,
+                        repeat: 0,
+                        onComplete: () => txt.clearTint(),
+                    })
+                }
+            }
+        }
+        this.refreshEnemies()
     }
 
     onPlayCard(fn: (card: CardInstance, targets: string[]) => void): void {

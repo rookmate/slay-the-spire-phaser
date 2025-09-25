@@ -13,7 +13,7 @@ export class CombatScene extends Phaser.Scene {
     create(): void {
         const seed = 'm1-seed'
         const player = createSimplePlayer(seed)
-        const enemies = [createDummyEnemy('e1')]
+        const enemies = [createDummyEnemy('e1'), createDummyEnemy('e2')]
         this.engine = new Engine(seed, player, enemies)
         // opening draw
         this.engine.enqueue({ kind: 'DrawCards', count: 5 })
@@ -21,12 +21,15 @@ export class CombatScene extends Phaser.Scene {
 
         this.ui = new CombatUI(this, this.engine)
         this.ui.onPlayCard((card, targets) => {
-            this.engine.playCard(card, targets)
-            this.engine.runUntilIdle()
+            const evStart = this.engine.playCard(card, targets)
+            this.ui.apply(evStart)
+            const evts = this.engine.runUntilIdle()
+            this.ui.apply(evts)
         })
         this.ui.onEndTurn(() => {
             this.engine.enqueue({ kind: 'EndTurn' })
-            this.engine.runUntilIdle()
+            const evts = this.engine.runUntilIdle()
+            this.ui.apply(evts)
         })
     }
 }
