@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { createNewRun, loadRun, saveRun } from '../core/run'
+// import { createNewRun, loadRun, saveRun } from '../core/run'
 
 export class BootScene extends Phaser.Scene {
     constructor() {
@@ -11,10 +11,8 @@ export class BootScene extends Phaser.Scene {
     }
 
     create(): void {
-        const existing = loadRun()
-        const run = existing ?? createNewRun()
-        saveRun(run)
-        this.scene.start('Map', { run })
+        // Go to Main Menu first
+        this.scene.start('MainMenu')
     }
 }
 

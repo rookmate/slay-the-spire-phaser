@@ -21,7 +21,7 @@ export class RewardsScene extends Phaser.Scene {
                     this.run.gold += 20
                     this.run.floor += 1
                     saveRun(this.run)
-                    this.scene.start('Map', { run: this.run })
+                    this.scene.start('RunSummary', { run: this.run, result: 'victory' })
                 })
         })
         this.add.text(16, 60 + choices.length * 40, 'Skip', { ...style, backgroundColor: '#333', padding: { x: 6, y: 4 } })
@@ -30,7 +30,7 @@ export class RewardsScene extends Phaser.Scene {
                 this.run.gold += 20
                 this.run.floor += 1
                 saveRun(this.run)
-                this.scene.start('Map', { run: this.run })
+                this.scene.start('RunSummary', { run: this.run, result: 'victory' })
             })
     }
 }

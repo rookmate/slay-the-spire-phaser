@@ -10,6 +10,7 @@ export interface RunState {
     player: { maxHp: number; hp: number }
     relics: RelicId[]
     deck: CardInstance[]
+    asc?: number
 }
 
 export function createNewRun(seed?: string): RunState {

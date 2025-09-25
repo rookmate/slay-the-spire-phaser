@@ -7,8 +7,9 @@ export class Engine {
     readonly rng: RNG
     readonly state: CombatState
     private queue: Action[] = []
+    private ascension: number
 
-    constructor(seed: string, player: PlayerState, enemies: EnemyState[]) {
+    constructor(seed: string, player: PlayerState, enemies: EnemyState[], opts?: { asc?: number }) {
         this.rng = new RNG(seed)
         this.state = {
             player,
@@ -17,6 +18,7 @@ export class Engine {
             victory: false,
             defeat: false,
         }
+        this.ascension = opts?.asc ?? 0
     }
 
     enqueue(a: Action): void {
@@ -82,9 +84,11 @@ export class Engine {
                     for (const enemy of this.state.enemies) {
                         if (enemy.hp > 0) {
                             if (enemy.intent?.kind === 'attack') {
-                                this.enqueue({ kind: 'DealDamage', source: enemy.id, target: this.state.player.id, amount: enemy.intent.amount })
+                                const scaled = Math.round(enemy.intent.amount * this.enemyDamageMultiplier())
+                                this.enqueue({ kind: 'DealDamage', source: enemy.id, target: this.state.player.id, amount: scaled })
                             } else if (enemy.intent?.kind === 'block') {
-                                this.enqueue({ kind: 'GainBlock', target: enemy.id, amount: enemy.intent.amount })
+                                const scaled = Math.round(enemy.intent.amount * this.enemyBlockMultiplier())
+                                this.enqueue({ kind: 'GainBlock', target: enemy.id, amount: scaled })
                             } else {
                                 this.enqueue({ kind: 'DealDamage', source: enemy.id, target: this.state.player.id, amount: 5 })
                             }
@@ -184,8 +188,20 @@ export class Engine {
 
     private modifyIncomingDamage(target: PlayerState | EnemyState, amount: number): number {
         const vulnerable = target.powers.find(p => p.id === 'VULNERABLE')?.stacks ?? 0
-        if (vulnerable > 0) return Math.round(amount * 1.5)
-        return amount
+        let result = amount
+        if (vulnerable > 0) result = Math.round(result * 1.5)
+        if (target === this.state.player) result = Math.round(result * this.enemyDamageMultiplier())
+        return result
+    }
+
+    private enemyDamageMultiplier(): number {
+        if (this.ascension >= 1) return 1.2
+        return 1
+    }
+
+    private enemyBlockMultiplier(): number {
+        if (this.ascension >= 1) return 1.2
+        return 1
     }
 }
 

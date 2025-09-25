@@ -18,7 +18,7 @@ export class CombatScene extends Phaser.Scene {
         const seed = this.run.seed
         const player = createPlayerFromDeck(seed, this.run.deck, this.run.player.hp, this.run.player.maxHp)
         const enemies = [createDummyEnemy('e1'), createDummyEnemy('e2')]
-        this.engine = new Engine(seed, player, enemies)
+        this.engine = new Engine(seed, player, enemies, { asc: this.run.asc ?? 0 })
         // opening draw
         this.engine.enqueue({ kind: 'DrawCards', count: 5 })
         this.engine.runUntilIdle()
@@ -45,7 +45,7 @@ export class CombatScene extends Phaser.Scene {
                 this.scene.start('Rewards', { run: this.run })
             } else if (this.engine.state.defeat) {
                 saveRun(this.run)
-                this.scene.start('Map', { run: this.run })
+                this.scene.start('RunSummary', { run: this.run, result: 'defeat' })
             }
         })
     }
