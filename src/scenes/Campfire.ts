@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
 import type { RunState } from '../core/run'
+import { saveRun } from '../core/run'
 
 export class CampfireScene extends Phaser.Scene {
     run!: RunState
@@ -14,6 +15,7 @@ export class CampfireScene extends Phaser.Scene {
             .on('pointerdown', () => {
                 const heal = Math.round(this.run.player.maxHp * 0.2)
                 this.run.player.hp = Math.min(this.run.player.maxHp, this.run.player.hp + heal)
+                saveRun(this.run)
                 this.scene.start('Map', { run: this.run })
             })
     }

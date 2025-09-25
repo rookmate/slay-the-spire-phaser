@@ -76,7 +76,9 @@ export class CombatUI {
     }
 
     private enemyText(e: EnemyState): string {
-        const intent = e.intent?.kind === 'attack' ? `  Intent: ${e.intent.amount} ⚔` : ''
+        let intent = ''
+        if (e.intent?.kind === 'attack') intent = `  Intent: ${e.intent.amount} ⚔`
+        else if (e.intent?.kind === 'block') intent = `  Intent: ${e.intent.amount} 🛡`
         return `${e.name}  HP ${e.hp}/${e.maxHp}  Block ${e.block}${intent}`
     }
 
@@ -100,6 +102,10 @@ export class CombatUI {
                         repeat: 0,
                         onComplete: () => txt.clearTint(),
                     })
+                }
+                // if player damaged, shake camera
+                if (e.target === 'player') {
+                    this.scene.cameras.main.shake(100, 0.004)
                 }
             }
         }

@@ -50,7 +50,7 @@ export interface EnemyState {
     hp: number
     block: number
     powers: PowerInstance[]
-    intent?: { kind: 'attack'; amount: number }
+    intent?: { kind: 'attack' | 'block'; amount: number }
 }
 
 export interface CombatState {

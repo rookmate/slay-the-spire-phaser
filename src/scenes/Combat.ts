@@ -1,6 +1,7 @@
 import Phaser from 'phaser'
-import { Engine, createDummyEnemy, createSimplePlayer } from '../core/engine'
+import { Engine, createDummyEnemy, createPlayerFromDeck } from '../core/engine'
 import type { RunState } from '../core/run'
+import { saveRun } from '../core/run'
 import { CombatUI } from '../ui/CombatUI'
 
 export class CombatScene extends Phaser.Scene {
@@ -15,9 +16,7 @@ export class CombatScene extends Phaser.Scene {
     create(data: { run: RunState }): void {
         this.run = data.run
         const seed = this.run.seed
-        const player = createSimplePlayer(seed)
-        player.maxHp = this.run.player.maxHp
-        player.hp = this.run.player.hp
+        const player = createPlayerFromDeck(seed, this.run.deck, this.run.player.hp, this.run.player.maxHp)
         const enemies = [createDummyEnemy('e1'), createDummyEnemy('e2')]
         this.engine = new Engine(seed, player, enemies)
         // opening draw
@@ -42,8 +41,10 @@ export class CombatScene extends Phaser.Scene {
                 } else {
                     this.run.player.hp = this.engine.state.player.hp
                 }
+                saveRun(this.run)
                 this.scene.start('Rewards', { run: this.run })
             } else if (this.engine.state.defeat) {
+                saveRun(this.run)
                 this.scene.start('Map', { run: this.run })
             }
         })

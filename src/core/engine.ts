@@ -78,11 +78,16 @@ export class Engine {
                     this.enqueue({ kind: 'DiscardHand' })
                     this.state.turn = 'enemy'
                     evts.push({ kind: 'TurnChanged', turn: 'enemy' })
-                    // simple enemy: all enemies attack for their intent amount if alive
+                    // enemies execute intents
                     for (const enemy of this.state.enemies) {
                         if (enemy.hp > 0) {
-                            const dmg = enemy.intent?.kind === 'attack' ? enemy.intent.amount : 5
-                            this.enqueue({ kind: 'DealDamage', source: enemy.id, target: this.state.player.id, amount: dmg })
+                            if (enemy.intent?.kind === 'attack') {
+                                this.enqueue({ kind: 'DealDamage', source: enemy.id, target: this.state.player.id, amount: enemy.intent.amount })
+                            } else if (enemy.intent?.kind === 'block') {
+                                this.enqueue({ kind: 'GainBlock', target: enemy.id, amount: enemy.intent.amount })
+                            } else {
+                                this.enqueue({ kind: 'DealDamage', source: enemy.id, target: this.state.player.id, amount: 5 })
+                            }
                         }
                     }
                     // end enemy turn
@@ -91,10 +96,10 @@ export class Engine {
                     this.state.turn = 'player'
                     this.state.player.energy = 3
                     for (const enemy of this.state.enemies) enemy.block = 0
-                    // roll next intents (attack for 5-10)
+                    // roll next intents (attack 5-10 or block 5-10)
                     for (const enemy of this.state.enemies) {
                         const amt = this.rng.int(5, 10)
-                        enemy.intent = { kind: 'attack', amount: amt }
+                        enemy.intent = this.rng.random() < 0.7 ? { kind: 'attack', amount: amt } : { kind: 'block', amount: amt }
                     }
                     this.enqueue({ kind: 'DrawCards', count: 5 })
                     evts.push({ kind: 'TurnChanged', turn: 'player' })
@@ -210,6 +215,26 @@ export function createSimplePlayer(seed: string): PlayerState {
 
 export function createDummyEnemy(id: string): EnemyState {
     return { id, name: 'Slime', maxHp: 40, hp: 40, block: 0, powers: [], intent: { kind: 'attack', amount: 5 } }
+}
+
+export function createPlayerFromDeck(seed: string, deck: CardInstance[], hp: number, maxHp: number): PlayerState {
+    const rng = new RNG(seed)
+    const fullDeck = [...deck]
+    rng.shuffleInPlace(fullDeck)
+    const drawPile = [...fullDeck]
+    return {
+        id: 'player',
+        maxHp,
+        hp,
+        block: 0,
+        energy: 3,
+        deck: fullDeck,
+        drawPile,
+        discardPile: [],
+        exhaustPile: [],
+        hand: [],
+        powers: [],
+    }
 }
 
 
