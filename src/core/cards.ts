@@ -17,6 +17,142 @@ export const CARD_DEFS: Record<string, CardDef> = {
             engine.enqueue({ kind: 'ApplyPower', target, powerId: 'VULNERABLE', stacks: 2 })
         },
     },
+    // Powers and advanced cards
+    BARRICADE: {
+        id: 'BARRICADE',
+        name: 'Barricade',
+        type: 'power',
+        cost: 3,
+        rarity: 'rare',
+        onPlay: ({ engine }) => {
+            engine.enqueue({ kind: 'ApplyPower', target: 'player', powerId: 'BARRICADE', stacks: 1 })
+        },
+    },
+    METALLICIZE: {
+        id: 'METALLICIZE',
+        name: 'Metallicize',
+        type: 'power',
+        cost: 1,
+        rarity: 'uncommon',
+        onPlay: ({ engine }) => {
+            engine.enqueue({ kind: 'ApplyPower', target: 'player', powerId: 'METALLICIZE', stacks: 3 })
+        },
+    },
+    DEMON_FORM: {
+        id: 'DEMON_FORM',
+        name: 'Demon Form',
+        type: 'power',
+        cost: 3,
+        rarity: 'rare',
+        onPlay: ({ engine }) => {
+            engine.enqueue({ kind: 'ApplyPower', target: 'player', powerId: 'DEMON_FORM', stacks: 1 })
+        },
+    },
+    CORRUPTION: {
+        id: 'CORRUPTION',
+        name: 'Corruption',
+        type: 'power',
+        cost: 3,
+        rarity: 'rare',
+        onPlay: ({ engine }) => {
+            engine.enqueue({ kind: 'ApplyPower', target: 'player', powerId: 'CORRUPTION', stacks: 1 })
+        },
+    },
+    FEEL_NO_PAIN: {
+        id: 'FEEL_NO_PAIN',
+        name: 'Feel No Pain',
+        type: 'power',
+        cost: 1,
+        rarity: 'uncommon',
+        onPlay: ({ engine }) => {
+            engine.enqueue({ kind: 'ApplyPower', target: 'player', powerId: 'FEEL_NO_PAIN', stacks: 1 })
+        },
+    },
+    JUGGERNAUT: {
+        id: 'JUGGERNAUT',
+        name: 'Juggernaut',
+        type: 'power',
+        cost: 2,
+        rarity: 'rare',
+        onPlay: ({ engine }) => {
+            engine.enqueue({ kind: 'ApplyPower', target: 'player', powerId: 'JUGGERNAUT', stacks: 1 })
+        },
+    },
+    DARK_EMBRACE: {
+        id: 'DARK_EMBRACE',
+        name: 'Dark Embrace',
+        type: 'power',
+        cost: 2,
+        rarity: 'rare',
+        onPlay: ({ engine }) => {
+            engine.enqueue({ kind: 'ApplyPower', target: 'player', powerId: 'DARK_EMBRACE', stacks: 1 })
+        },
+    },
+    BRUTALITY: {
+        id: 'BRUTALITY',
+        name: 'Brutality',
+        type: 'power',
+        cost: 0,
+        rarity: 'rare',
+        onPlay: ({ engine }) => {
+            engine.enqueue({ kind: 'ApplyPower', target: 'player', powerId: 'BRUTALITY', stacks: 1 })
+        },
+    },
+    BERSERK: {
+        id: 'BERSERK',
+        name: 'Berserk',
+        type: 'power',
+        cost: 0,
+        rarity: 'rare',
+        onPlay: ({ engine }) => {
+            engine.enqueue({ kind: 'ApplyPower', target: 'player', powerId: 'BERSERK', stacks: 1 })
+        },
+    },
+    DOUBLE_TAP: {
+        id: 'DOUBLE_TAP',
+        name: 'Double Tap',
+        type: 'skill',
+        cost: 1,
+        rarity: 'rare',
+        onPlay: ({ engine }) => {
+            // Next ATTACK this turn plays twice. Simple modeling: apply a temporary power.
+            engine.enqueue({ kind: 'ApplyPower', target: 'player', powerId: 'STRENGTH', stacks: 0 })
+                ; (engine as any)._doubleTap = true
+        },
+    },
+    EXHUME: {
+        id: 'EXHUME',
+        name: 'Exhume',
+        type: 'skill',
+        cost: 1,
+        rarity: 'rare',
+        onPlay: ({ engine }) => {
+            const ex = engine.state.player.exhaustPile
+            if (ex.length > 0) {
+                const card = ex.pop()!
+                engine.state.player.hand.push(card)
+            }
+        },
+    },
+    FIEND_FIRE: {
+        id: 'FIEND_FIRE',
+        name: 'Fiend Fire',
+        type: 'attack',
+        cost: 2,
+        rarity: 'rare',
+        exhaust: true,
+        onPlay: ({ engine, source, targets }) => {
+            const target = targets[0]
+            const toExhaust = [...engine.state.player.hand]
+            let hits = 0
+            for (const c of toExhaust) {
+                ; (engine as any).handleExhaust(c)
+                hits += 1
+            }
+            const str = engine.state.player.powers.find(p => p.id === 'STRENGTH')?.stacks ?? 0
+            for (let i = 0; i < hits; i++) engine.enqueue({ kind: 'DealDamage', source, target, amount: 7 + str })
+        },
+    },
     CLEAVE: {
         id: 'CLEAVE',
         name: 'Cleave',
@@ -217,7 +353,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
             if (hand.length > 0) {
                 const idx = Math.floor((engine as any).rng.random() * hand.length)
                 const [c] = hand.splice(idx, 1)
-                engine.state.player.exhaustPile.push(c)
+                    ; (engine as any).handleExhaust(c)
             }
         },
     },
@@ -293,7 +429,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         cost: 0,
         rarity: 'uncommon',
         onPlay: ({ engine }) => {
-            engine.state.player.hp = Math.max(0, engine.state.player.hp - 3)
+            engine.enqueue({ kind: 'LoseHp', target: 'player', amount: 3 })
             engine.enqueue({ kind: 'GainEnergy', amount: 2 })
         },
     },
@@ -308,7 +444,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
             if (hand.length > 0) {
                 const idx = Math.floor((engine as any).rng.random() * hand.length)
                 const [c] = hand.splice(idx, 1)
-                engine.state.player.exhaustPile.push(c)
+                    ; (engine as any).handleExhaust(c)
             }
             engine.enqueue({ kind: 'DrawCards', count: 2 })
         },
@@ -369,7 +505,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         cost: 1,
         rarity: 'uncommon',
         onPlay: ({ engine, source, targets }) => {
-            engine.state.player.hp = Math.max(0, engine.state.player.hp - 2)
+            engine.enqueue({ kind: 'LoseHp', target: 'player', amount: 2 })
             const target = targets[0]
             const str = engine.state.player.powers.find(p => p.id === 'STRENGTH')?.stacks ?? 0
             engine.enqueue({ kind: 'DealDamage', source, target, amount: 15 + str })
@@ -501,7 +637,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         rarity: 'rare',
         exhaust: true,
         onPlay: ({ engine }) => {
-            engine.state.player.hp = Math.max(0, engine.state.player.hp - 6)
+            engine.enqueue({ kind: 'LoseHp', target: 'player', amount: 6 })
             engine.enqueue({ kind: 'GainEnergy', amount: 2 })
             engine.enqueue({ kind: 'DrawCards', count: 3 })
         },

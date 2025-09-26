@@ -60,11 +60,29 @@ export class Engine {
                 this.checkWinLose(evts)
                 break
             }
+            case 'LoseHp': {
+                const target = this.getEntity(action.target)
+                if (!target) break
+                target.hp = Math.max(0, target.hp - action.amount)
+                evts.push({ kind: 'HpLost', target: action.target, amount: action.amount, resultingHp: target.hp })
+                this.checkWinLose(evts)
+                break
+            }
             case 'GainBlock': {
                 const target = this.getEntity(action.target)
                 if (!target) break
                 target.block += action.amount
                 evts.push({ kind: 'BlockGained', target: action.target, amount: action.amount, resultingBlock: target.block })
+                if (target === this.state.player) {
+                    const jug = this.state.player.powers.find(p => p.id === 'JUGGERNAUT')?.stacks ?? 0
+                    if (jug > 0) {
+                        const living = this.state.enemies.filter(e => e.hp > 0)
+                        if (living.length > 0) {
+                            const pick = living[this.rng.int(0, living.length - 1)]
+                            this.enqueue({ kind: 'DealDamage', source: this.state.player.id, target: pick.id, amount: 5 * jug })
+                        }
+                    }
+                }
                 break
             }
             case 'ApplyPower': {
@@ -74,6 +92,24 @@ export class Engine {
                 if (existing) existing.stacks += action.stacks
                 else target.powers.push({ id: action.powerId, stacks: action.stacks } as PowerInstance)
                 evts.push({ kind: 'PowerApplied', target: action.target, powerId: action.powerId, stacks: action.stacks })
+                break
+            }
+            case 'ExhaustCard': {
+                const owner = this.getEntity(action.owner)
+                if (!owner || owner.id !== this.state.player.id) break
+                const p = this.state.player
+                if (action.cardId) {
+                    const idx = p.hand.findIndex(c => c.defId === action.cardId)
+                    if (idx >= 0) {
+                        const [c] = p.hand.splice(idx, 1)
+                        this.handleExhaust(c)
+                        evts.push({ kind: 'CardExhausted', owner: owner.id, cardId: c.defId })
+                    }
+                } else if (p.hand.length > 0) {
+                    const c = p.hand.pop()!
+                    this.handleExhaust(c)
+                    evts.push({ kind: 'CardExhausted', owner: owner.id, cardId: c.defId })
+                }
                 break
             }
             case 'DiscardHand': {
@@ -86,6 +122,8 @@ export class Engine {
                     this.enqueue({ kind: 'DiscardHand' })
                     this.state.turn = 'enemy'
                     evts.push({ kind: 'TurnChanged', turn: 'enemy' })
+                    // end of player turn hooks
+                    this.onEndOfPlayerTurn()
                     // enemies execute intents
                     for (const enemy of this.state.enemies) {
                         if (enemy.hp > 0) {
@@ -105,7 +143,10 @@ export class Engine {
                 } else {
                     this.state.turn = 'player'
                     this.state.player.energy = 3
+                    // Barricade: keep block; otherwise clear enemy blocks
                     for (const enemy of this.state.enemies) enemy.block = 0
+                    // start of player turn hooks
+                    this.onStartOfPlayerTurn()
                     // roll next intents (attack 5-10 or block 5-10)
                     for (const enemy of this.state.enemies) {
                         const amt = this.rng.int(5, 10)
@@ -132,30 +173,39 @@ export class Engine {
     playCard(card: CardInstance, targetIds: EntityId[]): EmittedEvent[] {
         const def = CARD_DEFS[card.defId]
         if (!def) return []
-        if (this.state.player.energy < def.cost) return []
+        const hasCorruption = this.state.player.powers.find(p => p.id === 'CORRUPTION')?.stacks ?? 0
+        const isSkill = def.type === 'skill'
+        const effectiveCost = hasCorruption > 0 && isSkill ? 0 : def.cost
+        if (this.state.player.energy < effectiveCost) return []
         if (def.canPlay) {
             const ok = def.canPlay({ engine: this as unknown as any, source: this.state.player.id, targets: targetIds, card })
             if (!ok) return []
         }
-        this.state.player.energy -= def.cost
+        this.state.player.energy -= effectiveCost
         const events: EmittedEvent[] = [{ kind: 'EnergyChanged', energy: this.state.player.energy }]
-        // remove card from hand: take first match
         const idx = this.state.player.hand.findIndex(c => c === card)
         if (idx >= 0) this.state.player.hand.splice(idx, 1)
-        // by default, played cards go to discard pile; exhaust if flagged
-        if (def.exhaust) this.state.player.exhaustPile.push(card)
+        const shouldExhaust = !!def.exhaust || (hasCorruption > 0 && isSkill)
+        if (shouldExhaust) this.state.player.exhaustPile.push(card)
         else this.state.player.discardPile.push(card)
-        if (def.onPlay) {
-            def.onPlay({ engine: this as unknown as any, source: this.state.player.id, targets: targetIds, card })
-        } else {
-            if (def.baseDamage) {
-                const target = targetIds[0]
-                const amount = this.applyStrengthToOutgoing(def.baseDamage)
-                this.enqueue({ kind: 'DealDamage', source: this.state.player.id, target, amount })
+        const perform = () => {
+            if (def.onPlay) {
+                def.onPlay({ engine: this as unknown as any, source: this.state.player.id, targets: targetIds, card })
+            } else {
+                if (def.baseDamage) {
+                    const target = targetIds[0]
+                    const amount = this.applyStrengthToOutgoing(def.baseDamage)
+                    this.enqueue({ kind: 'DealDamage', source: this.state.player.id, target, amount })
+                }
+                if (def.baseBlock) {
+                    this.enqueue({ kind: 'GainBlock', target: this.state.player.id, amount: def.baseBlock })
+                }
             }
-            if (def.baseBlock) {
-                this.enqueue({ kind: 'GainBlock', target: this.state.player.id, amount: def.baseBlock })
-            }
+        }
+        perform()
+        if ((this as any)._doubleTap && def.type === 'attack') {
+            perform()
+                ; (this as any)._doubleTap = false
         }
         return events
     }
@@ -229,6 +279,42 @@ export class Engine {
     private enemyBlockMultiplier(): number {
         if (this.ascension >= 1) return 1.2
         return 1
+    }
+
+    // Hooks and helpers
+    onStartOfPlayerTurn(): void {
+        const p = this.state.player
+        // Demon Form: gain Strength each turn
+        const demonForm = p.powers.find(pr => pr.id === 'DEMON_FORM')?.stacks ?? 0
+        if (demonForm > 0) this.enqueue({ kind: 'ApplyPower', target: p.id, powerId: 'STRENGTH', stacks: demonForm })
+        // Metallicize: gain Block each end of turn (handled in end-of-turn)
+        // Brutality: lose 1 HP and draw 1 card at start of turn
+        const brutality = p.powers.find(pr => pr.id === 'BRUTALITY')?.stacks ?? 0
+        if (brutality > 0) {
+            this.enqueue({ kind: 'LoseHp', target: p.id, amount: brutality })
+            this.enqueue({ kind: 'DrawCards', count: brutality })
+        }
+        // Berserk: gain Energy at start of player turn if active
+        const berserk = p.powers.find(pr => pr.id === 'BERSERK')?.stacks ?? 0
+        if (berserk > 0) this.enqueue({ kind: 'GainEnergy', amount: berserk })
+    }
+
+    onEndOfPlayerTurn(): void {
+        const p = this.state.player
+        // Metallicize: gain block equal to stacks
+        const metallicize = p.powers.find(pr => pr.id === 'METALLICIZE')?.stacks ?? 0
+        if (metallicize > 0) this.enqueue({ kind: 'GainBlock', target: p.id, amount: metallicize })
+    }
+
+    handleExhaust(card: CardInstance): void {
+        const p = this.state.player
+        p.exhaustPile.push(card)
+        // Feel No Pain: gain block on exhaust
+        const fnp = p.powers.find(pr => pr.id === 'FEEL_NO_PAIN')?.stacks ?? 0
+        if (fnp > 0) this.enqueue({ kind: 'GainBlock', target: p.id, amount: fnp * 3 })
+        // Dark Embrace: draw on exhaust
+        const de = p.powers.find(pr => pr.id === 'DARK_EMBRACE')?.stacks ?? 0
+        if (de > 0) this.enqueue({ kind: 'DrawCards', count: de })
     }
 }
 
