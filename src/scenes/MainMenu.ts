@@ -52,6 +52,14 @@ export class MainMenuScene extends Phaser.Scene {
                 saveRun(run)
                 this.scene.start('Map', { run })
             })
+
+        this.add.text(16, 300, 'Deck Builder', { ...style, backgroundColor: '#333', padding: { x: 8, y: 6 } })
+            .setInteractive({ useHandCursor: true })
+            .on('pointerdown', () => {
+                const run = createNewRun()
+                saveRun(run)
+                this.scene.start('DeckBuilder', { run })
+            })
     }
 }
 

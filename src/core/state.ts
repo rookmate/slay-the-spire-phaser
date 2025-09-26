@@ -2,7 +2,7 @@ import type { EntityId } from './actions'
 
 export type CardType = 'attack' | 'skill' | 'power'
 
-export type PowerId = 'VULNERABLE'
+export type PowerId = 'VULNERABLE' | 'WEAK'
 
 export interface PowerInstance {
     id: PowerId

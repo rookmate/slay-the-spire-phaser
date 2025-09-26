@@ -8,6 +8,7 @@ import { ShopScene } from './scenes/Shop'
 import { RewardsScene } from './scenes/Rewards'
 import { MainMenuScene } from './scenes/MainMenu'
 import { RunSummaryScene } from './scenes/RunSummary'
+import { DeckBuilderScene } from './scenes/DeckBuilder'
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -15,7 +16,7 @@ const config: Phaser.Types.Core.GameConfig = {
   height: 450,
   parent: 'app',
   backgroundColor: '#1a1a1a',
-  scene: [BootScene, MainMenuScene, MapScene, CombatScene, EventScene, CampfireScene, ShopScene, RewardsScene, RunSummaryScene],
+  scene: [BootScene, MainMenuScene, MapScene, CombatScene, EventScene, CampfireScene, ShopScene, RewardsScene, RunSummaryScene, DeckBuilderScene],
 }
 
 // eslint-disable-next-line no-new

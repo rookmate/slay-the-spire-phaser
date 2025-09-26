@@ -43,6 +43,12 @@ export class Engine {
                 const target = this.getEntity(action.target)
                 if (!target) break
                 let damage = action.amount
+                // apply WEAK on source (reduces outgoing damage)
+                const src = this.getEntity(action.source)
+                if (src) {
+                    const weakStacks = src.powers.find(p => p.id === 'WEAK')?.stacks ?? 0
+                    if (weakStacks > 0) damage = Math.round(damage * 0.75)
+                }
                 // apply Vulnerable if target is player? Vulnerable increases damage taken by 50%
                 damage = this.modifyIncomingDamage(target, damage)
                 let remaining = damage
@@ -192,6 +198,13 @@ export class Engine {
         if (vulnerable > 0) result = Math.round(result * 1.5)
         if (target === this.state.player) result = Math.round(result * this.enemyDamageMultiplier())
         return result
+    }
+
+    modifyOutgoingDamageFromPlayer(base: number): number {
+        // WEAK reduces outgoing damage by 25%
+        const weak = this.state.player.powers.find(p => p.id === 'WEAK')?.stacks ?? 0
+        if (weak > 0) return Math.round(base * 0.75)
+        return base
     }
 
     private enemyDamageMultiplier(): number {

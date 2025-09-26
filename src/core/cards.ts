@@ -86,6 +86,41 @@ export const CARD_DEFS: Record<string, CardDef> = {
             engine.state.player.discardPile.push({ defId: 'ANGER', upgraded: false })
         },
     },
+    CLOTHESLINE: {
+        id: 'CLOTHESLINE',
+        name: 'Clothesline',
+        type: 'attack',
+        cost: 2,
+        baseDamage: 12,
+        onPlay: ({ engine, source, targets }) => {
+            const target = targets[0]
+            engine.enqueue({ kind: 'DealDamage', source, target, amount: 12 })
+            engine.enqueue({ kind: 'ApplyPower', target, powerId: 'WEAK', stacks: 2 })
+        },
+    },
+    UPPERCUT: {
+        id: 'UPPERCUT',
+        name: 'Uppercut',
+        type: 'attack',
+        cost: 2,
+        baseDamage: 13,
+        onPlay: ({ engine, source, targets }) => {
+            const target = targets[0]
+            engine.enqueue({ kind: 'DealDamage', source, target, amount: 13 })
+            engine.enqueue({ kind: 'ApplyPower', target, powerId: 'VULNERABLE', stacks: 1 })
+            engine.enqueue({ kind: 'ApplyPower', target, powerId: 'WEAK', stacks: 1 })
+        },
+    },
+    SWORD_BOOMERANG: {
+        id: 'SWORD_BOOMERANG',
+        name: 'Sword Boomerang',
+        type: 'attack',
+        cost: 1,
+        onPlay: ({ engine, source, targets }) => {
+            const target = targets[0]
+            for (let i = 0; i < 3; i++) engine.enqueue({ kind: 'DealDamage', source, target, amount: 3 })
+        },
+    },
 }
 
 
