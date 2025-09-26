@@ -7,6 +7,7 @@ export class MapScene extends Phaser.Scene {
     run!: RunState
     gmap!: GeneratedMap
     unknownWeights = defaultUnknownWeights()
+    private currentNodeId?: string
 
     constructor() {
         super('Map')
@@ -18,12 +19,21 @@ export class MapScene extends Phaser.Scene {
         this.add.text(16, 16, `Floor ${this.run.floor}  HP ${this.run.player.hp}/${this.run.player.maxHp}  Gold ${this.run.gold}`, style)
 
         // Generate map for this act
-        this.gmap = generateMap(this.run.seed, 1)
+        this.gmap = generateMap(this.run.seed, this.run.mapProgress?.act ?? 1)
+        this.currentNodeId = this.run.mapProgress?.currentNodeId
         this.drawGraph()
     }
 
     private enterNode(node: MapNode): void {
         const rng = new RNG(`${this.run.seed}-unknown-${this.run.floor}`)
+        // Update current node and persist
+        this.currentNodeId = node.id
+        this.run.mapProgress = { act: this.run.mapProgress?.act ?? 1, currentNodeId: this.currentNodeId }
+        // Repaint to lock other nodes
+        this.children.removeAll()
+        const style = { fontFamily: 'monospace', fontSize: '18px', color: '#ffffff' }
+        this.add.text(16, 16, `Floor ${this.run.floor}  HP ${this.run.player.hp}/${this.run.player.maxHp}  Gold ${this.run.gold}`, style)
+        this.drawGraph()
         if (node.kind === 'unknown') {
             const outcome = resolveUnknown(rng, this.unknownWeights)
             this.unknownWeights = updateUnknownWeights(this.unknownWeights, outcome)
@@ -67,11 +77,22 @@ export class MapScene extends Phaser.Scene {
         for (const n of this.gmap.nodes) {
             const x = left + n.col * cellW
             const y = top + (this.gmap.rows - 1 - n.row) * cellH
-            this.add.text(x - 20, y - 10, this.iconFor(n.kind), { ...style, backgroundColor: '#222', padding: { x: 6, y: 2 } })
-                .setInteractive({ useHandCursor: true })
-                .on('pointerdown', () => this.enterNode(n))
+            const isClickable = this.isSelectable(n)
+            const t = this.add.text(x - 20, y - 10, this.iconFor(n.kind), { ...style, backgroundColor: isClickable ? '#222' : '#111', padding: { x: 6, y: 2 }, color: isClickable ? '#ffffff' : '#555555' })
+            if (isClickable) {
+                t.setInteractive({ useHandCursor: true }).on('pointerdown', () => this.enterNode(n))
+            }
             this.add.text(x + 14, y - 10, n.kind, { fontFamily: 'monospace', fontSize: '12px', color: '#aaa' })
         }
+    }
+
+    private isSelectable(n: MapNode): boolean {
+        // If no current node yet, only bottom row starts are valid
+        if (!this.currentNodeId) return n.row === this.gmap.rows - 1 && n.kind === 'start'
+        // Otherwise must be a forward edge of current node
+        const cur = this.gmap.byId[this.currentNodeId]
+        if (!cur) return false
+        return cur.edgesTo.includes(n.id)
     }
 
     private iconFor(kind: string): string {

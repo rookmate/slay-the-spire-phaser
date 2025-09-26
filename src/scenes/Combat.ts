@@ -45,7 +45,7 @@ export class CombatScene extends Phaser.Scene {
                 this.scene.start('Rewards', { run: this.run })
             } else if (this.engine.state.defeat) {
                 saveRun(this.run)
-                this.scene.start('RunSummary', { run: this.run, result: 'defeat' })
+                this.scene.start('Map', { run: this.run })
             }
         })
     }

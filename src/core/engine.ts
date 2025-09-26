@@ -152,7 +152,8 @@ export class Engine {
                         const amt = this.rng.int(5, 10)
                         enemy.intent = this.rng.random() < 0.7 ? { kind: 'attack', amount: amt } : { kind: 'block', amount: amt }
                     }
-                    this.enqueue({ kind: 'DrawCards', count: 5 })
+                    const toDraw = Math.max(0, 5 - this.state.player.hand.length)
+                    if (toDraw > 0) this.enqueue({ kind: 'DrawCards', count: toDraw })
                     evts.push({ kind: 'TurnChanged', turn: 'player' })
                 }
                 break
