@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
 import type { RunState } from '../core/run'
+import { saveRun } from '../core/run'
 
 export class ShopScene extends Phaser.Scene {
     run!: RunState
@@ -11,7 +12,11 @@ export class ShopScene extends Phaser.Scene {
         this.add.text(16, 16, `Shop (gold ${this.run.gold})`, style)
         this.add.text(16, 50, 'Leave', { ...style, backgroundColor: '#333', padding: { x: 6, y: 4 } })
             .setInteractive({ useHandCursor: true })
-            .on('pointerdown', () => this.scene.start('Map', { run: this.run }))
+            .on('pointerdown', () => {
+                this.run.floor += 1
+                saveRun(this.run)
+                this.scene.start('Map', { run: this.run })
+            })
     }
 }
 

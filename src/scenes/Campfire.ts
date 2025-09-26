@@ -15,6 +15,7 @@ export class CampfireScene extends Phaser.Scene {
             .on('pointerdown', () => {
                 const heal = Math.round(this.run.player.maxHp * 0.2)
                 this.run.player.hp = Math.min(this.run.player.maxHp, this.run.player.hp + heal)
+                this.run.floor += 1
                 saveRun(this.run)
                 this.scene.start('Map', { run: this.run })
             })

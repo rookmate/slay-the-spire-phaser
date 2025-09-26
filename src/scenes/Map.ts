@@ -10,7 +10,6 @@ export class MapScene extends Phaser.Scene {
     private currentNodeId?: string
     private mapLayer!: Phaser.GameObjects.Container
     private contentHeight = 0
-    private wheelBound = false
     private isDragging = false
     private dragStartY = 0
     private layerStartY = 0
@@ -29,31 +28,32 @@ export class MapScene extends Phaser.Scene {
         this.currentNodeId = this.run.mapProgress?.currentNodeId
         this.drawGraph()
 
-        // Scroll with mouse wheel
-        if (!this.wheelBound) {
-            this.input.on('wheel', (_p: any, _go: any, _dx: number, dy: number) => {
-                if (!this.mapLayer) return
-                const maxY = 60
-                const visible = this.scale.height - 120
-                const minY = Math.min(maxY, maxY - Math.max(0, this.contentHeight - visible))
-                this.mapLayer.y = Phaser.Math.Clamp(this.mapLayer.y - dy, minY, maxY)
-            })
-            this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
-                this.isDragging = true
-                this.dragStartY = p.y
-                this.layerStartY = this.mapLayer?.y ?? 0
-            })
-            this.input.on('pointerup', () => { this.isDragging = false })
-            this.input.on('pointermove', (p: Phaser.Input.Pointer) => {
-                if (!this.isDragging || !this.mapLayer) return
-                const delta = p.y - this.dragStartY
-                const maxY = 60
-                const visible = this.scale.height - 120
-                const minY = Math.min(maxY, maxY - Math.max(0, this.contentHeight - visible))
-                this.mapLayer.y = Phaser.Math.Clamp(this.layerStartY + delta, minY, maxY)
-            })
-            this.wheelBound = true
-        }
+        // Scroll with mouse wheel and drag (bind fresh every time we enter Map)
+        this.input.removeAllListeners('wheel')
+        this.input.removeAllListeners('pointerdown')
+        this.input.removeAllListeners('pointerup')
+        this.input.removeAllListeners('pointermove')
+        this.input.on('wheel', (_p: any, _go: any, _dx: number, dy: number) => {
+            if (!this.mapLayer) return
+            const maxY = 60
+            const visible = this.scale.height - 120
+            const minY = Math.min(maxY, maxY - Math.max(0, this.contentHeight - visible))
+            this.mapLayer.y = Phaser.Math.Clamp(this.mapLayer.y - dy, minY, maxY)
+        })
+        this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
+            this.isDragging = true
+            this.dragStartY = p.y
+            this.layerStartY = this.mapLayer?.y ?? 0
+        })
+        this.input.on('pointerup', () => { this.isDragging = false })
+        this.input.on('pointermove', (p: Phaser.Input.Pointer) => {
+            if (!this.isDragging || !this.mapLayer) return
+            const delta = p.y - this.dragStartY
+            const maxY = 60
+            const visible = this.scale.height - 120
+            const minY = Math.min(maxY, maxY - Math.max(0, this.contentHeight - visible))
+            this.mapLayer.y = Phaser.Math.Clamp(this.layerStartY + delta, minY, maxY)
+        })
     }
 
     private enterNode(node: MapNode): void {
