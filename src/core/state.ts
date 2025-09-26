@@ -2,7 +2,7 @@ import type { EntityId } from './actions'
 
 export type CardType = 'attack' | 'skill' | 'power'
 
-export type PowerId = 'VULNERABLE' | 'WEAK'
+export type PowerId = 'VULNERABLE' | 'WEAK' | 'STRENGTH'
 
 export interface PowerInstance {
     id: PowerId
@@ -16,6 +16,17 @@ export interface CardDef {
     cost: number
     baseDamage?: number
     baseBlock?: number
+    // Optional rarity metadata used by UI/builders; not used by engine rules
+    rarity?: 'basic' | 'common' | 'uncommon' | 'rare'
+    // If true, the card is moved to exhaust pile when played
+    exhaust?: boolean
+    // Optional play restriction. If returns false, the card is not played and energy is not spent
+    canPlay?: (ctx: {
+        engine: { state: CombatState }
+        source: EntityId
+        targets: EntityId[]
+        card: CardInstance
+    }) => boolean
     onPlay?: (ctx: {
         engine: { enqueue: (a: any) => void; state: CombatState }
         source: EntityId

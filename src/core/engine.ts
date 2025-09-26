@@ -133,19 +133,25 @@ export class Engine {
         const def = CARD_DEFS[card.defId]
         if (!def) return []
         if (this.state.player.energy < def.cost) return []
+        if (def.canPlay) {
+            const ok = def.canPlay({ engine: this as unknown as any, source: this.state.player.id, targets: targetIds, card })
+            if (!ok) return []
+        }
         this.state.player.energy -= def.cost
         const events: EmittedEvent[] = [{ kind: 'EnergyChanged', energy: this.state.player.energy }]
         // remove card from hand: take first match
         const idx = this.state.player.hand.findIndex(c => c === card)
         if (idx >= 0) this.state.player.hand.splice(idx, 1)
-        // by default, played cards go to discard pile (no exhaust mechanic yet)
-        this.state.player.discardPile.push(card)
+        // by default, played cards go to discard pile; exhaust if flagged
+        if (def.exhaust) this.state.player.exhaustPile.push(card)
+        else this.state.player.discardPile.push(card)
         if (def.onPlay) {
             def.onPlay({ engine: this as unknown as any, source: this.state.player.id, targets: targetIds, card })
         } else {
             if (def.baseDamage) {
                 const target = targetIds[0]
-                this.enqueue({ kind: 'DealDamage', source: this.state.player.id, target, amount: def.baseDamage })
+                const amount = this.applyStrengthToOutgoing(def.baseDamage)
+                this.enqueue({ kind: 'DealDamage', source: this.state.player.id, target, amount })
             }
             if (def.baseBlock) {
                 this.enqueue({ kind: 'GainBlock', target: this.state.player.id, amount: def.baseBlock })
@@ -201,10 +207,18 @@ export class Engine {
     }
 
     modifyOutgoingDamageFromPlayer(base: number): number {
+        let amount = base
+        // Strength increases outgoing damage by Strength stacks
+        const strength = this.state.player.powers.find(p => p.id === 'STRENGTH')?.stacks ?? 0
+        amount += strength
         // WEAK reduces outgoing damage by 25%
         const weak = this.state.player.powers.find(p => p.id === 'WEAK')?.stacks ?? 0
-        if (weak > 0) return Math.round(base * 0.75)
-        return base
+        if (weak > 0) amount = Math.round(amount * 0.75)
+        return amount
+    }
+
+    private applyStrengthToOutgoing(base: number): number {
+        return this.modifyOutgoingDamageFromPlayer(base)
     }
 
     private enemyDamageMultiplier(): number {

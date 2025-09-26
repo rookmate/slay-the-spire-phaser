@@ -11,7 +11,17 @@ export class RewardsScene extends Phaser.Scene {
         this.run = data.run
         const style = { fontFamily: 'monospace', fontSize: '18px', color: '#ffffff' }
         this.add.text(16, 16, 'Victory! Choose a card:', style)
-        const choices = ['CLEAVE', 'SHRUG_IT_OFF', 'ANGER']
+        const pool = Object.entries(CARD_DEFS)
+            .filter(([_, def]) => def.rarity && def.rarity !== 'basic')
+            .map(([id]) => id)
+        const rng = new Phaser.Math.RandomDataGenerator([this.run.seed + ':' + this.run.floor])
+        const choices = [] as string[]
+        const copy = [...pool]
+        for (let i = 0; i < 3 && copy.length > 0; i++) {
+            const idx = Math.floor(rng.frac() * copy.length)
+            const [id] = copy.splice(idx, 1)
+            choices.push(id)
+        }
         choices.forEach((id, i) => {
             const def = CARD_DEFS[id]
             this.add.text(16, 60 + i * 40, `Add ${def.name}`, { ...style, backgroundColor: '#333', padding: { x: 6, y: 4 } })
