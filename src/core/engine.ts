@@ -143,6 +143,11 @@ export class Engine {
                 } else {
                     this.state.turn = 'player'
                     this.state.player.energy = 3
+                    // At the start of the player's turn, Block expires unless Barricade is active
+                    {
+                        const hasBarricade = this.state.player.powers.find(p => p.id === 'BARRICADE')?.stacks ?? 0
+                        if (hasBarricade === 0) this.state.player.block = 0
+                    }
                     // Barricade: keep block; otherwise clear enemy blocks
                     for (const enemy of this.state.enemies) enemy.block = 0
                     // start of player turn hooks
@@ -152,8 +157,8 @@ export class Engine {
                         const amt = this.rng.int(5, 10)
                         enemy.intent = this.rng.random() < 0.7 ? { kind: 'attack', amount: amt } : { kind: 'block', amount: amt }
                     }
-                    const toDraw = Math.max(0, 5 - this.state.player.hand.length)
-                    if (toDraw > 0) this.enqueue({ kind: 'DrawCards', count: toDraw })
+                    // Draw a fresh 5-card hand each player turn (hand was discarded at end of previous turn)
+                    this.enqueue({ kind: 'DrawCards', count: 5 })
                     evts.push({ kind: 'TurnChanged', turn: 'player' })
                 }
                 break

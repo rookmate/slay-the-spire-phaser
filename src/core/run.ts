@@ -20,7 +20,7 @@ export function createNewRun(seed?: string): RunState {
     // Starter deck similar to Ironclad-ish
     const deck: CardInstance[] = []
     for (let i = 0; i < 5; i++) deck.push({ defId: 'STRIKE', upgraded: false })
-    for (let i = 0; i < 5; i++) deck.push({ defId: 'DEFEND', upgraded: false })
+    for (let i = 0; i < 4; i++) deck.push({ defId: 'DEFEND', upgraded: false })
     deck.push({ defId: 'BASH', upgraded: false })
     rng.shuffleInPlace(deck)
     return {
