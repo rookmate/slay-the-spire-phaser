@@ -8,6 +8,12 @@ export class MapScene extends Phaser.Scene {
     gmap!: GeneratedMap
     unknownWeights = defaultUnknownWeights()
     private currentNodeId?: string
+    private mapLayer!: Phaser.GameObjects.Container
+    private contentHeight = 0
+    private wheelBound = false
+    private isDragging = false
+    private dragStartY = 0
+    private layerStartY = 0
 
     constructor() {
         super('Map')
@@ -22,6 +28,32 @@ export class MapScene extends Phaser.Scene {
         this.gmap = generateMap(this.run.seed, this.run.mapProgress?.act ?? 1)
         this.currentNodeId = this.run.mapProgress?.currentNodeId
         this.drawGraph()
+
+        // Scroll with mouse wheel
+        if (!this.wheelBound) {
+            this.input.on('wheel', (_p: any, _go: any, _dx: number, dy: number) => {
+                if (!this.mapLayer) return
+                const maxY = 60
+                const visible = this.scale.height - 120
+                const minY = Math.min(maxY, maxY - Math.max(0, this.contentHeight - visible))
+                this.mapLayer.y = Phaser.Math.Clamp(this.mapLayer.y - dy, minY, maxY)
+            })
+            this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
+                this.isDragging = true
+                this.dragStartY = p.y
+                this.layerStartY = this.mapLayer?.y ?? 0
+            })
+            this.input.on('pointerup', () => { this.isDragging = false })
+            this.input.on('pointermove', (p: Phaser.Input.Pointer) => {
+                if (!this.isDragging || !this.mapLayer) return
+                const delta = p.y - this.dragStartY
+                const maxY = 60
+                const visible = this.scale.height - 120
+                const minY = Math.min(maxY, maxY - Math.max(0, this.contentHeight - visible))
+                this.mapLayer.y = Phaser.Math.Clamp(this.layerStartY + delta, minY, maxY)
+            })
+            this.wheelBound = true
+        }
     }
 
     private enterNode(node: MapNode): void {
@@ -57,7 +89,10 @@ export class MapScene extends Phaser.Scene {
         const cellW = 90
         const cellH = 40
         const left = 40
-        const top = 60
+        const top = 0
+
+        if (this.mapLayer) this.mapLayer.destroy(true)
+        this.mapLayer = this.add.container(0, 60)
 
         // Draw edges
         const g = this.add.graphics()
@@ -72,6 +107,7 @@ export class MapScene extends Phaser.Scene {
                 g.lineBetween(x1, y1, x2, y2)
             }
         }
+        this.mapLayer.add(g)
 
         // Draw nodes
         for (const n of this.gmap.nodes) {
@@ -82,8 +118,12 @@ export class MapScene extends Phaser.Scene {
             if (isClickable) {
                 t.setInteractive({ useHandCursor: true }).on('pointerdown', () => this.enterNode(n))
             }
-            this.add.text(x + 14, y - 10, n.kind, { fontFamily: 'monospace', fontSize: '12px', color: '#aaa' })
+            const label = this.add.text(x + 14, y - 10, n.kind, { fontFamily: 'monospace', fontSize: '12px', color: '#aaa' })
+            this.mapLayer.add(t)
+            this.mapLayer.add(label)
         }
+
+        this.contentHeight = this.gmap.rows * cellH + 40
     }
 
     private isSelectable(n: MapNode): boolean {
