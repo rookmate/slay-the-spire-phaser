@@ -1,6 +1,6 @@
 ~~1. HP should be below each character (player and each enemy)~~
 ~~2. cards need to be centeredin the screen~~
-3. screen should scale to take the entire browser with min size being what currently exists
+~~3. screen should scale to take the entire browser with min size being what currently exists~~
 ~~4. enemy intent should show on top of sprite. so it should be intent > sprite > health~~
 ~~5. end of turn should be on the bottom right corner~~
 ~~6. carts in hand count is irrelevant, can remove~~

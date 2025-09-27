@@ -16,6 +16,18 @@ const config: Phaser.Types.Core.GameConfig = {
   height: 450,
   parent: 'app',
   backgroundColor: '#1a1a1a',
+  scale: {
+    mode: Phaser.Scale.FIT,
+    autoCenter: Phaser.Scale.CENTER_BOTH,
+    min: {
+      width: 800,
+      height: 450
+    },
+    max: {
+      width: 1920,
+      height: 1080
+    }
+  },
   scene: [BootScene, MainMenuScene, MapScene, CombatScene, EventScene, CampfireScene, ShopScene, RewardsScene, RunSummaryScene, DeckBuilderScene],
 }
 
