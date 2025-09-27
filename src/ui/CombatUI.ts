@@ -1,7 +1,6 @@
 import Phaser from 'phaser'
 import type { Engine } from '../core/engine'
 import type { EmittedEvent } from '../core/actions'
-import { CARD_DEFS } from '../core/cards'
 import type { CardInstance, EnemyState } from '../core/state'
 import { CardView } from './CardView'
 
@@ -11,8 +10,22 @@ export class CombatUI {
     private handButtons: Phaser.GameObjects.Text[] = []
     private handCards: CardView[] = []
     private enemyTexts: Phaser.GameObjects.Text[] = []
+    private playerHpText?: Phaser.GameObjects.Text
     private playerSprite?: Phaser.GameObjects.Image
     private enemySprites: Phaser.GameObjects.Image[] = []
+    private enemyHpTexts: Phaser.GameObjects.Text[] = []
+    private playerNameText?: Phaser.GameObjects.Text
+    private enemyNameTexts: Phaser.GameObjects.Text[] = []
+    private discardIcon?: Phaser.GameObjects.Text
+    private discardOverlay?: Phaser.GameObjects.Container
+    private discardList?: Phaser.GameObjects.Container
+    private discardContentHeight = 0
+    private drawIcon?: Phaser.GameObjects.Text
+    private energyText?: Phaser.GameObjects.Text
+    private readonly maxEnergyPerTurn = 3
+    private deckOverlay?: Phaser.GameObjects.Container
+    private deckList?: Phaser.GameObjects.Container
+    private deckContentHeight = 0
 
     private onPlay?: (card: CardInstance, targets: string[]) => void
     private onEnd?: () => void
@@ -26,73 +39,190 @@ export class CombatUI {
     private build(): void {
         const p = this.engine.state.player
         const style = { fontFamily: 'monospace', fontSize: '16px', color: '#ffffff' }
-        this.scene.add.text(16, 16, 'Player', style)
+        const hpStyle = { ...style, fontSize: '14px' }
         // Player sprite
         this.playerSprite = this.scene.add.image(120, 180, 'player:ironclad').setScale(0.35)
-        const playerStats = this.scene.add.text(16, 40, this.playerStatsText(), style)
+        // Draw pile (bottom-left) and Energy just above-right of it
+        {
+            const { height } = this.scene.scale
+            this.drawIcon = this.scene.add.text(16, height - 16, '🃏', {
+                ...style,
+                fontSize: '24px',
+                padding: { x: 6, y: 2 },
+                backgroundColor: '#333333',
+            }).setOrigin(0, 1)
+            this.drawIcon.setDepth(1000)
+            this.drawIcon.setInteractive({ useHandCursor: true }).on('pointerdown', () => this.openDeckOverlay())
+            this.energyText = this.scene.add.text(16 + 56, height - 16 - 40, this.playerStatsText(), {
+                ...style,
+                backgroundColor: '#222',
+                padding: { x: 6, y: 4 },
+            }).setOrigin(0, 1)
+            this.energyText.setDepth(1000)
+        }
+        // Player HP under sprite
+        this.playerHpText = this.scene.add
+            .text(this.playerSprite.x, this.playerSprite.y + 80, this.playerHpLabel(), hpStyle)
+            .setOrigin(0.5, 0)
+        // Player name on hover
+        this.playerNameText = this.scene.add
+            .text(this.playerSprite.x, this.playerSprite.y - 70, 'Ironclad', style)
+            .setOrigin(0.5, 1)
+            .setAlpha(0)
+        this.playerSprite.setInteractive()
+        this.playerSprite.on('pointerover', () => this.playerNameText?.setAlpha(1))
+        this.playerSprite.on('pointerout', () => this.playerNameText?.setAlpha(0))
 
         // Enemy sprites and labels
         this.enemySprites.forEach(s => s.destroy())
         this.enemySprites = []
         this.enemyTexts = []
+        this.enemyHpTexts.forEach(t => t.destroy())
+        this.enemyHpTexts = []
+        this.enemyNameTexts.forEach(t => t.destroy())
+        this.enemyNameTexts = []
         this.engine.state.enemies.forEach((e, i) => {
             const texKey = `enemy:${e.specId ?? e.name.toUpperCase().replace(/\s+/g, '_')}`
             const sprite = this.scene.add.image(600, 160 + i * 80, texKey).setScale(0.5)
+            sprite.setInteractive()
+            sprite.setDepth(5)
             this.enemySprites.push(sprite)
-            const label = this.scene.add.text(500, 120 + i * 80, this.enemyText(e), style)
-            this.enemyTexts.push(label)
+            const intentText = this.scene.add
+                .text(sprite.x, sprite.y - 80, this.enemyText(e), style)
+                .setOrigin(0.5, 1)
+                .setDepth(10)
+            this.enemyTexts.push(intentText)
+            const hp = this.scene.add
+                .text(sprite.x, sprite.y + 60, this.enemyHpLabel(e), hpStyle)
+                .setOrigin(0.5, 0)
+                .setDepth(1)
+            this.enemyHpTexts.push(hp)
+            const nameText = this.scene.add
+                .text(sprite.x, sprite.y - 60, e.name, style)
+                .setOrigin(0.5, 1)
+                .setAlpha(0)
+                .setDepth(9)
+            this.enemyNameTexts.push(nameText)
+            sprite.on('pointerover', () => nameText.setAlpha(1))
+            sprite.on('pointerout', () => nameText.setAlpha(0))
         })
 
-        // Hand buttons
+        // Hand: fan layout bottom-centered with hover raise
+        const layoutHand = () => {
+            const n = this.handCards.length
+            const screenW = this.scene.scale.width
+            const screenH = this.scene.scale.height
+            if (n === 0) return
+            // Arc width shrinks with larger hands; radius grows slightly so more cards fit
+            const arcDeg = Phaser.Math.Clamp(70 - 4 * (n - 1), 18, 70)
+            const radius = Phaser.Math.Clamp(200 + 10 * (n - 1), 200, 360)
+            const cx = screenW / 2
+            const cy = screenH - 16 + radius // center below bottom so arc touches bottom
+            const step = n > 1 ? Phaser.Math.DegToRad(arcDeg) / (n - 1) : 0
+            const start = -Phaser.Math.DegToRad(arcDeg) / 2
+            for (let i = 0; i < n; i++) {
+                const theta = start + i * step
+                const x = cx + radius * Math.sin(theta)
+                const y = cy - radius * Math.cos(theta)
+                // Rotate slightly following the arc (tangent-like)
+                const rot = theta * 0.85
+                const depth = 200 + i
+                const view = this.handCards[i]
+                view.setPosition(x, y)
+                view.setRotation(rot)
+                view.setDepth(depth)
+                view.setData('baseX', x)
+                view.setData('baseY', y)
+                view.setData('baseRot', rot)
+                view.setData('baseDepth', depth)
+            }
+        }
+
         const rebuildHand = () => {
             this.handButtons.forEach(b => b.destroy())
             this.handButtons = []
             this.handCards.forEach(c => c.destroy())
             this.handCards = []
-            p.hand.forEach((card, i) => {
-                const cardView = new CardView(this.scene, card, { x: 16 + i * 100, y: 290, scale: 1, interactive: true })
+            p.hand.forEach((card) => {
+                const cardView = new CardView(this.scene, card, { x: 0, y: 0, scale: 1, interactive: true })
                 this.scene.add.existing(cardView)
+                // Hover behavior: straighten, raise and bring to front
+                cardView.on('pointerover', () => {
+                    cardView.setDepth(5000)
+                    cardView.setRotation(0)
+                    cardView.setY(this.scene.scale.height - 130) // align with bottom
+                })
+                cardView.on('pointerout', () => {
+                    const bx = cardView.getData('baseX')
+                    const by = cardView.getData('baseY')
+                    const br = cardView.getData('baseRot')
+                    const bd = cardView.getData('baseDepth')
+                    if (bx != null && by != null) cardView.setPosition(bx, by)
+                    if (br != null) cardView.setRotation(br)
+                    if (bd != null) cardView.setDepth(bd)
+                })
                 cardView.on('pointerdown', () => {
                     const target = this.engine.state.enemies.find(e => e.hp > 0)?.id
                     if (!target) return
                     this.onPlay?.(card, [target])
-                    playerStats.setText(this.playerStatsText())
+                    this.refreshEnergy()
                     this.refreshEnemies()
                     rebuildHand()
                 })
                 this.handCards.push(cardView)
             })
+            layoutHand()
         }
 
         rebuildHand()
 
-        const endTurn = this.scene.add.text(700, 16, 'End Turn', {
+        const { width, height } = this.scene.scale
+        // Discard pile icon (bottom-right)
+        this.discardIcon = this.scene.add.text(width - 16, height - 16, '🂠', {
+            ...style,
+            fontSize: '24px',
+            padding: { x: 6, y: 2 },
+            backgroundColor: '#333333',
+        })
+            .setOrigin(1, 1)
+            .setInteractive({ useHandCursor: true })
+            .on('pointerdown', () => this.openDiscardOverlay())
+
+        // End Turn slightly above-left of discard icon
+        const endTurn = this.scene.add.text(width - 16 - 50, height - 16 - 30, 'End\nTurn', {
             ...style,
             backgroundColor: '#550000',
             padding: { x: 6, y: 4 },
         })
+            .setOrigin(1, 1)
             .setInteractive({ useHandCursor: true })
             .on('pointerdown', () => {
                 this.onEnd?.()
-                playerStats.setText(this.playerStatsText())
+                this.refreshEnergy()
                 this.refreshEnemies()
                 rebuildHand()
             })
         endTurn.setDepth(1000)
+        this.discardIcon.setDepth(1000)
+        this.scene.scale.on('resize', (gameSize: any) => {
+            this.discardIcon?.setPosition(gameSize.width - 16, gameSize.height - 16)
+            endTurn.setPosition(gameSize.width - 16 - 50, gameSize.height - 16 - 30)
+            this.drawIcon?.setPosition(16, gameSize.height - 16)
+            this.energyText?.setPosition(16 + 56, gameSize.height - 16 - 40)
+            layoutHand()
+        })
     }
 
     private playerStatsText(): string {
         const p = this.engine.state.player
-        return `HP ${p.hp}/${p.maxHp}  Block ${p.block}  Energy ${p.energy}  Hand ${p.hand.length}`
+        return `⚡ ${p.energy}/${this.maxEnergyPerTurn}`
     }
 
     private enemyText(e: EnemyState): string {
-        let intent = ''
-        if (e.intent?.kind === 'attack') intent = `  Intent: ${e.intent.amount} ⚔`
-        else if (e.intent?.kind === 'block') intent = `  Intent: ${e.intent.amount} 🛡`
-        else if (e.intent?.kind === 'debuff') intent = `  Intent: ${e.intent.debuff} ↓`
-        else intent = `  Intent: Buff ✦`
-        return `${e.name}  HP ${e.hp}/${e.maxHp}  Block ${e.block}${intent}`
+        if (e.intent?.kind === 'attack') return `${e.intent.amount} ⚔`
+        if (e.intent?.kind === 'block') return `${e.intent.amount} 🛡`
+        if (e.intent?.kind === 'debuff') return `${e.intent.debuff} ↓`
+        return `Buff ✦`
     }
 
     private refreshEnemies(): void {
@@ -103,6 +233,7 @@ export class CombatUI {
             if (!spr) return
             spr.setAlpha(e.hp > 0 ? 1 : 0.3)
         })
+        this.refreshHp()
     }
 
     apply(events: EmittedEvent[]): void {
@@ -129,6 +260,9 @@ export class CombatUI {
             }
         }
         this.refreshEnemies()
+        this.refreshDiscardOverlay()
+        this.refreshDeckOverlay()
+        this.refreshEnergy()
     }
 
     onPlayCard(fn: (card: CardInstance, targets: string[]) => void): void {
@@ -137,6 +271,179 @@ export class CombatUI {
 
     onEndTurn(fn: () => void): void {
         this.onEnd = fn
+    }
+
+    private playerHpLabel(): string {
+        const p = this.engine.state.player
+        return `🛡 ${p.block}  ♥ ${p.hp}/${p.maxHp}`
+    }
+
+    private enemyHpLabel(e: EnemyState): string {
+        return `🛡 ${e.block}  ♥ ${e.hp}/${e.maxHp}`
+    }
+
+    private refreshHp(): void {
+        if (this.playerHpText) this.playerHpText.setText(this.playerHpLabel())
+        this.engine.state.enemies.forEach((e, i) => {
+            const t = this.enemyHpTexts[i]
+            if (t) t.setText(this.enemyHpLabel(e))
+        })
+    }
+
+    private refreshEnergy(): void {
+        if (this.energyText) this.energyText.setText(this.playerStatsText())
+    }
+
+    private openDiscardOverlay(): void {
+        if (this.discardOverlay) {
+            this.closeDiscardOverlay()
+        }
+        const { width, height } = this.scene.scale
+        const overlay = this.scene.add.container(0, 0)
+        overlay.setDepth(2000)
+        const bg = this.scene.add.rectangle(0, 0, width, height, 0x000000, 0.8).setOrigin(0, 0)
+        bg.setInteractive()
+        bg.on('pointerdown', () => this.closeDiscardOverlay())
+        overlay.add(bg)
+
+        const title = this.scene.add.text(16, 16, 'Discard Pile', { fontFamily: 'monospace', fontSize: '18px', color: '#ffffff' })
+        overlay.add(title)
+
+        const close = this.scene.add.text(width - 16, 16, 'Close', { fontFamily: 'monospace', fontSize: '16px', color: '#ffffff', backgroundColor: '#444', padding: { x: 8, y: 6 } })
+            .setOrigin(1, 0)
+            .setInteractive({ useHandCursor: true })
+            .on('pointerdown', () => this.closeDiscardOverlay())
+        overlay.add(close)
+
+        const list = this.scene.add.container(0, 60)
+        overlay.add(list)
+        const colW = 100
+        const rowHCard = 140
+        const cols = 6
+        const pile = this.engine.state.player.discardPile
+        pile.forEach((card, i) => {
+            const col = i % cols
+            const row = Math.floor(i / cols)
+            const view = new CardView(this.scene, card, { x: 16 + col * colW, y: row * rowHCard, scale: 1 })
+            list.add(view)
+        })
+        const totalRows = Math.ceil(pile.length / cols)
+        this.discardContentHeight = totalRows * rowHCard
+
+        const onWheel = (_p: any, _go: any, _dx: number, dy: number) => {
+            const viewportHeight = this.scene.scale.height - 120
+            const minY = 60 - Math.max(0, this.discardContentHeight - viewportHeight)
+            const maxY = 60
+            list.y = Phaser.Math.Clamp(list.y - dy, minY, maxY)
+        }
+        this.scene.input.on('wheel', onWheel)
+
+        // Save refs for cleanup
+        this.discardOverlay = overlay
+        this.discardList = list
+            // Attach cleanup function on overlay for wheel
+            ; (overlay as any)._wheelHandler = onWheel
+    }
+
+    private closeDiscardOverlay(): void {
+        if (!this.discardOverlay) return
+        const handler = (this.discardOverlay as any)._wheelHandler
+        if (handler) this.scene.input.off('wheel', handler)
+        this.discardOverlay.destroy(true)
+        this.discardOverlay = undefined
+        this.discardList = undefined
+    }
+
+    private refreshDiscardOverlay(): void {
+        if (!this.discardOverlay || !this.discardList) return
+        this.discardList.removeAll(true)
+        const colW = 100
+        const rowHCard = 140
+        const cols = 6
+        const pile = this.engine.state.player.discardPile
+        pile.forEach((card, i) => {
+            const col = i % cols
+            const row = Math.floor(i / cols)
+            const view = new CardView(this.scene, card, { x: 16 + col * colW, y: row * rowHCard, scale: 1 })
+            this.discardList!.add(view)
+        })
+        const totalRows = Math.ceil(pile.length / cols)
+        this.discardContentHeight = totalRows * rowHCard
+    }
+
+    private openDeckOverlay(): void {
+        if (this.deckOverlay) {
+            this.closeDeckOverlay()
+        }
+        const { width, height } = this.scene.scale
+        const overlay = this.scene.add.container(0, 0)
+        overlay.setDepth(2000)
+        const bg = this.scene.add.rectangle(0, 0, width, height, 0x000000, 0.8).setOrigin(0, 0)
+        bg.setInteractive()
+        bg.on('pointerdown', () => this.closeDeckOverlay())
+        overlay.add(bg)
+
+        const title = this.scene.add.text(16, 16, 'Draw Pile', { fontFamily: 'monospace', fontSize: '18px', color: '#ffffff' })
+        overlay.add(title)
+
+        const close = this.scene.add.text(width - 16, 16, 'Close', { fontFamily: 'monospace', fontSize: '16px', color: '#ffffff', backgroundColor: '#444', padding: { x: 8, y: 6 } })
+            .setOrigin(1, 0)
+            .setInteractive({ useHandCursor: true })
+            .on('pointerdown', () => this.closeDeckOverlay())
+        overlay.add(close)
+
+        const list = this.scene.add.container(0, 60)
+        overlay.add(list)
+        const colW = 100
+        const rowHCard = 140
+        const cols = 6
+        const pile = this.engine.state.player.drawPile
+        pile.forEach((card, i) => {
+            const col = i % cols
+            const row = Math.floor(i / cols)
+            const view = new CardView(this.scene, card, { x: 16 + col * colW, y: row * rowHCard, scale: 1 })
+            list.add(view)
+        })
+        const totalRows = Math.ceil(pile.length / cols)
+        this.deckContentHeight = totalRows * rowHCard
+
+        const onWheel = (_p: any, _go: any, _dx: number, dy: number) => {
+            const viewportHeight = this.scene.scale.height - 120
+            const minY = 60 - Math.max(0, this.deckContentHeight - viewportHeight)
+            const maxY = 60
+            list.y = Phaser.Math.Clamp(list.y - dy, minY, maxY)
+        }
+        this.scene.input.on('wheel', onWheel)
+
+        this.deckOverlay = overlay
+        this.deckList = list
+            ; (overlay as any)._wheelHandler = onWheel
+    }
+
+    private closeDeckOverlay(): void {
+        if (!this.deckOverlay) return
+        const handler = (this.deckOverlay as any)._wheelHandler
+        if (handler) this.scene.input.off('wheel', handler)
+        this.deckOverlay.destroy(true)
+        this.deckOverlay = undefined
+        this.deckList = undefined
+    }
+
+    private refreshDeckOverlay(): void {
+        if (!this.deckOverlay || !this.deckList) return
+        this.deckList.removeAll(true)
+        const colW = 100
+        const rowHCard = 140
+        const cols = 6
+        const pile = this.engine.state.player.drawPile
+        pile.forEach((card, i) => {
+            const col = i % cols
+            const row = Math.floor(i / cols)
+            const view = new CardView(this.scene, card, { x: 16 + col * colW, y: row * rowHCard, scale: 1 })
+            this.deckList!.add(view)
+        })
+        const totalRows = Math.ceil(pile.length / cols)
+        this.deckContentHeight = totalRows * rowHCard
     }
 }
 
