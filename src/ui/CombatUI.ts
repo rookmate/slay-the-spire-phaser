@@ -107,34 +107,88 @@ export class CombatUI {
             sprite.on('pointerout', () => nameText.setAlpha(0))
         })
 
-        // Hand: fan layout bottom-centered with hover raise
+        // Hand: fan layout bottom-centered with controlled horizontal overlap and arc
         const layoutHand = () => {
             const n = this.handCards.length
             const screenW = this.scene.scale.width
             const screenH = this.scene.scale.height
             if (n === 0) return
-            // Arc width shrinks with larger hands; radius grows slightly so more cards fit
-            const arcDeg = Phaser.Math.Clamp(70 - 4 * (n - 1), 18, 70)
-            const radius = Phaser.Math.Clamp(200 + 10 * (n - 1), 200, 360)
+            // Card metrics
+            const cardWidth = 90 // matches CardView
+            const desiredOverlapFrac = 0.25 // 25% horizontal overlap
+            const spacing = cardWidth * (1 - desiredOverlapFrac) // distance between card centers along the arc chord
+            // Radius controls curvature; larger radius = flatter fan. Keep constant for consistency.
+            const radius = 320
             const cx = screenW / 2
-            const cy = screenH - 16 + radius // center below bottom so arc touches bottom
-            const step = n > 1 ? Phaser.Math.DegToRad(arcDeg) / (n - 1) : 0
-            const start = -Phaser.Math.DegToRad(arcDeg) / 2
+            // Ensure center card baseline Y is at screenH - 150
+            const cy = (screenH - 150) + radius
+            // Angle step chosen from chord length approximation (small-angle): c ≈ r * Δθ
+            const step = n > 1 ? spacing / radius : 0
+            const totalArc = step * (n - 1)
+            const start = -totalArc / 2
             for (let i = 0; i < n; i++) {
                 const theta = start + i * step
                 const x = cx + radius * Math.sin(theta)
                 const y = cy - radius * Math.cos(theta)
-                // Rotate slightly following the arc (tangent-like)
-                const rot = theta * 0.85
+                // Rotate to loosely follow arc tangent
+                const rot = theta * 0.9
                 const depth = 200 + i
                 const view = this.handCards[i]
                 view.setPosition(x, y)
                 view.setRotation(rot)
                 view.setDepth(depth)
+                view.setScale(1)
                 view.setData('baseX', x)
                 view.setData('baseY', y)
                 view.setData('baseRot', rot)
                 view.setData('baseDepth', depth)
+            }
+        }
+
+        // Apply hover state: raise hovered card, scale it, straighten rotation; push siblings slightly aside
+        const applyHoverState = (hoverIndex: number | null) => {
+            const n = this.handCards.length
+            const siblingShift = 20
+            for (let i = 0; i < n; i++) {
+                const view = this.handCards[i]
+                const bx = view.getData('baseX') as number
+                const by = view.getData('baseY') as number
+                const br = view.getData('baseRot') as number
+                const bd = view.getData('baseDepth') as number
+                if (hoverIndex === i) {
+                    view.setDepth(5000)
+                    this.scene.tweens.add({
+                        targets: view,
+                        x: bx,
+                        y: by - 50,
+                        rotation: 0,
+                        scale: 1.1,
+                        duration: 120,
+                        ease: 'Sine.Out',
+                    })
+                } else if (hoverIndex != null) {
+                    const dir = Math.sign(i - hoverIndex)
+                    this.scene.tweens.add({
+                        targets: view,
+                        x: bx + dir * siblingShift,
+                        y: by,
+                        rotation: br,
+                        scale: 1,
+                        duration: 120,
+                        ease: 'Sine.Out',
+                    })
+                } else {
+                    this.scene.tweens.add({
+                        targets: view,
+                        x: bx,
+                        y: by,
+                        rotation: br,
+                        scale: 1,
+                        duration: 120,
+                        ease: 'Sine.Out',
+                        onComplete: () => view.setDepth(bd),
+                    })
+                }
             }
         }
 
@@ -143,24 +197,12 @@ export class CombatUI {
             this.handButtons = []
             this.handCards.forEach(c => c.destroy())
             this.handCards = []
-            p.hand.forEach((card) => {
+            p.hand.forEach((card, i) => {
                 const cardView = new CardView(this.scene, card, { x: 0, y: 0, scale: 1, interactive: true })
                 this.scene.add.existing(cardView)
-                // Hover behavior: straighten, raise and bring to front
-                cardView.on('pointerover', () => {
-                    cardView.setDepth(5000)
-                    cardView.setRotation(0)
-                    cardView.setY(this.scene.scale.height - 130) // align with bottom
-                })
-                cardView.on('pointerout', () => {
-                    const bx = cardView.getData('baseX')
-                    const by = cardView.getData('baseY')
-                    const br = cardView.getData('baseRot')
-                    const bd = cardView.getData('baseDepth')
-                    if (bx != null && by != null) cardView.setPosition(bx, by)
-                    if (br != null) cardView.setRotation(br)
-                    if (bd != null) cardView.setDepth(bd)
-                })
+                // Hover behavior: tween up, scale, straighten; shift siblings slightly
+                cardView.on('pointerover', () => applyHoverState(i))
+                cardView.on('pointerout', () => applyHoverState(null))
                 cardView.on('pointerdown', () => {
                     const target = this.engine.state.enemies.find(e => e.hp > 0)?.id
                     if (!target) return
