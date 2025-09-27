@@ -3,12 +3,16 @@ import type { Engine } from '../core/engine'
 import type { EmittedEvent } from '../core/actions'
 import { CARD_DEFS } from '../core/cards'
 import type { CardInstance, EnemyState } from '../core/state'
+import { CardView } from './CardView'
 
 export class CombatUI {
     private scene: Phaser.Scene
     private engine: Engine
     private handButtons: Phaser.GameObjects.Text[] = []
+    private handCards: CardView[] = []
     private enemyTexts: Phaser.GameObjects.Text[] = []
+    private playerSprite?: Phaser.GameObjects.Image
+    private enemySprites: Phaser.GameObjects.Image[] = []
 
     private onPlay?: (card: CardInstance, targets: string[]) => void
     private onEnd?: () => void
@@ -23,34 +27,40 @@ export class CombatUI {
         const p = this.engine.state.player
         const style = { fontFamily: 'monospace', fontSize: '16px', color: '#ffffff' }
         this.scene.add.text(16, 16, 'Player', style)
+        // Player sprite
+        this.playerSprite = this.scene.add.image(120, 180, 'player:ironclad').setScale(0.35)
         const playerStats = this.scene.add.text(16, 40, this.playerStatsText(), style)
 
-        // Enemy labels
-        this.enemyTexts = this.engine.state.enemies.map((e, i) =>
-            this.scene.add.text(400, 40 + i * 40, this.enemyText(e), style)
-        )
+        // Enemy sprites and labels
+        this.enemySprites.forEach(s => s.destroy())
+        this.enemySprites = []
+        this.enemyTexts = []
+        this.engine.state.enemies.forEach((e, i) => {
+            const texKey = `enemy:${e.specId ?? e.name.toUpperCase().replace(/\s+/g, '_')}`
+            const sprite = this.scene.add.image(600, 160 + i * 80, texKey).setScale(0.5)
+            this.enemySprites.push(sprite)
+            const label = this.scene.add.text(500, 120 + i * 80, this.enemyText(e), style)
+            this.enemyTexts.push(label)
+        })
 
         // Hand buttons
         const rebuildHand = () => {
             this.handButtons.forEach(b => b.destroy())
             this.handButtons = []
+            this.handCards.forEach(c => c.destroy())
+            this.handCards = []
             p.hand.forEach((card, i) => {
-                const def = CARD_DEFS[card.defId]
-                const btn = this.scene.add.text(16 + i * 120, 300, `${def.name} (${def.cost})`, {
-                    ...style,
-                    backgroundColor: '#333',
-                    padding: { x: 6, y: 4 },
+                const cardView = new CardView(this.scene, card, { x: 16 + i * 100, y: 290, scale: 1, interactive: true })
+                this.scene.add.existing(cardView)
+                cardView.on('pointerdown', () => {
+                    const target = this.engine.state.enemies.find(e => e.hp > 0)?.id
+                    if (!target) return
+                    this.onPlay?.(card, [target])
+                    playerStats.setText(this.playerStatsText())
+                    this.refreshEnemies()
+                    rebuildHand()
                 })
-                    .setInteractive({ useHandCursor: true })
-                    .on('pointerdown', () => {
-                        const target = this.engine.state.enemies.find(e => e.hp > 0)?.id
-                        if (!target) return
-                        this.onPlay?.(card, [target])
-                        playerStats.setText(this.playerStatsText())
-                        this.refreshEnemies()
-                        rebuildHand()
-                    })
-                this.handButtons.push(btn)
+                this.handCards.push(cardView)
             })
         }
 
@@ -86,6 +96,12 @@ export class CombatUI {
 
     private refreshEnemies(): void {
         this.enemyTexts.forEach((t, i) => t.setText(this.enemyText(this.engine.state.enemies[i])))
+        // hide defeated
+        this.engine.state.enemies.forEach((e, i) => {
+            const spr = this.enemySprites[i]
+            if (!spr) return
+            spr.setAlpha(e.hp > 0 ? 1 : 0.3)
+        })
     }
 
     apply(events: EmittedEvent[]): void {
