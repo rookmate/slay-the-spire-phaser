@@ -28,32 +28,56 @@ export class CombatScene extends Phaser.Scene {
         this.engine.enqueue({ kind: 'DrawCards', count: 5 })
         this.engine.runUntilIdle()
 
+        // Check for immediate victory/defeat after setup (unlikely but possible)
+        if (this.engine.state.victory) {
+            this.handleVictory()
+            return
+        } else if (this.engine.state.defeat) {
+            this.handleDefeat()
+            return
+        }
+
         this.ui = new CombatUI(this, this.engine)
         this.ui.onPlayCard((card, targets) => {
             const evStart = this.engine.playCard(card, targets)
             this.ui.apply(evStart)
             const evts = this.engine.runUntilIdle()
             this.ui.apply(evts)
+
+            // Check for victory/defeat immediately after card effects resolve
+            if (this.engine.state.victory) {
+                this.handleVictory()
+            } else if (this.engine.state.defeat) {
+                this.handleDefeat()
+            }
         })
         this.ui.onEndTurn(() => {
             this.engine.enqueue({ kind: 'EndTurn' })
             const evts = this.engine.runUntilIdle()
             this.ui.apply(evts)
             if (this.engine.state.victory) {
-                // Burning Blood: heal 6 after combat if owned
-                if (this.run.relics.includes('BURNING_BLOOD')) {
-                    this.run.player.hp = Math.min(this.run.player.maxHp, this.engine.state.player.hp + 6)
-                } else {
-                    this.run.player.hp = this.engine.state.player.hp
-                }
-                saveRun(this.run)
-                this.run.combatCount = (this.run.combatCount ?? 0) + 1
-                this.scene.start('Rewards', { run: this.run })
+                this.handleVictory()
             } else if (this.engine.state.defeat) {
-                saveRun(this.run)
-                this.scene.start('Map', { run: this.run })
+                this.handleDefeat()
             }
         })
+    }
+
+    private handleVictory(): void {
+        // Burning Blood: heal 6 after combat if owned
+        if (this.run.relics.includes('BURNING_BLOOD')) {
+            this.run.player.hp = Math.min(this.run.player.maxHp, this.engine.state.player.hp + 6)
+        } else {
+            this.run.player.hp = this.engine.state.player.hp
+        }
+        saveRun(this.run)
+        this.run.combatCount = (this.run.combatCount ?? 0) + 1
+        this.scene.start('Rewards', { run: this.run })
+    }
+
+    private handleDefeat(): void {
+        saveRun(this.run)
+        this.scene.start('Map', { run: this.run })
     }
 }
 

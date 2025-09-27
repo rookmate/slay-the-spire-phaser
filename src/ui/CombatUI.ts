@@ -2,13 +2,15 @@ import Phaser from 'phaser'
 import type { Engine } from '../core/engine'
 import type { EmittedEvent } from '../core/actions'
 import type { CardInstance, EnemyState } from '../core/state'
-import { CardView } from './CardView'
+import { CardSprite } from './CardSprite'
 
 export class CombatUI {
     private scene: Phaser.Scene
     private engine: Engine
     private handButtons: Phaser.GameObjects.Text[] = []
-    private handCards: CardView[] = []
+    private handCards: CardSprite[] = []
+    private handContainer?: Phaser.GameObjects.Container
+    private handInputArea?: Phaser.GameObjects.Rectangle // Add this line
     private enemyTexts: Phaser.GameObjects.Text[] = []
     private playerHpText?: Phaser.GameObjects.Text
     private playerSprite?: Phaser.GameObjects.Image
@@ -107,40 +109,34 @@ export class CombatUI {
             sprite.on('pointerout', () => nameText.setAlpha(0))
         })
 
-        // Hand: fan layout bottom-centered with controlled horizontal overlap and arc
+        // Hand: simple fan layout with proper centering
         const layoutHand = () => {
             const n = this.handCards.length
             const screenW = this.scene.scale.width
             const screenH = this.scene.scale.height
             if (n === 0) return
-            // Card metrics
-            const cardWidth = 90 // matches CardView
-            const desiredOverlapFrac = 0.25 // 25% horizontal overlap
-            const spacing = cardWidth * (1 - desiredOverlapFrac) // distance between card centers along the arc chord
-            // Radius controls curvature; larger radius = flatter fan. Keep constant for consistency.
-            const radius = 320
-            const cx = screenW / 2
-            // Ensure center card baseline Y is at screenH - 150
-            const cy = (screenH - 150) + radius
-            // Angle step chosen from chord length approximation (small-angle): c ≈ r * Δθ
-            const step = n > 1 ? spacing / radius : 0
-            const totalArc = step * (n - 1)
-            const start = -totalArc / 2
+
+            // Simple linear fan with slight curve
+            const centerX = screenW / 2
+            const baseY = screenH - 150
+            const cardSpacing = 60 // spacing between card centers
+            const totalWidth = (n - 1) * cardSpacing
+            const startX = centerX - totalWidth / 2
+
             for (let i = 0; i < n; i++) {
-                const theta = start + i * step
-                const x = cx + radius * Math.sin(theta)
-                const y = cy - radius * Math.cos(theta)
-                // Rotate to loosely follow arc tangent
-                const rot = theta * 0.9
-                const depth = 200 + i
                 const view = this.handCards[i]
+                const x = startX + i * cardSpacing
+                const y = baseY + Math.sin((i / (n - 1)) * Math.PI) * 15 // slight curve
+                const rotation = (i - (n - 1) / 2) * 0.08 // rotation per position
+                const depth = 200 + i
+
                 view.setPosition(x, y)
-                view.setRotation(rot)
+                view.setRotation(rotation)
                 view.setDepth(depth)
                 view.setScale(1)
                 view.setData('baseX', x)
                 view.setData('baseY', y)
-                view.setData('baseRot', rot)
+                view.setData('baseRot', rotation)
                 view.setData('baseDepth', depth)
             }
         }
@@ -197,23 +193,83 @@ export class CombatUI {
             this.handButtons = []
             this.handCards.forEach(c => c.destroy())
             this.handCards = []
-            p.hand.forEach((card, i) => {
-                const cardView = new CardView(this.scene, card, { x: 0, y: 0, scale: 1, interactive: true })
-                this.scene.add.existing(cardView)
-                // Hover behavior: tween up, scale, straighten; shift siblings slightly
-                cardView.on('pointerover', () => applyHoverState(i))
-                cardView.on('pointerout', () => applyHoverState(null))
-                cardView.on('pointerdown', () => {
-                    const target = this.engine.state.enemies.find(e => e.hp > 0)?.id
-                    if (!target) return
-                    this.onPlay?.(card, [target])
-                    this.refreshEnergy()
-                    this.refreshEnemies()
-                    rebuildHand()
-                })
-                this.handCards.push(cardView)
+
+            // Create or recreate hand container
+            if (this.handContainer) {
+                this.handContainer.destroy()
+            }
+            this.handContainer = this.scene.add.container(0, 0)
+            this.handContainer.setDepth(200)
+
+            p.hand.forEach((card) => {
+                // Create card with interactive disabled to avoid conflicts
+                const cardSprite = new CardSprite(this.scene, card, { x: 0, y: 0, scale: 1, interactive: false })
+                this.handContainer!.add(cardSprite)
+                this.handCards.push(cardSprite)
             })
+
+            // Set up a single interactive area for the entire hand
+            setupHandInput()
             layoutHand()
+        }
+
+        // Set up input handling for the hand
+        const setupHandInput = () => {
+            // Remove existing hand input if any
+            if (this.handInputArea) {
+                this.handInputArea.destroy()
+            }
+
+            // Create a large invisible rectangle that covers the hand area
+            const screenW = this.scene.scale.width
+            const screenH = this.scene.scale.height
+            const centerX = screenW / 2
+            const baseY = screenH - 150
+
+            this.handInputArea = this.scene.add.rectangle(
+                centerX,
+                baseY,
+                screenW,
+                200,
+                0x000000,
+                0 // Completely transparent
+            )
+            this.handInputArea.setDepth(100) // Below cards but above background
+            this.handInputArea.setInteractive()
+
+            let currentHoverIndex: number | null = null
+
+            this.handInputArea.on('pointermove', (pointer: Phaser.Input.Pointer) => {
+                // Find all cards at this pointer position
+                const cardsAtPoint = CardSprite.getCardsAtPoint(pointer.worldX, pointer.worldY)
+                const topCard = cardsAtPoint[0]
+
+                if (topCard) {
+                    const topIndex = this.handCards.indexOf(topCard)
+                    if (topIndex !== currentHoverIndex) {
+                        currentHoverIndex = topIndex
+                        applyHoverState(topIndex)
+                    }
+                } else if (currentHoverIndex !== null) {
+                    currentHoverIndex = null
+                    applyHoverState(null)
+                }
+            })
+
+            this.handInputArea.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+                const topCard = CardSprite.getTopCardAtPoint(pointer.worldX, pointer.worldY)
+                if (topCard) {
+                    const cardIndex = this.handCards.indexOf(topCard)
+                    if (cardIndex !== -1) {
+                        const target = this.engine.state.enemies.find(e => e.hp > 0)?.id
+                        if (!target) return
+                        this.onPlay?.(this.engine.state.player.hand[cardIndex], [target])
+                        this.refreshEnergy()
+                        this.refreshEnemies()
+                        rebuildHand()
+                    }
+                }
+            })
         }
 
         rebuildHand()
@@ -366,7 +422,7 @@ export class CombatUI {
         pile.forEach((card, i) => {
             const col = i % cols
             const row = Math.floor(i / cols)
-            const view = new CardView(this.scene, card, { x: 16 + col * colW, y: row * rowHCard, scale: 1 })
+            const view = new CardSprite(this.scene, card, { x: 16 + col * colW, y: row * rowHCard, scale: 0.5 })
             list.add(view)
         })
         const totalRows = Math.ceil(pile.length / cols)
@@ -406,7 +462,7 @@ export class CombatUI {
         pile.forEach((card, i) => {
             const col = i % cols
             const row = Math.floor(i / cols)
-            const view = new CardView(this.scene, card, { x: 16 + col * colW, y: row * rowHCard, scale: 1 })
+            const view = new CardSprite(this.scene, card, { x: 16 + col * colW, y: row * rowHCard, scale: 0.5 })
             this.discardList!.add(view)
         })
         const totalRows = Math.ceil(pile.length / cols)
@@ -443,7 +499,7 @@ export class CombatUI {
         pile.forEach((card, i) => {
             const col = i % cols
             const row = Math.floor(i / cols)
-            const view = new CardView(this.scene, card, { x: 16 + col * colW, y: row * rowHCard, scale: 1 })
+            const view = new CardSprite(this.scene, card, { x: 16 + col * colW, y: row * rowHCard, scale: 0.5 })
             list.add(view)
         })
         const totalRows = Math.ceil(pile.length / cols)
@@ -481,12 +537,49 @@ export class CombatUI {
         pile.forEach((card, i) => {
             const col = i % cols
             const row = Math.floor(i / cols)
-            const view = new CardView(this.scene, card, { x: 16 + col * colW, y: row * rowHCard, scale: 1 })
+            const view = new CardSprite(this.scene, card, { x: 16 + col * colW, y: row * rowHCard, scale: 0.5 })
             this.deckList!.add(view)
         })
         const totalRows = Math.ceil(pile.length / cols)
         this.deckContentHeight = totalRows * rowHCard
     }
+
+    // Clean up method to properly destroy all UI elements
+    public destroy(): void {
+        // Clear all card sprites from the static registry
+        CardSprite.clearAllCards()
+
+        // Destroy hand input area
+        if (this.handInputArea) {
+            this.handInputArea.destroy()
+        }
+
+        // Destroy hand container and cards
+        if (this.handContainer) {
+            this.handContainer.destroy()
+        }
+
+        // Destroy overlays
+        if (this.discardOverlay) {
+            this.closeDiscardOverlay()
+        }
+        if (this.deckOverlay) {
+            this.closeDeckOverlay()
+        }
+
+        // Destroy other UI elements
+        this.handButtons.forEach(b => b.destroy())
+        this.enemySprites.forEach(s => s.destroy())
+        this.enemyTexts.forEach(t => t.destroy())
+        this.enemyHpTexts.forEach(t => t.destroy())
+        this.enemyNameTexts.forEach(t => t.destroy())
+
+        // Destroy remaining elements
+        this.playerSprite?.destroy()
+        this.playerHpText?.destroy()
+        this.playerNameText?.destroy()
+        this.discardIcon?.destroy()
+        this.drawIcon?.destroy()
+        this.energyText?.destroy()
+    }
 }
-
-

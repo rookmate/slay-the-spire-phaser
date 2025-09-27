@@ -117,6 +117,8 @@ export class MapScene extends Phaser.Scene {
             const t = this.add.text(x - 20, y - 10, this.iconFor(n.kind), { ...style, backgroundColor: isClickable ? '#222' : '#111', padding: { x: 6, y: 2 }, color: isClickable ? '#ffffff' : '#555555' })
             if (isClickable) {
                 t.setInteractive({ useHandCursor: true }).on('pointerdown', () => this.enterNode(n))
+                // Add pulsating animation for available paths
+                this.addPulsateAnimation(t)
             }
             const label = this.add.text(x + 14, y - 10, n.kind, { fontFamily: 'monospace', fontSize: '12px', color: '#aaa' })
             this.mapLayer.add(t)
@@ -147,6 +149,20 @@ export class MapScene extends Phaser.Scene {
             case 'start': return 'S'
             default: return '·'
         }
+    }
+
+    private addPulsateAnimation(node: Phaser.GameObjects.Text): void {
+        // Create a subtle pulsating effect by scaling and changing alpha
+        this.tweens.add({
+            targets: node,
+            scaleX: 1.1,
+            scaleY: 1.1,
+            alpha: 0.8,
+            duration: 1000,
+            ease: 'Sine.easeInOut',
+            yoyo: true,
+            repeat: -1
+        })
     }
 }
 

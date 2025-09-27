@@ -11,5 +11,5 @@
 ~~11. cards in hand should look like an open fan and be bottom centered in the screen, slightly under view to simulate a person holding the cards~~
 ~~12. on hover a card in hand it should show standing straight version of the card aligned with the bottom. It should overlap any card close to it while hovered.~~
 13. cards should only be played on mouse press and drag on top of the enemy. This way the player can pick which enemy to attack when there are multiple enemies on the screen
-14. when all enemies' health is 0, combat should auto conclude
-15. available paths on the map to take should "pulsate"
+~~14. when all enemies' health is 0, combat should auto conclude~~
+~~15. available paths on the map to take should "pulsate"~~
