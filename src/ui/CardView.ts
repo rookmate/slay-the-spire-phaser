@@ -58,6 +58,11 @@ export class CardView extends Phaser.GameObjects.Container {
         this.setScale(scale)
         if (opts.interactive) {
             this.setInteractive(new Phaser.Geom.Rectangle(0, 0, w, h), Phaser.Geom.Rectangle.Contains)
+            this.bg.setInteractive({ useHandCursor: true })
+            if (this.art) this.art.setInteractive({ useHandCursor: true })
+            const forward = (ev: any) => this.emit('pointerdown', ev)
+            this.bg.on('pointerdown', forward)
+            if (this.art) this.art.on('pointerdown', forward)
         }
     }
 }

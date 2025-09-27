@@ -41,7 +41,7 @@ export class BootScene extends Phaser.Scene {
         this.load.image('enemy:ACID_SLIME_M', acidSlimeWebp)
         this.load.image('enemy:ACID_SLIME_L', acidSlimeWebp)
         // Load any sprites in src/sprites as potential card art with key card:<basename>
-        const mod = import.meta.glob('../sprites/*', { eager: true, as: 'url' }) as Record<string, string>
+        const mod = import.meta.glob('../sprites/*', { eager: true, import: 'default', query: '?url' }) as Record<string, string>
         Object.entries(mod).forEach(([path, url]) => {
             const file = path.split('/').pop() ?? ''
             const base = file.replace(/\.[^.]+$/, '')

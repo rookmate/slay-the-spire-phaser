@@ -66,7 +66,7 @@ export class CombatUI {
 
         rebuildHand()
 
-        this.scene.add.text(16, 360, 'End Turn', {
+        const endTurn = this.scene.add.text(700, 16, 'End Turn', {
             ...style,
             backgroundColor: '#550000',
             padding: { x: 6, y: 4 },
@@ -78,6 +78,7 @@ export class CombatUI {
                 this.refreshEnemies()
                 rebuildHand()
             })
+        endTurn.setDepth(1000)
     }
 
     private playerStatsText(): string {
