@@ -12,6 +12,7 @@ export interface RunState {
     deck: CardInstance[]
     asc?: number
     mapProgress?: { act: number; currentNodeId?: string }
+    combatCount?: number
 }
 
 export function createNewRun(seed?: string): RunState {
@@ -31,6 +32,7 @@ export function createNewRun(seed?: string): RunState {
         relics: ['BURNING_BLOOD'],
         deck,
         mapProgress: { act: 1 },
+        combatCount: 0,
     }
 }
 

@@ -1,5 +1,8 @@
 import Phaser from 'phaser'
-import { Engine, createDummyEnemy, createPlayerFromDeck } from '../core/engine'
+import { Engine, createPlayerFromDeck } from '../core/engine'
+import { RNG } from '../core/rng'
+import { createEnemyFromSpec } from '../core/enemies'
+import { generateEncounter } from '../core/encounters'
 import type { RunState } from '../core/run'
 import { saveRun } from '../core/run'
 import { CombatUI } from '../ui/CombatUI'
@@ -17,7 +20,9 @@ export class CombatScene extends Phaser.Scene {
         this.run = data.run
         const seed = this.run.seed
         const player = createPlayerFromDeck(seed, this.run.deck, this.run.player.hp, this.run.player.maxHp)
-        const enemies = [createDummyEnemy('e1'), createDummyEnemy('e2')]
+        const rng = new RNG(seed)
+        const keys = generateEncounter(rng, this.run.combatCount ?? 0)
+        const enemies = keys.map((k, i) => createEnemyFromSpec(rng, k as any, `e${i + 1}`))
         this.engine = new Engine(seed, player, enemies, { asc: this.run.asc ?? 0 })
         // opening draw
         this.engine.enqueue({ kind: 'DrawCards', count: 5 })
@@ -42,6 +47,7 @@ export class CombatScene extends Phaser.Scene {
                     this.run.player.hp = this.engine.state.player.hp
                 }
                 saveRun(this.run)
+                this.run.combatCount = (this.run.combatCount ?? 0) + 1
                 this.scene.start('Rewards', { run: this.run })
             } else if (this.engine.state.defeat) {
                 saveRun(this.run)

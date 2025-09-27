@@ -73,7 +73,13 @@ export interface EnemyState {
     hp: number
     block: number
     powers: PowerInstance[]
-    intent?: { kind: 'attack' | 'block'; amount: number }
+    intent?:
+    | { kind: 'attack'; amount: number }
+    | { kind: 'block'; amount: number }
+    | { kind: 'buff'; desc?: string }
+    | { kind: 'debuff'; debuff: 'WEAK' | 'VULNERABLE'; stacks: number }
+    // Optional spec reference to drive intent generation
+    specId?: string
 }
 
 export interface CombatState {

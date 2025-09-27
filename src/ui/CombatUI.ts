@@ -79,6 +79,8 @@ export class CombatUI {
         let intent = ''
         if (e.intent?.kind === 'attack') intent = `  Intent: ${e.intent.amount} ⚔`
         else if (e.intent?.kind === 'block') intent = `  Intent: ${e.intent.amount} 🛡`
+        else if (e.intent?.kind === 'debuff') intent = `  Intent: ${e.intent.debuff} ↓`
+        else intent = `  Intent: Buff ✦`
         return `${e.name}  HP ${e.hp}/${e.maxHp}  Block ${e.block}${intent}`
     }
 
