@@ -339,6 +339,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         cost: 1,
         rarity: 'common',
         baseDamage: 9,
+        targeting: { type: 'single_enemy', required: true },
         onPlay: ({ engine, source, targets }) => {
             const target = targets[0]
             const str = engine.state.player.powers.find(p => p.id === 'STRENGTH')?.stacks ?? 0
@@ -356,6 +357,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         type: 'attack',
         cost: 2,
         rarity: 'common',
+        targeting: { type: 'single_enemy', required: true },
         onPlay: ({ engine, source, targets }) => {
             const target = targets[0]
             const strength = engine.state.player.powers.find(p => p.id === 'STRENGTH')?.stacks ?? 0

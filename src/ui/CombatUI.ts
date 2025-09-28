@@ -59,6 +59,14 @@ export class CombatUI {
             return this.enemyDisplay.getEnemyAtPoint(x, y)
         })
 
+        this.dragSystem.setGetEnemySprites(() => {
+            return this.enemyDisplay.getEnemySprites()
+        })
+
+        this.dragSystem.setGetPlayerSprite(() => {
+            return this.playerDisplay.getPlayerSprite()
+        })
+
         this.playerDisplay.setOnEndTurn(() => {
             this.onEnd?.()
             this.update()

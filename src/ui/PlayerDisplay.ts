@@ -167,6 +167,10 @@ export class PlayerDisplay {
         }
     }
 
+    getPlayerSprite(): Phaser.GameObjects.Image | undefined {
+        return this.playerSprite
+    }
+
     destroy(): void {
         this.playerSprite?.destroy()
         this.playerHpText?.destroy()

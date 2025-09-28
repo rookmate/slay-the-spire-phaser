@@ -18,6 +18,8 @@ export class DragSystem {
 
     private onCardPlay?: (card: CardInstance, targets: string[]) => void
     private getEnemyAtPoint?: (x: number, y: number) => number
+    private getEnemySprites?: () => Phaser.GameObjects.Image[]
+    private getPlayerSprite?: () => Phaser.GameObjects.Image | undefined
 
     constructor(scene: Phaser.Scene, engine: Engine) {
         this.scene = scene
@@ -30,6 +32,14 @@ export class DragSystem {
 
     setGetEnemyAtPoint(callback: (x: number, y: number) => number): void {
         this.getEnemyAtPoint = callback
+    }
+
+    setGetEnemySprites(callback: () => Phaser.GameObjects.Image[]): void {
+        this.getEnemySprites = callback
+    }
+
+    setGetPlayerSprite(callback: () => Phaser.GameObjects.Image | undefined): void {
+        this.getPlayerSprite = callback
     }
 
     startDrag(card: Card, cardIndex: number, pointer: Phaser.Input.Pointer): void {
@@ -180,12 +190,21 @@ export class DragSystem {
     }
 
     private highlightEnemies(): void {
-        // Highlight individual enemies for single targeting
+        // Highlight individual enemies for single targeting using actual enemy positions
+        if (!this.getEnemySprites) return
+
+        const enemySprites = this.getEnemySprites()
         this.engine.state.enemies.forEach((enemy, index) => {
-            if (enemy.hp > 0) {
+            if (enemy.hp > 0 && enemySprites[index]) {
+                const enemySprite = enemySprites[index]
+                const bounds = enemySprite.getBounds()
+
+                // Create highlight that matches the enemy sprite size and position
                 const highlight = this.scene.add.rectangle(
-                    600, 160 + index * 80, // Approximate enemy positions
-                    100, 100, // Approximate enemy size
+                    enemySprite.x,
+                    enemySprite.y,
+                    bounds.width * 1.2, // Slightly larger than enemy
+                    bounds.height * 1.2,
                     COMBAT_UI_CONFIG.colors.targetHighlight,
                     COMBAT_UI_CONFIG.colors.targetHighlightAlpha
                 )
@@ -197,15 +216,25 @@ export class DragSystem {
 
 
     private highlightPlayer(): void {
-        // Highlight player for self-targeting
-        const highlight = this.scene.add.rectangle(
-            200, 400, // Approximate player position
-            100, 100, // Approximate player size
-            COMBAT_UI_CONFIG.colors.targetHighlight,
-            COMBAT_UI_CONFIG.colors.targetHighlightAlpha
-        )
-        highlight.setDepth(COMBAT_UI_CONFIG.depths.targetHighlight)
-        this.validTargets.push(highlight as any)
+        // Highlight player for self-targeting using actual player position
+        if (!this.getPlayerSprite) return
+
+        const playerSprite = this.getPlayerSprite()
+        if (playerSprite) {
+            const bounds = playerSprite.getBounds()
+
+            // Create highlight that matches the player sprite size and position
+            const highlight = this.scene.add.rectangle(
+                playerSprite.x,
+                playerSprite.y,
+                bounds.width * 1.2, // Slightly larger than player
+                bounds.height * 1.2,
+                COMBAT_UI_CONFIG.colors.targetHighlight,
+                COMBAT_UI_CONFIG.colors.targetHighlightAlpha
+            )
+            highlight.setDepth(COMBAT_UI_CONFIG.depths.targetHighlight)
+            this.validTargets.push(highlight as any)
+        }
     }
 
     private highlightUpwardDragZone(): void {

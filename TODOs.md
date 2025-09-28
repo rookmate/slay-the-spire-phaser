@@ -1,0 +1,1 @@
+- review card effects and add targetting as not all of them have it
