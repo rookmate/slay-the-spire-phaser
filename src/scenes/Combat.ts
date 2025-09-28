@@ -20,9 +20,13 @@ export class CombatScene extends Phaser.Scene {
         this.run = data.run
         const seed = this.run.seed
         const player = createPlayerFromDeck(seed, this.run.deck, this.run.player.hp, this.run.player.maxHp)
-        const rng = new RNG(seed)
-        const keys = generateEncounter(rng, this.run.combatCount ?? 0)
-        const enemies = keys.map((k, i) => createEnemyFromSpec(rng, k as any, `e${i + 1}`))
+        const combatIndex = this.run.combatCount ?? 0
+        const encounterRng = new RNG(`${seed}-encounter-${combatIndex}`)
+        const keys = generateEncounter(encounterRng, combatIndex)
+        const enemies = keys.map((k, i) => {
+            const enemyRng = new RNG(`${seed}-enemy-${combatIndex}-${i}`)
+            return createEnemyFromSpec(enemyRng, k as any, `e${i + 1}`)
+        })
         this.engine = new Engine(seed, player, enemies, { asc: this.run.asc ?? 0 })
         // opening draw
         this.engine.enqueue({ kind: 'DrawCards', count: 5 })
