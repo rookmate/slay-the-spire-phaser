@@ -2,7 +2,7 @@ import Phaser from 'phaser'
 import { CARD_DEFS } from '../core/cards'
 import type { RunState } from '../core/run'
 // import { saveRun } from '../core/run'
-import { CardView } from '../ui/CardView'
+import { Card } from '../ui/Card'
 
 export class DeckBuilderScene extends Phaser.Scene {
     run!: RunState
@@ -22,14 +22,14 @@ export class DeckBuilderScene extends Phaser.Scene {
 
         // Scrollable grid of all cards
         this.list = this.add.container(0, 60)
-        const colW = 100
-        const rowHCard = 140
-        const cols = 6
+        const colW = 130
+        const rowHCard = 190
+        const cols = 5
         keys.forEach((id, i) => {
             const col = i % cols
             const row = Math.floor(i / cols)
             const card = { defId: id, upgraded: false } as any
-            const view = new CardView(this, card, { x: 16 + col * colW, y: row * rowHCard, scale: 1 })
+            const view = new Card(this, card, { x: 16 + col * colW, y: row * rowHCard, scale: 1 })
             this.list.add(view)
         })
         const totalRows = Math.ceil(keys.length / cols)

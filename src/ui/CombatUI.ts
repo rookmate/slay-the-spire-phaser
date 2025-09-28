@@ -2,13 +2,13 @@ import Phaser from 'phaser'
 import type { Engine } from '../core/engine'
 import type { EmittedEvent } from '../core/actions'
 import type { CardInstance, EnemyState } from '../core/state'
-import { CardSprite } from './CardSprite'
+import { Card } from './Card'
 
 export class CombatUI {
     private scene: Phaser.Scene
     private engine: Engine
     private handButtons: Phaser.GameObjects.Text[] = []
-    private handCards: CardSprite[] = []
+    private handCards: Card[] = []
     private handContainer?: Phaser.GameObjects.Container
     private handInputArea?: Phaser.GameObjects.Rectangle // Add this line
     private enemyTexts: Phaser.GameObjects.Text[] = []
@@ -203,7 +203,7 @@ export class CombatUI {
 
             p.hand.forEach((card) => {
                 // Create card with interactive disabled to avoid conflicts
-                const cardSprite = new CardSprite(this.scene, card, { x: 0, y: 0, scale: 1, interactive: false })
+                const cardSprite = new Card(this.scene, card, { x: 0, y: 0, scale: 1, interactive: false })
                 this.handContainer!.add(cardSprite)
                 this.handCards.push(cardSprite)
             })
@@ -241,7 +241,7 @@ export class CombatUI {
 
             this.handInputArea.on('pointermove', (pointer: Phaser.Input.Pointer) => {
                 // Find all cards at this pointer position
-                const cardsAtPoint = CardSprite.getCardsAtPoint(pointer.worldX, pointer.worldY)
+                const cardsAtPoint = Card.getCardsAtPoint(pointer.worldX, pointer.worldY)
                 const topCard = cardsAtPoint[0]
 
                 if (topCard) {
@@ -257,7 +257,7 @@ export class CombatUI {
             })
 
             this.handInputArea.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-                const topCard = CardSprite.getTopCardAtPoint(pointer.worldX, pointer.worldY)
+                const topCard = Card.getTopCardAtPoint(pointer.worldX, pointer.worldY)
                 if (topCard) {
                     const cardIndex = this.handCards.indexOf(topCard)
                     if (cardIndex !== -1) {
@@ -422,7 +422,7 @@ export class CombatUI {
         pile.forEach((card, i) => {
             const col = i % cols
             const row = Math.floor(i / cols)
-            const view = new CardSprite(this.scene, card, { x: 16 + col * colW, y: row * rowHCard, scale: 0.5 })
+            const view = new Card(this.scene, card, { x: 16 + col * colW, y: row * rowHCard, scale: 0.5 })
             list.add(view)
         })
         const totalRows = Math.ceil(pile.length / cols)
@@ -462,7 +462,7 @@ export class CombatUI {
         pile.forEach((card, i) => {
             const col = i % cols
             const row = Math.floor(i / cols)
-            const view = new CardSprite(this.scene, card, { x: 16 + col * colW, y: row * rowHCard, scale: 0.5 })
+            const view = new Card(this.scene, card, { x: 16 + col * colW, y: row * rowHCard, scale: 0.5 })
             this.discardList!.add(view)
         })
         const totalRows = Math.ceil(pile.length / cols)
@@ -499,7 +499,7 @@ export class CombatUI {
         pile.forEach((card, i) => {
             const col = i % cols
             const row = Math.floor(i / cols)
-            const view = new CardSprite(this.scene, card, { x: 16 + col * colW, y: row * rowHCard, scale: 0.5 })
+            const view = new Card(this.scene, card, { x: 16 + col * colW, y: row * rowHCard, scale: 0.5 })
             list.add(view)
         })
         const totalRows = Math.ceil(pile.length / cols)
@@ -537,7 +537,7 @@ export class CombatUI {
         pile.forEach((card, i) => {
             const col = i % cols
             const row = Math.floor(i / cols)
-            const view = new CardSprite(this.scene, card, { x: 16 + col * colW, y: row * rowHCard, scale: 0.5 })
+            const view = new Card(this.scene, card, { x: 16 + col * colW, y: row * rowHCard, scale: 0.5 })
             this.deckList!.add(view)
         })
         const totalRows = Math.ceil(pile.length / cols)
@@ -547,7 +547,7 @@ export class CombatUI {
     // Clean up method to properly destroy all UI elements
     public destroy(): void {
         // Clear all card sprites from the static registry
-        CardSprite.clearAllCards()
+        Card.clearAllCards()
 
         // Destroy hand input area
         if (this.handInputArea) {
