@@ -119,14 +119,14 @@ export class CombatUI {
             // Simple linear fan with slight curve
             const centerX = screenW / 2
             const baseY = screenH - 150
-            const cardSpacing = 60 // spacing between card centers
+            const cardSpacing = 70 // spacing between card centers
             const totalWidth = (n - 1) * cardSpacing
             const startX = centerX - totalWidth / 2
 
             for (let i = 0; i < n; i++) {
                 const view = this.handCards[i]
                 const x = startX + i * cardSpacing
-                const y = baseY + Math.sin((i / (n - 1)) * Math.PI) * 15 // slight curve
+                const y = baseY - Math.sin((i / (n - 1)) * Math.PI) * 15 // slight curve
                 const rotation = (i - (n - 1) / 2) * 0.08 // rotation per position
                 const depth = 200 + i
 
@@ -141,10 +141,10 @@ export class CombatUI {
             }
         }
 
-        // Apply hover state: raise hovered card, scale it, straighten rotation; push siblings slightly aside
+        // Apply hover state: raise hovered card, scale it, straighten rotation; push siblings aside to prevent overlap
         const applyHoverState = (hoverIndex: number | null) => {
             const n = this.handCards.length
-            const siblingShift = 20
+            const siblingShift = 60 // Increased to prevent overlap when card is hovered
             for (let i = 0; i < n; i++) {
                 const view = this.handCards[i]
                 const bx = view.getData('baseX') as number
@@ -158,8 +158,8 @@ export class CombatUI {
                         x: bx,
                         y: by - 50,
                         rotation: 0,
-                        scale: 1.1,
-                        duration: 120,
+                        scale: 1,
+                        duration: 100,
                         ease: 'Sine.Out',
                     })
                 } else if (hoverIndex != null) {
@@ -169,8 +169,8 @@ export class CombatUI {
                         x: bx + dir * siblingShift,
                         y: by,
                         rotation: br,
-                        scale: 1,
-                        duration: 120,
+                        scale: 0.9,
+                        duration: 100,
                         ease: 'Sine.Out',
                     })
                 } else {
@@ -180,7 +180,7 @@ export class CombatUI {
                         y: by,
                         rotation: br,
                         scale: 1,
-                        duration: 120,
+                        duration: 100,
                         ease: 'Sine.Out',
                         onComplete: () => view.setDepth(bd),
                     })
