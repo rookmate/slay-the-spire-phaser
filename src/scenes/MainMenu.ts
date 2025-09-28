@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
-import { createNewRun, loadRun, saveRun, type RunState } from '../core/run'
-import { getDailySeed, loadMeta } from '../core/meta'
+import { createNewRun, loadRun, saveRun, /*type RunState */ } from '../core/run'
+import { /*getDailySeed, */loadMeta } from '../core/meta'
 
 export class MainMenuScene extends Phaser.Scene {
     constructor() { super('MainMenu') }

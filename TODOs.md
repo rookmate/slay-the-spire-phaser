@@ -13,3 +13,4 @@
 13. cards should only be played on mouse press and drag on top of the enemy. This way the player can pick which enemy to attack when there are multiple enemies on the screen
 ~~14. when all enemies' health is 0, combat should auto conclude~~
 ~~15. available paths on the map to take should "pulsate"~~
+16. Fix selection boxes for cards on rewards screen
