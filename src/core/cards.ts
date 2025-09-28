@@ -1,8 +1,24 @@
 import type { CardDef } from './state'
 
 export const CARD_DEFS: Record<string, CardDef> = {
-    STRIKE: { id: 'STRIKE', name: 'Strike', type: 'attack', cost: 1, baseDamage: 6, rarity: 'basic' },
-    DEFEND: { id: 'DEFEND', name: 'Defend', type: 'skill', cost: 1, baseBlock: 5, rarity: 'basic' },
+    STRIKE: {
+        id: 'STRIKE',
+        name: 'Strike',
+        type: 'attack',
+        cost: 1,
+        baseDamage: 6,
+        rarity: 'basic',
+        targeting: { type: 'single_enemy', required: true }
+    },
+    DEFEND: {
+        id: 'DEFEND',
+        name: 'Defend',
+        type: 'skill',
+        cost: 1,
+        baseBlock: 5,
+        rarity: 'basic',
+        targeting: { type: 'none' }
+    },
     BASH: {
         id: 'BASH',
         name: 'Bash',
@@ -10,6 +26,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         cost: 2,
         rarity: 'basic',
         baseDamage: 8,
+        targeting: { type: 'single_enemy', required: true },
         onPlay: ({ engine, source, targets }) => {
             const target = targets[0]
             const str = engine.state.player.powers.find(p => p.id === 'STRENGTH')?.stacks ?? 0
@@ -24,6 +41,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         type: 'power',
         cost: 3,
         rarity: 'rare',
+        targeting: { type: 'none' },
         onPlay: ({ engine }) => {
             engine.enqueue({ kind: 'ApplyPower', target: 'player', powerId: 'BARRICADE', stacks: 1 })
         },
@@ -34,6 +52,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         type: 'power',
         cost: 1,
         rarity: 'uncommon',
+        targeting: { type: 'none' },
         onPlay: ({ engine }) => {
             engine.enqueue({ kind: 'ApplyPower', target: 'player', powerId: 'METALLICIZE', stacks: 3 })
         },
@@ -44,6 +63,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         type: 'power',
         cost: 3,
         rarity: 'rare',
+        targeting: { type: 'none' },
         onPlay: ({ engine }) => {
             engine.enqueue({ kind: 'ApplyPower', target: 'player', powerId: 'DEMON_FORM', stacks: 1 })
         },
@@ -54,6 +74,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         type: 'power',
         cost: 3,
         rarity: 'rare',
+        targeting: { type: 'none' },
         onPlay: ({ engine }) => {
             engine.enqueue({ kind: 'ApplyPower', target: 'player', powerId: 'CORRUPTION', stacks: 1 })
         },
@@ -64,6 +85,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         type: 'power',
         cost: 1,
         rarity: 'uncommon',
+        targeting: { type: 'none' },
         onPlay: ({ engine }) => {
             engine.enqueue({ kind: 'ApplyPower', target: 'player', powerId: 'FEEL_NO_PAIN', stacks: 1 })
         },
@@ -74,6 +96,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         type: 'power',
         cost: 2,
         rarity: 'rare',
+        targeting: { type: 'none' },
         onPlay: ({ engine }) => {
             engine.enqueue({ kind: 'ApplyPower', target: 'player', powerId: 'JUGGERNAUT', stacks: 1 })
         },
@@ -84,6 +107,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         type: 'power',
         cost: 2,
         rarity: 'rare',
+        targeting: { type: 'none' },
         onPlay: ({ engine }) => {
             engine.enqueue({ kind: 'ApplyPower', target: 'player', powerId: 'DARK_EMBRACE', stacks: 1 })
         },
@@ -94,6 +118,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         type: 'power',
         cost: 0,
         rarity: 'rare',
+        targeting: { type: 'none' },
         onPlay: ({ engine }) => {
             engine.enqueue({ kind: 'ApplyPower', target: 'player', powerId: 'BRUTALITY', stacks: 1 })
         },
@@ -104,6 +129,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         type: 'power',
         cost: 0,
         rarity: 'rare',
+        targeting: { type: 'none' },
         onPlay: ({ engine }) => {
             engine.enqueue({ kind: 'ApplyPower', target: 'player', powerId: 'BERSERK', stacks: 1 })
         },
@@ -160,6 +186,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         cost: 1,
         rarity: 'common',
         baseDamage: 8,
+        targeting: { type: 'all_enemies', required: true },
         onPlay: ({ engine, source }) => {
             const str = engine.state.player.powers.find(p => p.id === 'STRENGTH')?.stacks ?? 0
             for (const enemy of engine.state.enemies) {
@@ -174,6 +201,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         cost: 1,
         rarity: 'common',
         baseDamage: 9,
+        targeting: { type: 'single_enemy', required: true },
         onPlay: ({ engine, source, targets }) => {
             const target = targets[0]
             const str = engine.state.player.powers.find(p => p.id === 'STRENGTH')?.stacks ?? 0
@@ -188,6 +216,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         cost: 1,
         rarity: 'common',
         baseBlock: 8,
+        targeting: { type: 'none' },
         onPlay: ({ engine }) => {
             engine.enqueue({ kind: 'GainBlock', target: 'player', amount: 8 })
             engine.enqueue({ kind: 'DrawCards', count: 1 })
@@ -200,6 +229,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         cost: 1,
         rarity: 'common',
         baseDamage: 5,
+        targeting: { type: 'single_enemy', required: true },
         onPlay: ({ engine, source, targets }) => {
             const target = targets[0]
             const str = engine.state.player.powers.find(p => p.id === 'STRENGTH')?.stacks ?? 0
@@ -213,13 +243,23 @@ export const CARD_DEFS: Record<string, CardDef> = {
         type: 'attack',
         cost: 1,
         rarity: 'common',
+        targeting: { type: 'single_enemy', required: true },
         onPlay: ({ engine, source, targets }) => {
             const target = targets[0]
             const amount = engine.state.player.block
             if (amount > 0) engine.enqueue({ kind: 'DealDamage', source, target, amount })
         },
     },
-    IRON_WAVE: { id: 'IRON_WAVE', name: 'Iron Wave', type: 'attack', cost: 1, baseDamage: 5, baseBlock: 5, rarity: 'common' },
+    IRON_WAVE: {
+        id: 'IRON_WAVE',
+        name: 'Iron Wave',
+        type: 'attack',
+        cost: 1,
+        baseDamage: 5,
+        baseBlock: 5,
+        rarity: 'common',
+        targeting: { type: 'single_enemy', required: true }
+    },
     ANGER: {
         id: 'ANGER',
         name: 'Anger',
@@ -227,6 +267,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         cost: 0,
         rarity: 'common',
         baseDamage: 6,
+        targeting: { type: 'single_enemy', required: true },
         onPlay: ({ engine, source, targets }) => {
             const target = targets[0]
             const str = engine.state.player.powers.find(p => p.id === 'STRENGTH')?.stacks ?? 0

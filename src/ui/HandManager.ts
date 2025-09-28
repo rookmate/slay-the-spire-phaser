@@ -1,6 +1,8 @@
 import Phaser from 'phaser'
 import type { Engine } from '../core/engine'
+import type { CardInstance, CardDef } from '../core/state'
 import { Card } from './Card'
+import { CARD_DEFS } from '../core/cards'
 import { COMBAT_UI_CONFIG } from './CombatUIConfig'
 
 export class HandManager {
@@ -12,6 +14,7 @@ export class HandManager {
     private currentHoverIndex: number | null = null
 
     private onCardDrag?: (card: Card, cardIndex: number, pointer: Phaser.Input.Pointer) => void
+    private onCardPlay?: (card: CardInstance, targets: string[]) => void
 
     constructor(scene: Phaser.Scene, engine: Engine) {
         this.scene = scene
@@ -21,6 +24,10 @@ export class HandManager {
 
     setOnCardDrag(callback: (card: Card, cardIndex: number, pointer: Phaser.Input.Pointer) => void): void {
         this.onCardDrag = callback
+    }
+
+    setOnCardPlay(callback: (card: CardInstance, targets: string[]) => void): void {
+        this.onCardPlay = callback
     }
 
     rebuildHand(): void {
@@ -54,6 +61,7 @@ export class HandManager {
                 scale: 1,
                 interactive: false
             })
+            card.updateCardVisuals()
             this.handContainer!.add(card)
             this.handCards.push(card)
         })
@@ -147,8 +155,43 @@ export class HandManager {
         if (topCard) {
             const cardIndex = this.handCards.indexOf(topCard)
             if (cardIndex !== -1) {
-                this.onCardDrag?.(topCard, cardIndex, pointer)
+                const cardInstance = this.engine.state.player.hand[cardIndex]
+                const cardDef = CARD_DEFS[cardInstance.defId]
+
+                // Check if card can be auto-played
+                if (this.canAutoPlay(cardDef)) {
+                    this.autoPlayCard(cardInstance, cardIndex)
+                } else {
+                    // Use drag system for targeting cards
+                    this.onCardDrag?.(topCard, cardIndex, pointer)
+                }
             }
+        }
+    }
+
+    private canAutoPlay(cardDef: CardDef): boolean {
+        return cardDef.targeting?.type === 'none' ||
+            (cardDef.targeting?.type === 'all_enemies' && this.engine.state.enemies.some(e => e.hp > 0))
+    }
+
+    private autoPlayCard(cardInstance: CardInstance, _cardIndex: number): void {
+        const cardDef = CARD_DEFS[cardInstance.defId]
+        const targets = this.getAutoPlayTargets(cardDef)
+
+        // Play the card immediately
+        this.onCardPlay?.(cardInstance, targets)
+    }
+
+    private getAutoPlayTargets(cardDef: CardDef): string[] {
+        switch (cardDef.targeting?.type) {
+            case 'none':
+                return ['player']
+            case 'all_enemies':
+                return this.engine.state.enemies
+                    .filter(enemy => enemy.hp > 0)
+                    .map(enemy => enemy.id)
+            default:
+                return []
         }
     }
 

@@ -32,6 +32,14 @@ export interface CardDef {
     rarity?: 'basic' | 'common' | 'uncommon' | 'rare'
     // If true, the card is moved to exhaust pile when played
     exhaust?: boolean
+
+    // Targeting requirements for the card
+    targeting?: {
+        type: 'none' | 'single_enemy' | 'all_enemies' | 'player' | 'any'
+        required?: boolean // If false, can be played without targeting
+        description?: string // UI hint for targeting
+    }
+
     // Optional play restriction. If returns false, the card is not played and energy is not spent
     canPlay?: (ctx: {
         engine: { state: CombatState }

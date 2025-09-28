@@ -10,6 +10,7 @@ export interface CardOptions {
 }
 
 export class Card extends Phaser.GameObjects.Container {
+    private card: CardInstance
     private bg: Phaser.GameObjects.Rectangle
     private selectionArea: Phaser.GameObjects.Rectangle
     private title: Phaser.GameObjects.Text
@@ -26,6 +27,7 @@ export class Card extends Phaser.GameObjects.Container {
 
     constructor(scene: Phaser.Scene, card: CardInstance, opts: CardOptions) {
         super(scene, opts.x, opts.y)
+        this.card = card
         const def = CARD_DEFS[card.defId]
         const w = Card.CARD_WIDTH
         const h = Card.CARD_HEIGHT
@@ -147,6 +149,33 @@ export class Card extends Phaser.GameObjects.Container {
     public static getTopCardAtPoint(x: number, y: number): Card | null {
         const cards = Card.getCardsAtPoint(x, y)
         return cards.length > 0 ? cards[0] : null
+    }
+
+    updateCardVisuals(): void {
+        const cardDef = CARD_DEFS[this.card.defId]
+
+        // Add visual indicators for targeting type
+        if (cardDef.targeting?.type === 'none') {
+            // Add a small icon to indicate auto-play
+            this.addAutoPlayIndicator()
+        } else if (cardDef.targeting?.type === 'all_enemies') {
+            // Add multi-target indicator
+            this.addMultiTargetIndicator()
+        }
+    }
+
+    private addAutoPlayIndicator(): void {
+        // Add a small "auto" icon or glow effect
+        const indicator = this.scene.add.circle(100, 20, 8, 0x00ff00, 0.8)
+        indicator.setDepth(1000)
+        this.add(indicator)
+    }
+
+    private addMultiTargetIndicator(): void {
+        // Add a small "multi" icon
+        const indicator = this.scene.add.circle(100, 20, 8, 0xff8800, 0.8)
+        indicator.setDepth(1000)
+        this.add(indicator)
     }
 
     // Clean up when card is destroyed

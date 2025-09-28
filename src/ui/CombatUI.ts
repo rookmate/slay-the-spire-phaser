@@ -50,6 +50,11 @@ export class CombatUI {
             this.dragSystem.startDrag(card, cardIndex, pointer)
         })
 
+        this.handManager.setOnCardPlay((card, targets) => {
+            this.onPlay?.(card, targets)
+            this.update()
+        })
+
         this.dragSystem.setOnCardPlay((card, targets) => {
             this.onPlay?.(card, targets)
             this.update()

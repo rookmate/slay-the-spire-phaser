@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
 import type { Engine } from '../core/engine'
-import type { CardInstance } from '../core/state'
+import type { CardInstance, CardDef } from '../core/state'
 import { Card } from './Card'
 import { CARD_DEFS } from '../core/cards'
 import { COMBAT_UI_CONFIG } from './CombatUIConfig'
@@ -42,6 +42,13 @@ export class DragSystem {
             return // Can't afford, don't start drag
         }
 
+        // Check if card requires targeting
+        if (cardDef.targeting?.type === 'none') {
+            // Auto-play cards that don't require targeting
+            this.autoPlayCard(cardInstance, cardIndex)
+            return
+        }
+
         this.isDragging = true
         this.dragCard = card
         this.dragCardIndex = cardIndex
@@ -56,7 +63,7 @@ export class DragSystem {
 
         // Create drag preview and highlight targets
         this.createDragPreview(pointer)
-        this.highlightValidTargets()
+        this.highlightValidTargets(cardDef)
 
         // Move original card to follow cursor
         card.setDepth(COMBAT_UI_CONFIG.depths.dragCard)
@@ -111,16 +118,51 @@ export class DragSystem {
         this.dragPreview.setDepth(COMBAT_UI_CONFIG.depths.dragPreview)
     }
 
-    private highlightValidTargets(): void {
+    private autoPlayCard(cardInstance: CardInstance, _cardIndex: number): void {
+        // Auto-play cards that don't require targeting
+        const targets = this.getAutoPlayTargets(cardInstance)
+        this.onCardPlay?.(cardInstance, targets)
+    }
+
+    private getAutoPlayTargets(cardInstance: CardInstance): string[] {
+        const cardDef = CARD_DEFS[cardInstance.defId]
+
+        switch (cardDef.targeting?.type) {
+            case 'none':
+                return ['player'] // Default to player for self-targeting cards
+            case 'all_enemies':
+                return this.engine.state.enemies
+                    .filter(enemy => enemy.hp > 0)
+                    .map(enemy => enemy.id)
+            default:
+                return []
+        }
+    }
+
+    private highlightValidTargets(cardDef: CardDef): void {
         // Clear existing highlights
         this.clearTargetHighlights()
 
-        // For now, highlight all alive enemies as valid targets
-        // TODO: Implement proper target validation based on card type
+        switch (cardDef.targeting?.type) {
+            case 'single_enemy':
+                this.highlightEnemies()
+                break
+            case 'all_enemies':
+                this.highlightAllEnemies()
+                break
+            case 'player':
+                this.highlightPlayer()
+                break
+            case 'any':
+                this.highlightAllTargets()
+                break
+        }
+    }
+
+    private highlightEnemies(): void {
+        // Highlight individual enemies for single targeting
         this.engine.state.enemies.forEach((enemy, index) => {
             if (enemy.hp > 0) {
-                // We need to get enemy sprites from the enemy display
-                // For now, create a simple highlight at enemy positions
                 const highlight = this.scene.add.rectangle(
                     600, 160 + index * 80, // Approximate enemy positions
                     100, 100, // Approximate enemy size
@@ -131,6 +173,29 @@ export class DragSystem {
                 this.validTargets.push(highlight as any)
             }
         })
+    }
+
+    private highlightAllEnemies(): void {
+        // Highlight all enemies for multi-targeting
+        this.highlightEnemies() // Same as single enemy for now
+    }
+
+    private highlightPlayer(): void {
+        // Highlight player for self-targeting
+        const highlight = this.scene.add.rectangle(
+            200, 400, // Approximate player position
+            100, 100, // Approximate player size
+            COMBAT_UI_CONFIG.colors.targetHighlight,
+            COMBAT_UI_CONFIG.colors.targetHighlightAlpha
+        )
+        highlight.setDepth(COMBAT_UI_CONFIG.depths.targetHighlight)
+        this.validTargets.push(highlight as any)
+    }
+
+    private highlightAllTargets(): void {
+        // Highlight all possible targets
+        this.highlightEnemies()
+        this.highlightPlayer()
     }
 
     private clearTargetHighlights(): void {
