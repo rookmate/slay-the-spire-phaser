@@ -83,6 +83,11 @@ export class CombatUI {
                 }
             }
         })
+
+        // Handle screen resize events
+        this.scene.scale.on('resize', () => {
+            this.handleScreenResize()
+        })
     }
 
     update(): void {
@@ -119,6 +124,13 @@ export class CombatUI {
 
     onEndTurn(fn: () => void): void {
         this.onEnd = fn
+    }
+
+    private handleScreenResize(): void {
+        // Rebuild layouts when screen size changes
+        this.enemyDisplay.handleScreenResize()
+        this.handManager.rebuildHand()
+        this.playerDisplay.update()
     }
 
     destroy(): void {
