@@ -45,45 +45,54 @@ export class RewardsScene extends Phaser.Scene {
                 x: cardX,
                 y: cardY,
                 scale: 0.8,
-                interactive: true
+                interactive: false // Don't make individual cards interactive
             })
 
             // Add the card directly to the scene
             this.add.existing(cardObj)
             cardObjects.push(cardObj)
-
-            // Ensure the card is properly interactive
-            cardObj.setInteractive({
-                useHandCursor: true
-            })
-
-            // Add click handler
-            cardObj.on('pointerdown', () => {
-                // Add card to deck
-                this.run.deck.push({ defId: id, upgraded: false })
-
-                // Hide all other cards
-                cardObjects.forEach((otherCard) => {
-                    if (otherCard !== cardObj) {
-                        otherCard.setVisible(false)
-                    }
-                })
-
-                // Move selected card to center
-                cardObj.setPosition(this.scale.width / 2, cardY)
-                cardObj.setScale(1.0) // Make it slightly larger
-
-                // Disable interaction on the selected card
-                cardObj.setInteractive(false)
-
-
-                // Enable continue button
-                enableContinueButton()
-            })
         })
 
-        // Continue button centered at bottom (initially disabled)
-        const continueButton = this.add.text(this.scale.width / 2, this.scale.height - 60, 'Continue', {
+        // Set up input handling for the cards area
+        const setupCardInput = () => {
+            // Create a large invisible rectangle that covers the cards area
+            const inputArea = this.add.rectangle(
+                this.scale.width / 2,
+                cardY,
+                this.scale.width,
+                200,
+                0x000000,
+                0 // Completely transparent
+            )
+            inputArea.setDepth(100) // Below cards but above background
+            inputArea.setInteractive()
+
+            inputArea.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+                const topCard = Card.getTopCardAtPoint(pointer.worldX, pointer.worldY)
+                if (topCard) {
+                    const cardIndex = cardObjects.indexOf(topCard)
+                    if (cardIndex !== -1) {
+                        const selectedId = choices[cardIndex]
+
+                        // Add card to deck
+                        this.run.deck.push({ defId: selectedId, upgraded: false })
+
+                        // Hide all cards (including the selected one)
+                        cardObjects.forEach((otherCard) => {
+                            otherCard.setVisible(false)
+                        })
+
+                        // Enable continue button
+                        enableContinueButton()
+                    }
+                }
+            })
+        }
+
+        setupCardInput()
+
+        // Continue button centered at bottom, slightly off the bottom (initially disabled)
+        const continueButton = this.add.text(this.scale.width / 2, this.scale.height - 40, 'Continue', {
             ...style,
             backgroundColor: '#666',
             padding: { x: 12, y: 8 },

@@ -11,6 +11,7 @@ export interface CardOptions {
 
 export class Card extends Phaser.GameObjects.Container {
     private bg: Phaser.GameObjects.Rectangle
+    private selectionArea: Phaser.GameObjects.Rectangle
     private title: Phaser.GameObjects.Text
     private cost: Phaser.GameObjects.Text
     private subtype: Phaser.GameObjects.Text
@@ -32,9 +33,12 @@ export class Card extends Phaser.GameObjects.Container {
 
         // Create card background with color based on card type
         const bgColor = this.getBackgroundColor(def.type)
-        this.bg = scene.add.rectangle(0, 0, w, h, bgColor, 1).setStrokeStyle(4, 0xffffff)
+        this.bg = scene.add.rectangle(0, 0, w, h, bgColor, 1)
         this.bg.setOrigin(0, 0)
 
+        // Create transparent selection area rectangle
+        this.selectionArea = scene.add.rectangle(0, 0, w, h, 0x000000, 0).setStrokeStyle(4, 0xffffff)
+        this.selectionArea.setOrigin(0, 0)
 
         // Text elements sized for smaller cards
         this.title = scene.add.text(8, 8, def.name, {
@@ -67,9 +71,9 @@ export class Card extends Phaser.GameObjects.Container {
             color: '#ddd'
         })
 
-        // Add in correct z-order: background -> texts
+        // Add in correct z-order: background -> texts -> selectionArea
         this.add(this.bg)
-        this.add([this.title, this.cost, this.subtype, this.stats])
+        this.add([this.title, this.cost, this.subtype, this.stats, this.selectionArea])
 
         // Set Container bounds
         this.setSize(w, h)
