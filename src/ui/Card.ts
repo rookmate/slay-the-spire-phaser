@@ -156,24 +156,21 @@ export class Card extends Phaser.GameObjects.Container {
 
         // Add visual indicators for targeting type
         if (cardDef.targeting?.type === 'none') {
-            // Add a small icon to indicate auto-play
-            this.addAutoPlayIndicator()
+            // Add upward arrow indicator for drag-up-to-play
+            this.addUpwardDragIndicator()
         } else if (cardDef.targeting?.type === 'all_enemies') {
-            // Add multi-target indicator
-            this.addMultiTargetIndicator()
+            // Add upward arrow indicator for drag-up-to-play
+            this.addUpwardDragIndicator()
         }
     }
 
-    private addAutoPlayIndicator(): void {
-        // Add a small "auto" icon or glow effect
-        const indicator = this.scene.add.circle(100, 20, 8, 0x00ff00, 0.8)
-        indicator.setDepth(1000)
-        this.add(indicator)
-    }
-
-    private addMultiTargetIndicator(): void {
-        // Add a small "multi" icon
-        const indicator = this.scene.add.circle(100, 20, 8, 0xff8800, 0.8)
+    private addUpwardDragIndicator(): void {
+        // Add an upward arrow to indicate drag-up-to-play
+        const indicator = this.scene.add.polygon(100, 20, [
+            0, 12,   // Bottom left
+            6, 0,    // Top center
+            12, 12   // Bottom right
+        ], 0x00ff00, 0.8)
         indicator.setDepth(1000)
         this.add(indicator)
     }
