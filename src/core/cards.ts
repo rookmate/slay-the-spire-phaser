@@ -140,6 +140,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         type: 'skill',
         cost: 1,
         rarity: 'rare',
+        targeting: { type: 'single_enemy', required: true },
         onPlay: ({ engine }) => {
             // Next ATTACK this turn plays twice. Simple modeling: apply a temporary power.
             engine.enqueue({ kind: 'ApplyPower', target: 'player', powerId: 'STRENGTH', stacks: 0 })
@@ -167,6 +168,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         cost: 2,
         rarity: 'rare',
         exhaust: true,
+        targeting: { type: 'single_enemy', required: true },
         onPlay: ({ engine, source, targets }) => {
             const target = targets[0]
             const toExhaust = [...engine.state.player.hand]
@@ -282,6 +284,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         cost: 2,
         rarity: 'common',
         baseDamage: 12,
+        targeting: { type: 'single_enemy', required: true },
         onPlay: ({ engine, source, targets }) => {
             const target = targets[0]
             const str = engine.state.player.powers.find(p => p.id === 'STRENGTH')?.stacks ?? 0
@@ -296,6 +299,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         cost: 2,
         rarity: 'uncommon',
         baseDamage: 13,
+        targeting: { type: 'single_enemy', required: true },
         onPlay: ({ engine, source, targets }) => {
             const target = targets[0]
             const str = engine.state.player.powers.find(p => p.id === 'STRENGTH')?.stacks ?? 0
@@ -310,6 +314,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         type: 'attack',
         cost: 1,
         rarity: 'common',
+        targeting: { type: 'single_enemy', required: true },
         onPlay: ({ engine, source, targets }) => {
             const target = targets[0]
             const str = engine.state.player.powers.find(p => p.id === 'STRENGTH')?.stacks ?? 0
@@ -322,6 +327,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         type: 'attack',
         cost: 1,
         rarity: 'common',
+        targeting: { type: 'all_enemies', required: true },
         onPlay: ({ engine, source }) => {
             const str = engine.state.player.powers.find(p => p.id === 'STRENGTH')?.stacks ?? 0
             for (const enemy of engine.state.enemies) {
@@ -371,6 +377,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         type: 'attack',
         cost: 2,
         rarity: 'common',
+        targeting: { type: 'single_enemy', required: true },
         onPlay: ({ engine, source, targets }) => {
             const target = targets[0]
             const fullDeck = engine.state.player.deck
@@ -390,6 +397,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         type: 'skill',
         cost: 1,
         rarity: 'common',
+        targeting: { type: 'none' },
         onPlay: ({ engine }) => {
             engine.enqueue({ kind: 'GainBlock', target: 'player', amount: 7 })
             const hand = engine.state.player.hand
@@ -406,6 +414,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         type: 'skill',
         cost: 0,
         rarity: 'common',
+        targeting: { type: 'none' },
         onPlay: ({ engine }) => {
             engine.enqueue({ kind: 'DrawCards', count: 2 })
             // place last card in hand on top of draw pile
@@ -422,6 +431,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         type: 'attack',
         cost: 1,
         rarity: 'common',
+        targeting: { type: 'single_enemy', required: true },
         onPlay: ({ engine, source, targets }) => {
             const target = targets[0]
             const strength = engine.state.player.powers.find(p => p.id === 'STRENGTH')?.stacks ?? 0
@@ -434,6 +444,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         type: 'attack',
         cost: 0,
         rarity: 'common',
+        targeting: { type: 'single_enemy', required: true },
         canPlay: ({ engine }) => {
             // Can only play if every card in hand is an attack
             return engine.state.player.hand.every(c => (CARD_DEFS as any)[c.defId]?.type === 'attack')
@@ -450,6 +461,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         type: 'skill',
         cost: 1,
         rarity: 'common',
+        targeting: { type: 'none' },
         onPlay: ({ engine }) => {
             engine.enqueue({ kind: 'GainBlock', target: 'player', amount: 5 })
         },
@@ -461,6 +473,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         type: 'skill',
         cost: 0,
         rarity: 'uncommon',
+        targeting: { type: 'none' },
         onPlay: ({ engine }) => {
             engine.enqueue({ kind: 'DrawCards', count: 3 })
         },
@@ -471,6 +484,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         type: 'skill',
         cost: 0,
         rarity: 'uncommon',
+        targeting: { type: 'none' },
         onPlay: ({ engine }) => {
             engine.enqueue({ kind: 'LoseHp', target: 'player', amount: 3 })
             engine.enqueue({ kind: 'GainEnergy', amount: 2 })
@@ -482,6 +496,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         type: 'skill',
         cost: 1,
         rarity: 'uncommon',
+        targeting: { type: 'none' },
         onPlay: ({ engine }) => {
             const hand = engine.state.player.hand
             if (hand.length > 0) {
@@ -499,6 +514,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         cost: 1,
         rarity: 'uncommon',
         baseDamage: 5,
+        targeting: { type: 'single_enemy', required: true },
         onPlay: ({ engine, source, targets }) => {
             const target = targets[0]
             const str = engine.state.player.powers.find(p => p.id === 'STRENGTH')?.stacks ?? 0
@@ -516,6 +532,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         type: 'skill',
         cost: 2,
         rarity: 'uncommon',
+        targeting: { type: 'none' },
         onPlay: ({ engine }) => {
             const b = engine.state.player.block
             if (b > 0) engine.enqueue({ kind: 'GainBlock', target: 'player', amount: b })
@@ -527,6 +544,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         type: 'skill',
         cost: 2,
         rarity: 'uncommon',
+        targeting: { type: 'none' },
         onPlay: ({ engine }) => {
             engine.enqueue({ kind: 'GainBlock', target: 'player', amount: 12 })
         },
@@ -537,6 +555,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         type: 'skill',
         cost: 1,
         rarity: 'uncommon',
+        targeting: { type: 'none' },
         onPlay: ({ engine }) => {
             engine.enqueue({ kind: 'GainBlock', target: 'player', amount: 10 })
         },
@@ -547,6 +566,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         type: 'attack',
         cost: 1,
         rarity: 'uncommon',
+        targeting: { type: 'single_enemy', required: true },
         onPlay: ({ engine, source, targets }) => {
             engine.enqueue({ kind: 'LoseHp', target: 'player', amount: 2 })
             const target = targets[0]
@@ -560,6 +580,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         type: 'skill',
         cost: 0,
         rarity: 'uncommon',
+        targeting: { type: 'single_enemy', required: true },
         onPlay: ({ engine }) => {
             for (const enemy of engine.state.enemies) {
                 if (enemy.hp > 0) engine.enqueue({ kind: 'ApplyPower', target: enemy.id, powerId: 'WEAK', stacks: 1 })
@@ -572,6 +593,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         type: 'skill',
         cost: 1,
         rarity: 'uncommon',
+        targeting: { type: 'none' },
         onPlay: ({ engine }) => {
             engine.enqueue({ kind: 'GainBlock', target: 'player', amount: 15 })
         },
@@ -582,6 +604,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         type: 'attack',
         cost: 1,
         rarity: 'uncommon',
+        targeting: { type: 'single_enemy', required: true },
         onPlay: ({ engine, source, targets }) => {
             const target = targets[0]
             const str = engine.state.player.powers.find(p => p.id === 'STRENGTH')?.stacks ?? 0
@@ -594,6 +617,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         type: 'skill',
         cost: 0,
         rarity: 'uncommon',
+        targeting: { type: 'none' },
         onPlay: ({ engine }) => {
             engine.enqueue({ kind: 'GainEnergy', amount: 2 })
         },
@@ -604,6 +628,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         type: 'attack',
         cost: 2,
         rarity: 'uncommon',
+        targeting: { type: 'single_enemy', required: true },
         onPlay: ({ engine, source, targets }) => {
             const target = targets[0]
             const str = engine.state.player.powers.find(p => p.id === 'STRENGTH')?.stacks ?? 0
@@ -616,6 +641,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         type: 'skill',
         cost: 1,
         rarity: 'uncommon',
+        targeting: { type: 'none' },
         onPlay: ({ engine }) => {
             engine.enqueue({ kind: 'GainBlock', target: 'player', amount: 5 })
         },
@@ -626,6 +652,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         type: 'skill',
         cost: 2,
         rarity: 'uncommon',
+        targeting: { type: 'all_enemies', required: true },
         onPlay: ({ engine }) => {
             for (const enemy of engine.state.enemies) {
                 if (enemy.hp > 0) {
@@ -641,6 +668,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         type: 'skill',
         cost: 1,
         rarity: 'uncommon',
+        targeting: { type: 'single_enemy', required: true },
         onPlay: ({ engine }) => {
             const anyAttacking = engine.state.enemies.some(e => e.intent?.kind === 'attack')
             if (anyAttacking) engine.enqueue({ kind: 'ApplyPower', target: 'player', powerId: 'STRENGTH', stacks: 3 })
@@ -652,6 +680,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         type: 'attack',
         cost: 2,
         rarity: 'uncommon',
+        targeting: { type: 'all_enemies', required: true },
         onPlay: ({ engine, source }) => {
             const str = engine.state.player.powers.find(p => p.id === 'STRENGTH')?.stacks ?? 0
             for (const enemy of engine.state.enemies) {
@@ -666,6 +695,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         type: 'attack',
         cost: 3,
         rarity: 'rare',
+        targeting: { type: 'single_enemy', required: true },
         onPlay: ({ engine, source, targets }) => {
             const target = targets[0]
             const str = engine.state.player.powers.find(p => p.id === 'STRENGTH')?.stacks ?? 0
@@ -679,6 +709,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         cost: 0,
         rarity: 'rare',
         exhaust: true,
+        targeting: { type: 'none' },
         onPlay: ({ engine }) => {
             engine.enqueue({ kind: 'LoseHp', target: 'player', amount: 6 })
             engine.enqueue({ kind: 'GainEnergy', amount: 2 })
@@ -691,6 +722,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         type: 'skill',
         cost: 2,
         rarity: 'rare',
+        targeting: { type: 'none' },
         onPlay: ({ engine }) => {
             engine.enqueue({ kind: 'GainBlock', target: 'player', amount: 30 })
         },
@@ -701,6 +733,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         type: 'skill',
         cost: 1,
         rarity: 'rare',
+        targeting: { type: 'none' },
         onPlay: ({ engine }) => {
             const st = engine.state.player.powers.find(p => p.id === 'STRENGTH')
             if (st && st.stacks > 0) engine.enqueue({ kind: 'ApplyPower', target: 'player', powerId: 'STRENGTH', stacks: st.stacks })
@@ -712,6 +745,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         type: 'attack',
         cost: 2,
         rarity: 'rare',
+        targeting: { type: 'all_enemies', required: true },
         onPlay: ({ engine, source }) => {
             let totalHeal = 0
             const base = 4

@@ -1,6 +1,6 @@
 Gameplay items:
 - review card effects:
-    - add targetting as not all of them have it
+    - ~~add targetting as not all of them have it~~
     - add definition if it's use once per combat card
     - add power effects to card, like effects to apply and what values to apply
 - add exhaust pile for exhaust effect cards
