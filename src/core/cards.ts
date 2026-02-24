@@ -140,10 +140,9 @@ export const CARD_DEFS: Record<string, CardDef> = {
         type: 'skill',
         cost: 1,
         rarity: 'rare',
-        targeting: { type: 'single_enemy', required: true },
+        targeting: { type: 'none' },
         onPlay: ({ engine }) => {
-            // Next ATTACK this turn plays twice. Simple modeling: apply a temporary power.
-            engine.enqueue({ kind: 'ApplyPower', target: 'player', powerId: 'STRENGTH', stacks: 0 })
+            // Next ATTACK this turn plays twice.
                 ; (engine as any)._doubleTap = true
         },
     },
@@ -580,7 +579,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         type: 'skill',
         cost: 0,
         rarity: 'uncommon',
-        targeting: { type: 'single_enemy', required: true },
+        targeting: { type: 'none' },
         onPlay: ({ engine }) => {
             for (const enemy of engine.state.enemies) {
                 if (enemy.hp > 0) engine.enqueue({ kind: 'ApplyPower', target: enemy.id, powerId: 'WEAK', stacks: 1 })
@@ -669,9 +668,12 @@ export const CARD_DEFS: Record<string, CardDef> = {
         cost: 1,
         rarity: 'uncommon',
         targeting: { type: 'single_enemy', required: true },
-        onPlay: ({ engine }) => {
-            const anyAttacking = engine.state.enemies.some(e => e.intent?.kind === 'attack')
-            if (anyAttacking) engine.enqueue({ kind: 'ApplyPower', target: 'player', powerId: 'STRENGTH', stacks: 3 })
+        onPlay: ({ engine, targets }) => {
+            const target = targets[0]
+            const enemy = engine.state.enemies.find(e => e.id === target)
+            if (enemy?.intent?.kind === 'attack') {
+                engine.enqueue({ kind: 'ApplyPower', target: 'player', powerId: 'STRENGTH', stacks: 3 })
+            }
         },
     },
     WHIRLWIND: {
@@ -761,5 +763,4 @@ export const CARD_DEFS: Record<string, CardDef> = {
         },
     },
 }
-
 

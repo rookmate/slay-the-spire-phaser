@@ -6,18 +6,21 @@ import { generateEncounter } from '../core/encounters'
 import type { RunState } from '../core/run'
 import { saveRun } from '../core/run'
 import { CombatUI } from '../ui/CombatUI'
+import type { RoomKind } from '../core/map'
 
 export class CombatScene extends Phaser.Scene {
     private engine!: Engine
     private ui!: CombatUI
     private run!: RunState
+    private roomKind: RoomKind = 'monster'
 
     constructor() {
         super('Combat')
     }
 
-    create(data: { run: RunState }): void {
+    create(data: { run: RunState; roomKind?: RoomKind }): void {
         this.run = data.run
+        this.roomKind = data.roomKind ?? 'monster'
         const seed = this.run.seed
         const player = createPlayerFromDeck(seed, this.run.deck, this.run.player.hp, this.run.player.maxHp)
         const combatIndex = this.run.combatCount ?? 0
@@ -42,6 +45,8 @@ export class CombatScene extends Phaser.Scene {
         }
 
         this.ui = new CombatUI(this, this.engine)
+        this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.ui?.destroy())
+        this.events.once(Phaser.Scenes.Events.DESTROY, () => this.ui?.destroy())
         this.ui.onPlayCard((card, targets) => {
             const evStart = this.engine.playCard(card, targets)
             this.ui.apply(evStart)
@@ -74,15 +79,28 @@ export class CombatScene extends Phaser.Scene {
         } else {
             this.run.player.hp = this.engine.state.player.hp
         }
-        saveRun(this.run)
         this.run.combatCount = (this.run.combatCount ?? 0) + 1
+
+        if (this.roomKind === 'boss') {
+            const currentAct = this.run.mapProgress?.act ?? 1
+            if (currentAct >= 3) {
+                this.scene.start('RunSummary', { run: this.run, result: 'victory' as const })
+                return
+            }
+
+            this.run.floor += 1
+            this.run.mapProgress = { act: currentAct + 1 }
+            saveRun(this.run)
+            this.scene.start('Map', { run: this.run })
+            return
+        }
+
+        saveRun(this.run)
         this.scene.start('Rewards', { run: this.run })
     }
 
     private handleDefeat(): void {
-        saveRun(this.run)
-        this.scene.start('Map', { run: this.run })
+        this.run.player.hp = 0
+        this.scene.start('RunSummary', { run: this.run, result: 'defeat' as const })
     }
 }
-
-

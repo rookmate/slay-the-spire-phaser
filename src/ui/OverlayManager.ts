@@ -4,16 +4,21 @@ import type { CardInstance } from '../core/state'
 import { Card } from './Card'
 import { COMBAT_UI_CONFIG } from './CombatUIConfig'
 
+type WheelHandler = (_p: unknown, _go: unknown, _dx: number, dy: number) => void
+
 export class OverlayManager {
     private scene: Phaser.Scene
     private engine: Engine
     private discardOverlay?: Phaser.GameObjects.Container
     private discardList?: Phaser.GameObjects.Container
     private discardContentHeight = 0
+    private discardWheelHandler?: WheelHandler
     private deckOverlay?: Phaser.GameObjects.Container
     private deckList?: Phaser.GameObjects.Container
     private deckContentHeight = 0
+    private deckWheelHandler?: WheelHandler
     private discardIcon?: Phaser.GameObjects.Text
+    private resizeHandler?: (gameSize: Phaser.Structs.Size) => void
 
     constructor(scene: Phaser.Scene, engine: Engine) {
         this.scene = scene
@@ -38,9 +43,10 @@ export class OverlayManager {
             .setDepth(COMBAT_UI_CONFIG.depths.ui)
 
         // Handle resize
-        this.scene.scale.on('resize', (gameSize: any) => {
+        this.resizeHandler = (gameSize: Phaser.Structs.Size) => {
             this.discardIcon?.setPosition(gameSize.width - 16, gameSize.height - 16)
-        })
+        }
+        this.scene.scale.on('resize', this.resizeHandler)
     }
 
     openDiscardOverlay(): void {
@@ -48,9 +54,12 @@ export class OverlayManager {
             this.closeDiscardOverlay()
             return
         }
+        this.closeDeckOverlay()
 
-        this.discardOverlay = this.createOverlay('Discard Pile', this.engine.state.player.discardPile)
-        this.discardList = this.discardOverlay.getAt(3) as Phaser.GameObjects.Container
+        const { overlay, list, wheelHandler } = this.createOverlay('discard', 'Discard Pile', this.engine.state.player.discardPile)
+        this.discardOverlay = overlay
+        this.discardList = list
+        this.discardWheelHandler = wheelHandler
     }
 
     openDeckOverlay(): void {
@@ -58,12 +67,23 @@ export class OverlayManager {
             this.closeDeckOverlay()
             return
         }
+        this.closeDiscardOverlay()
 
-        this.deckOverlay = this.createOverlay('Draw Pile', this.engine.state.player.drawPile)
-        this.deckList = this.deckOverlay.getAt(3) as Phaser.GameObjects.Container
+        const { overlay, list, wheelHandler } = this.createOverlay('deck', 'Draw Pile', this.engine.state.player.drawPile)
+        this.deckOverlay = overlay
+        this.deckList = list
+        this.deckWheelHandler = wheelHandler
     }
 
-    private createOverlay(title: string, cards: CardInstance[]): Phaser.GameObjects.Container {
+    private createOverlay(
+        kind: 'discard' | 'deck',
+        title: string,
+        cards: CardInstance[]
+    ): {
+        overlay: Phaser.GameObjects.Container
+        list: Phaser.GameObjects.Container
+        wheelHandler: WheelHandler
+    } {
         const { width, height } = this.scene.scale
         const overlay = this.scene.add.container(0, 0)
         overlay.setDepth(COMBAT_UI_CONFIG.depths.overlay)
@@ -103,15 +123,17 @@ export class OverlayManager {
         overlay.add(list)
 
         // Populate cards
-        this.populateCardList(list, cards)
+        const contentHeight = this.populateCardList(list, cards)
+        if (kind === 'discard') this.discardContentHeight = contentHeight
+        else this.deckContentHeight = contentHeight
 
         // Set up scrolling
-        this.setupScrolling(list)
+        const wheelHandler = this.setupScrolling(kind, list)
 
-        return overlay
+        return { overlay, list, wheelHandler }
     }
 
-    private populateCardList(list: Phaser.GameObjects.Container, cards: CardInstance[]): void {
+    private populateCardList(list: Phaser.GameObjects.Container, cards: CardInstance[]): number {
         const { cardWidth, cardHeight, columns } = COMBAT_UI_CONFIG.overlay
 
         cards.forEach((card, i) => {
@@ -126,28 +148,27 @@ export class OverlayManager {
         })
 
         const totalRows = Math.ceil(cards.length / columns)
-        const contentHeight = totalRows * cardHeight
-
-        if (list === this.discardList) {
-            this.discardContentHeight = contentHeight
-        } else if (list === this.deckList) {
-            this.deckContentHeight = contentHeight
-        }
+        return totalRows * cardHeight
     }
 
-    private setupScrolling(list: Phaser.GameObjects.Container): void {
+    private setupScrolling(kind: 'discard' | 'deck', list: Phaser.GameObjects.Container): WheelHandler {
         const onWheel = (_p: any, _go: any, _dx: number, dy: number) => {
             const viewportHeight = this.scene.scale.height - 120
-            const contentHeight = list === this.discardList ? this.discardContentHeight : this.deckContentHeight
+            const contentHeight = kind === 'discard' ? this.discardContentHeight : this.deckContentHeight
             const minY = COMBAT_UI_CONFIG.overlay.titleHeight - Math.max(0, contentHeight - viewportHeight)
             const maxY = COMBAT_UI_CONFIG.overlay.titleHeight
             list.y = Phaser.Math.Clamp(list.y - dy, minY, maxY)
         }
 
         this.scene.input.on('wheel', onWheel)
+        return onWheel
+    }
 
-            // Store handler for cleanup
-            ; (list as any)._wheelHandler = onWheel
+    private clampListY(list: Phaser.GameObjects.Container, contentHeight: number): void {
+        const viewportHeight = this.scene.scale.height - 120
+        const minY = COMBAT_UI_CONFIG.overlay.titleHeight - Math.max(0, contentHeight - viewportHeight)
+        const maxY = COMBAT_UI_CONFIG.overlay.titleHeight
+        list.y = Phaser.Math.Clamp(list.y, minY, maxY)
     }
 
     private closeAllOverlays(): void {
@@ -158,23 +179,29 @@ export class OverlayManager {
     private closeDiscardOverlay(): void {
         if (!this.discardOverlay) return
 
-        const handler = (this.discardOverlay as any)._wheelHandler
-        if (handler) this.scene.input.off('wheel', handler)
+        if (this.discardWheelHandler) {
+            this.scene.input.off('wheel', this.discardWheelHandler)
+            this.discardWheelHandler = undefined
+        }
 
         this.discardOverlay.destroy(true)
         this.discardOverlay = undefined
         this.discardList = undefined
+        this.discardContentHeight = 0
     }
 
     private closeDeckOverlay(): void {
         if (!this.deckOverlay) return
 
-        const handler = (this.deckOverlay as any)._wheelHandler
-        if (handler) this.scene.input.off('wheel', handler)
+        if (this.deckWheelHandler) {
+            this.scene.input.off('wheel', this.deckWheelHandler)
+            this.deckWheelHandler = undefined
+        }
 
         this.deckOverlay.destroy(true)
         this.deckOverlay = undefined
         this.deckList = undefined
+        this.deckContentHeight = 0
     }
 
     refreshOverlays(): void {
@@ -186,18 +213,21 @@ export class OverlayManager {
         if (!this.discardOverlay || !this.discardList) return
 
         this.discardList.removeAll(true)
-        this.populateCardList(this.discardList, this.engine.state.player.discardPile)
+        this.discardContentHeight = this.populateCardList(this.discardList, this.engine.state.player.discardPile)
+        this.clampListY(this.discardList, this.discardContentHeight)
     }
 
     private refreshDeckOverlay(): void {
         if (!this.deckOverlay || !this.deckList) return
 
         this.deckList.removeAll(true)
-        this.populateCardList(this.deckList, this.engine.state.player.drawPile)
+        this.deckContentHeight = this.populateCardList(this.deckList, this.engine.state.player.drawPile)
+        this.clampListY(this.deckList, this.deckContentHeight)
     }
 
     destroy(): void {
         this.closeAllOverlays()
+        if (this.resizeHandler) this.scene.scale.off('resize', this.resizeHandler)
         this.discardIcon?.destroy()
     }
 }

@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
 import type { RunState } from '../core/run'
+import { saveRun } from '../core/run'
 import { RNG } from '../core/rng'
 import { generateMap, resolveUnknown, updateUnknownWeights, defaultUnknownWeights, type GeneratedMap, type MapNode } from '../core/map'
 
@@ -61,6 +62,7 @@ export class MapScene extends Phaser.Scene {
         // Update current node and persist
         this.currentNodeId = node.id
         this.run.mapProgress = { act: this.run.mapProgress?.act ?? 1, currentNodeId: this.currentNodeId }
+        saveRun(this.run)
         // Repaint to lock other nodes
         this.children.removeAll()
         const style = { fontFamily: 'monospace', fontSize: '18px', color: '#ffffff' }
@@ -69,18 +71,18 @@ export class MapScene extends Phaser.Scene {
         if (node.kind === 'unknown') {
             const outcome = resolveUnknown(rng, this.unknownWeights)
             this.unknownWeights = updateUnknownWeights(this.unknownWeights, outcome)
-            if (outcome === 'monster') { this.scene.start('Combat', { run: this.run }); return }
+            if (outcome === 'monster') { this.scene.start('Combat', { run: this.run, roomKind: 'monster' }); return }
             if (outcome === 'shop') { this.scene.start('Shop', { run: this.run }); return }
             if (outcome === 'chest') { this.scene.start('Rewards', { run: this.run }); return }
             this.scene.start('Event', { run: this.run }); return
         }
         const kind = node.kind
-        if (kind === 'monster') { this.scene.start('Combat', { run: this.run }); return }
+        if (kind === 'monster') { this.scene.start('Combat', { run: this.run, roomKind: 'monster' }); return }
         if (kind === 'rest') { this.scene.start('Campfire', { run: this.run }); return }
         if (kind === 'shop') { this.scene.start('Shop', { run: this.run }); return }
         if (kind === 'chest') { this.scene.start('Rewards', { run: this.run }); return }
-        if (kind === 'elite') { this.scene.start('Combat', { run: this.run }); return }
-        if (kind === 'boss') { this.scene.start('Combat', { run: this.run }); return }
+        if (kind === 'elite') { this.scene.start('Combat', { run: this.run, roomKind: 'elite' }); return }
+        if (kind === 'boss') { this.scene.start('Combat', { run: this.run, roomKind: 'boss' }); return }
         this.scene.start('Event', { run: this.run })
     }
 
@@ -165,5 +167,4 @@ export class MapScene extends Phaser.Scene {
         })
     }
 }
-
 

@@ -23,6 +23,9 @@ export class CombatUI {
 
     private onPlay?: (card: CardInstance, targets: string[]) => void
     private onEnd?: () => void
+    private pointerMoveHandler?: (pointer: Phaser.Input.Pointer) => void
+    private pointerUpHandler?: (pointer: Phaser.Input.Pointer) => void
+    private resizeHandler?: () => void
 
     constructor(scene: Phaser.Scene, engine: Engine) {
         this.scene = scene
@@ -77,25 +80,28 @@ export class CombatUI {
         })
 
         // Set up global input handlers
-        this.scene.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
+        this.pointerMoveHandler = (pointer: Phaser.Input.Pointer) => {
             if (this.dragSystem.isCurrentlyDragging()) {
                 this.dragSystem.updateDrag(pointer)
             }
-        })
+        }
+        this.scene.input.on('pointermove', this.pointerMoveHandler)
 
-        this.scene.input.on('pointerup', (pointer: Phaser.Input.Pointer) => {
+        this.pointerUpHandler = (pointer: Phaser.Input.Pointer) => {
             if (this.dragSystem.isCurrentlyDragging()) {
                 const targetFound = this.dragSystem.endDrag(pointer)
                 if (targetFound) {
                     this.handManager.rebuildHand()
                 }
             }
-        })
+        }
+        this.scene.input.on('pointerup', this.pointerUpHandler)
 
         // Handle screen resize events
-        this.scene.scale.on('resize', () => {
+        this.resizeHandler = () => {
             this.handleScreenResize()
-        })
+        }
+        this.scene.scale.on('resize', this.resizeHandler)
     }
 
     update(): void {
@@ -142,6 +148,10 @@ export class CombatUI {
     }
 
     destroy(): void {
+        if (this.pointerMoveHandler) this.scene.input.off('pointermove', this.pointerMoveHandler)
+        if (this.pointerUpHandler) this.scene.input.off('pointerup', this.pointerUpHandler)
+        if (this.resizeHandler) this.scene.scale.off('resize', this.resizeHandler)
+
         // Destroy all components
         this.handManager.destroy()
         this.enemyDisplay.destroy()

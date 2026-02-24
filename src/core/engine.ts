@@ -1,5 +1,6 @@
 import { RNG } from './rng'
 import { CARD_DEFS } from './cards'
+import { rollEngineIntentForEnemy } from './enemies'
 import type { Action, EmittedEvent, EntityId } from './actions'
 import type { CombatState, CardInstance, PlayerState, EnemyState, PowerInstance } from './state'
 
@@ -122,25 +123,50 @@ export class Engine {
                     this.enqueue({ kind: 'DiscardHand' })
                     this.state.turn = 'enemy'
                     evts.push({ kind: 'TurnChanged', turn: 'enemy' })
+                    ; (this as any)._doubleTap = false
                     // end of player turn hooks
                     this.onEndOfPlayerTurn()
+                    this.tickTemporaryDebuffs(this.state.player)
                     // enemies execute intents
                     for (const enemy of this.state.enemies) {
                         if (enemy.hp > 0) {
                             if (enemy.intent?.kind === 'attack') {
-                                const scaled = Math.round(enemy.intent.amount * this.enemyDamageMultiplier())
-                                this.enqueue({ kind: 'DealDamage', source: enemy.id, target: this.state.player.id, amount: scaled })
+                                const enemyStrength = enemy.powers.find(p => p.id === 'STRENGTH')?.stacks ?? 0
+                                this.enqueue({
+                                    kind: 'DealDamage',
+                                    source: enemy.id,
+                                    target: this.state.player.id,
+                                    amount: enemy.intent.amount + enemyStrength,
+                                })
                             } else if (enemy.intent?.kind === 'block') {
                                 const scaled = Math.round(enemy.intent.amount * this.enemyBlockMultiplier())
                                 this.enqueue({ kind: 'GainBlock', target: enemy.id, amount: scaled })
+                            } else if (enemy.intent?.kind === 'debuff') {
+                                this.enqueue({
+                                    kind: 'ApplyPower',
+                                    target: this.state.player.id,
+                                    powerId: enemy.intent.debuff,
+                                    stacks: enemy.intent.stacks,
+                                })
+                            } else if (enemy.intent?.kind === 'buff') {
+                                const strengthGain = this.resolveEnemyBuffStrength(enemy.intent.desc)
+                                if (strengthGain > 0) {
+                                    this.enqueue({
+                                        kind: 'ApplyPower',
+                                        target: enemy.id,
+                                        powerId: 'STRENGTH',
+                                        stacks: strengthGain,
+                                    })
+                                }
                             } else {
-                                this.enqueue({ kind: 'DealDamage', source: enemy.id, target: this.state.player.id, amount: 5 })
+                                this.enqueue({ kind: 'GainBlock', target: enemy.id, amount: 3 })
                             }
                         }
                     }
                     // end enemy turn
                     this.enqueue({ kind: 'EndTurn' })
                 } else {
+                    for (const enemy of this.state.enemies) this.tickTemporaryDebuffs(enemy)
                     this.state.turn = 'player'
                     this.state.player.energy = 3
                     // At the start of the player's turn, Block expires unless Barricade is active
@@ -152,10 +178,10 @@ export class Engine {
                     for (const enemy of this.state.enemies) enemy.block = 0
                     // start of player turn hooks
                     this.onStartOfPlayerTurn()
-                    // roll next intents (attack 5-10 or block 5-10)
+                    // Roll next intent from enemy spec AI
                     for (const enemy of this.state.enemies) {
-                        const amt = this.rng.int(5, 10)
-                        enemy.intent = this.rng.random() < 0.7 ? { kind: 'attack', amount: amt } : { kind: 'block', amount: amt }
+                        if (enemy.hp <= 0) continue
+                        enemy.intent = rollEngineIntentForEnemy(this.rng, enemy)
                     }
                     // Draw a fresh 5-card hand each player turn (hand was discarded at end of previous turn)
                     this.enqueue({ kind: 'DrawCards', count: 5 })
@@ -179,6 +205,7 @@ export class Engine {
     playCard(card: CardInstance, targetIds: EntityId[]): EmittedEvent[] {
         const def = CARD_DEFS[card.defId]
         if (!def) return []
+        if (!this.validateTargets(card, targetIds)) return []
         const hasCorruption = this.state.player.powers.find(p => p.id === 'CORRUPTION')?.stacks ?? 0
         const isSkill = def.type === 'skill'
         const effectiveCost = hasCorruption > 0 && isSkill ? 0 : def.cost
@@ -214,6 +241,26 @@ export class Engine {
                 ; (this as any)._doubleTap = false
         }
         return events
+    }
+
+    private validateTargets(card: CardInstance, targetIds: EntityId[]): boolean {
+        const def = CARD_DEFS[card.defId]
+        if (!def) return false
+
+        const targetType = def.targeting?.type ?? 'none'
+        const livingEnemyIds = this.state.enemies.filter(e => e.hp > 0).map(e => e.id)
+
+        if (targetType === 'none') return true
+        if (targetType === 'player') return targetIds.length === 1 && targetIds[0] === this.state.player.id
+        if (targetType === 'single_enemy') return targetIds.length === 1 && livingEnemyIds.includes(targetIds[0])
+        if (targetType === 'all_enemies') {
+            return targetIds.length === livingEnemyIds.length && targetIds.every(id => livingEnemyIds.includes(id))
+        }
+        if (targetType === 'any') {
+            if (targetIds.length !== 1) return false
+            return targetIds[0] === this.state.player.id || livingEnemyIds.includes(targetIds[0])
+        }
+        return false
     }
 
     private drawOne(): void {
@@ -285,6 +332,22 @@ export class Engine {
     private enemyBlockMultiplier(): number {
         if (this.ascension >= 1) return 1.2
         return 1
+    }
+
+    private resolveEnemyBuffStrength(desc?: string): number {
+        const text = (desc ?? '').toLowerCase()
+        if (text.includes('ritual') || text.includes('strength')) return 1
+        if (text.includes('charging')) return 2
+        return 0
+    }
+
+    private tickTemporaryDebuffs(target: PlayerState | EnemyState): void {
+        for (let i = target.powers.length - 1; i >= 0; i--) {
+            const p = target.powers[i]
+            if (p.id !== 'WEAK' && p.id !== 'VULNERABLE') continue
+            p.stacks -= 1
+            if (p.stacks <= 0) target.powers.splice(i, 1)
+        }
     }
 
     // Hooks and helpers
@@ -371,5 +434,3 @@ export function createPlayerFromDeck(seed: string, deck: CardInstance[], hp: num
         powers: [],
     }
 }
-
-

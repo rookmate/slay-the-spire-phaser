@@ -107,20 +107,35 @@ export const ENEMIES: Record<string, EnemySpec> = {
 
 export function createEnemyFromSpec(rng: RNG, key: keyof typeof ENEMIES, id: string): EnemyState {
     const spec = ENEMIES[key]
-    return {
+    const enemy: EnemyState = {
         id,
         name: spec.name,
         maxHp: spec.maxHp,
         hp: spec.maxHp,
         block: 0,
         powers: [],
-        intent: toEngineIntent(spec.ai(rng, undefined as unknown as EnemyState)),
+        intent: { kind: 'attack', amount: 0 },
         specId: spec.id,
     }
+    enemy.intent = toEngineIntent(spec.ai(rng, enemy))
+    return enemy
 }
 
 export function rollIntent(rng: RNG, key: keyof typeof ENEMIES): Intent {
     return ENEMIES[key].ai(rng, undefined as unknown as EnemyState)
+}
+
+export function rollEngineIntentForEnemy(rng: RNG, enemy: EnemyState): EnemyState['intent'] {
+    if (!enemy.specId) {
+        const amount = rng.int(5, 10)
+        return rng.random() < 0.7 ? { kind: 'attack', amount } : { kind: 'block', amount }
+    }
+    const spec = ENEMIES[enemy.specId as keyof typeof ENEMIES]
+    if (!spec) {
+        const amount = rng.int(5, 10)
+        return rng.random() < 0.7 ? { kind: 'attack', amount } : { kind: 'block', amount }
+    }
+    return toEngineIntent(spec.ai(rng, enemy))
 }
 
 export function toEngineIntent(intent: Intent): EnemyState['intent'] {
@@ -130,5 +145,4 @@ export function toEngineIntent(intent: Intent): EnemyState['intent'] {
     if (intent.kind === 'debuff') return { kind: 'debuff', debuff: intent.debuff, stacks: intent.stacks }
     return { kind: 'block', amount: 0 }
 }
-
 

@@ -46,11 +46,23 @@ export class DragSystem {
         if (this.isDragging) return
 
         const cardInstance = this.engine.state.player.hand[cardIndex]
+        if (!cardInstance) return
         const cardDef = CARD_DEFS[cardInstance.defId]
+        if (!cardDef) return
 
-        // Check if player can afford the card
-        if (this.engine.state.player.energy < (cardDef.cost ?? 0)) {
+        // Mirror engine cost modifiers so drag availability matches actual playability.
+        const effectiveCost = this.getEffectiveCost(cardDef)
+        if (this.engine.state.player.energy < effectiveCost) {
             return // Can't afford, don't start drag
+        }
+        if (cardDef.canPlay) {
+            const canPlay = cardDef.canPlay({
+                engine: this.engine as unknown as { state: any },
+                source: this.engine.state.player.id,
+                targets: [],
+                card: cardInstance,
+            })
+            if (!canPlay) return
         }
 
         this.isDragging = true
@@ -94,7 +106,15 @@ export class DragSystem {
         if (!this.isDragging) return false
 
         const cardInstance = this.engine.state.player.hand[this.dragCardIndex]
+        if (!cardInstance) {
+            this.cleanupDrag()
+            return false
+        }
         const cardDef = CARD_DEFS[cardInstance.defId]
+        if (!cardDef) {
+            this.cleanupDrag()
+            return false
+        }
         let targetFound = false
 
         // Check if this is a non-targeting or all-enemies card dragged upward
@@ -278,6 +298,12 @@ export class DragSystem {
     private clearTargetHighlights(): void {
         this.validTargets.forEach(target => target.destroy())
         this.validTargets = []
+    }
+
+    private getEffectiveCost(cardDef: CardDef): number {
+        const hasCorruption = this.engine.state.player.powers.find(p => p.id === 'CORRUPTION')?.stacks ?? 0
+        if (hasCorruption > 0 && cardDef.type === 'skill') return 0
+        return cardDef.cost ?? 0
     }
 
     private cleanupDrag(): void {

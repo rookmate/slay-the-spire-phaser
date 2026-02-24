@@ -14,6 +14,7 @@ export class PlayerDisplay {
 
     private onEndTurn?: () => void
     private onOpenDeck?: () => void
+    private resizeHandler?: (gameSize: Phaser.Structs.Size) => void
 
     constructor(scene: Phaser.Scene, engine: Engine) {
         this.scene = scene
@@ -129,12 +130,13 @@ export class PlayerDisplay {
     }
 
     private setupResizeHandler(): void {
-        this.scene.scale.on('resize', (gameSize: any) => {
+        this.resizeHandler = (gameSize: Phaser.Structs.Size) => {
             this.handleResize(gameSize)
-        })
+        }
+        this.scene.scale.on('resize', this.resizeHandler)
     }
 
-    private handleResize(gameSize: any): void {
+    private handleResize(gameSize: Phaser.Structs.Size): void {
         this.drawIcon?.setPosition(16, gameSize.height - 16)
         this.energyText?.setPosition(16 + 56, gameSize.height - 16 - 40)
         this.endTurnButton?.setPosition(gameSize.width - 16 - 50, gameSize.height - 16 - 30)
@@ -172,6 +174,7 @@ export class PlayerDisplay {
     }
 
     destroy(): void {
+        if (this.resizeHandler) this.scene.scale.off('resize', this.resizeHandler)
         this.playerSprite?.destroy()
         this.playerHpText?.destroy()
         this.playerNameText?.destroy()
