@@ -66,6 +66,18 @@ export class CombatScene extends Phaser.Scene {
             this.checkOutcome()
         })
 
+        this.ui.onSubmitPendingChoice((instanceIds) => {
+            this.ui.apply(this.engine.submitPendingChoice(instanceIds))
+            this.ui.apply(this.engine.runUntilIdle())
+            this.checkOutcome()
+        })
+
+        this.ui.onCancelPendingChoice(() => {
+            this.ui.apply(this.engine.cancelPendingChoice())
+            this.ui.apply(this.engine.runUntilIdle())
+            this.checkOutcome()
+        })
+
         this.ui.onUsePotion((potionIndex, targets) => {
             const potionId = this.run.potions[potionIndex]
             if (!potionId) return

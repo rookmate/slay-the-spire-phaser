@@ -52,7 +52,7 @@ export class Card extends Phaser.GameObjects.Container {
             wordWrap: { width: w - 16 }
         })
 
-        this.cost = scene.add.text(w - 24, 8, String(def.cost ?? 0), {
+        this.cost = scene.add.text(w - 28, 8, def.xCost ? 'X' : String(def.cost ?? 0), {
             fontFamily: 'monospace',
             fontSize: '12px',
             color: '#ffeb3b',
@@ -60,7 +60,8 @@ export class Card extends Phaser.GameObjects.Container {
             padding: { x: 6, y: 3 }
         })
 
-        this.subtype = scene.add.text(8, 32, def.type.toUpperCase(), {
+        const typeLabel = [def.type.toUpperCase(), def.unplayable ? 'UNPLAYABLE' : undefined].filter(Boolean).join('  ')
+        this.subtype = scene.add.text(8, 32, typeLabel, {
             fontFamily: 'monospace',
             fontSize: '10px',
             color: '#aaa'
@@ -69,6 +70,7 @@ export class Card extends Phaser.GameObjects.Container {
         const stats: string[] = []
         if (def.baseDamage) stats.push(`DMG ${def.baseDamage}`)
         if (def.baseBlock) stats.push(`BLK ${def.baseBlock}`)
+        if (def.ethereal) stats.push('ETH')
         if (def.exhaust) stats.push('EXH')
         this.stats = scene.add.text(8, h - 24, stats.join('  '), {
             fontFamily: 'monospace',
@@ -121,6 +123,10 @@ export class Card extends Phaser.GameObjects.Container {
                 return 0x006400 // Dark green for skills
             case 'power':
                 return 0x4B0082 // Indigo for powers
+            case 'status':
+                return 0x4a4a4a
+            case 'curse':
+                return 0x3f1d3f
             default:
                 return 0x8B4513 // Default brown
         }

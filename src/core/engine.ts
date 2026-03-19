@@ -1,9 +1,31 @@
 import { RNG } from './rng'
-import { CARD_DEFS, resolveCard } from './cards'
+import { CARD_DEFS, canUpgradeCard, createCardInstance, createStarterDeck, resolveCard } from './cards'
 import { onEnemyDamaged, onPlayerCardPlayed, rollEngineIntentForEnemy } from './enemies'
 import { POTION_DEFS, type PotionId } from './potions'
 import type { Action, EmittedEvent, EntityId } from './actions'
-import type { CombatState, CardInstance, PlayerState, EnemyState, PowerInstance } from './state'
+import type {
+    CardChoiceRequest,
+    CardDestination,
+    CardInstance,
+    ChoiceZone,
+    CombatState,
+    EnemyState,
+    LimboCardState,
+    PendingChoice,
+    PendingChoiceView,
+    PlayerState,
+    PowerInstance,
+} from './state'
+
+interface InternalPendingChoice extends PendingChoice {
+    onSubmit: (instanceIds: string[]) => void
+    onCancel?: () => void
+}
+
+interface InternalLimboCardState extends LimboCardState {
+    remainingRepeats: number
+    pendingChoiceStarter?: () => void
+}
 
 export class Engine {
     readonly rng: RNG
@@ -13,6 +35,8 @@ export class Engine {
     private doubleTapCharges = 0
     private basePlayerThorns = 0
     private temporaryThorns = 0
+    private activeLimbo?: InternalLimboCardState
+    private pendingChoice?: InternalPendingChoice
 
     constructor(seed: string, player: PlayerState, enemies: EnemyState[], opts?: { asc?: number }) {
         this.rng = new RNG(seed)
@@ -22,6 +46,7 @@ export class Engine {
             turn: 'player',
             victory: false,
             defeat: false,
+            limbo: [],
         }
         this.ascension = opts?.asc ?? 0
     }
@@ -36,9 +61,7 @@ export class Engine {
 
     configurePlayerCombatBonuses(opts: { baseThorns?: number } = {}): void {
         this.basePlayerThorns = opts.baseThorns ?? this.basePlayerThorns
-        if (this.basePlayerThorns > 0) {
-            this.setPowerStacks(this.state.player, 'THORNS', this.basePlayerThorns + this.temporaryThorns)
-        }
+        if (this.basePlayerThorns > 0) this.setPowerStacks(this.state.player, 'THORNS', this.basePlayerThorns + this.temporaryThorns)
     }
 
     addTemporaryThorns(amount: number): void {
@@ -46,7 +69,101 @@ export class Engine {
         this.setPowerStacks(this.state.player, 'THORNS', this.basePlayerThorns + this.temporaryThorns)
     }
 
+    canAcceptInput(): boolean {
+        return this.state.turn === 'player' && !this.state.victory && !this.state.defeat && !this.pendingChoice
+    }
+
+    getPendingChoice(): PendingChoiceView | undefined {
+        if (!this.pendingChoice) return undefined
+        const { onSubmit: _onSubmit, onCancel: _onCancel, ...view } = this.pendingChoice
+        return view
+    }
+
+    submitPendingChoice(instanceIds: string[]): EmittedEvent[] {
+        if (!this.pendingChoice) return []
+        const uniqueIds = [...new Set(instanceIds)]
+        const validIds = uniqueIds.filter(id => this.pendingChoice?.eligibleInstanceIds.includes(id))
+        if (validIds.length < this.pendingChoice.minSelections || validIds.length > this.pendingChoice.maxSelections) return []
+
+        const choice = this.pendingChoice
+        this.pendingChoice = undefined
+        choice.onSubmit(validIds)
+        if (!this.pendingChoice) this.resolveActiveLimbo()
+        return []
+    }
+
+    cancelPendingChoice(): EmittedEvent[] {
+        if (!this.pendingChoice || !this.pendingChoice.canSkip) return []
+        const choice = this.pendingChoice
+        this.pendingChoice = undefined
+        choice.onCancel?.()
+        if (!this.pendingChoice) this.resolveActiveLimbo()
+        return []
+    }
+
+    beginChoice(choice: CardChoiceRequest): void {
+        this.pendingChoice = choice
+    }
+
+    deferChoice(startChoice: () => void): void {
+        if (!this.activeLimbo) {
+            startChoice()
+            return
+        }
+        this.activeLimbo.pendingChoiceStarter = startChoice
+    }
+
+    getCardsInZone(zone: ChoiceZone): CardInstance[] {
+        if (zone === 'hand') return this.state.player.hand
+        if (zone === 'discard') return this.state.player.discardPile
+        return this.state.player.exhaustPile
+    }
+
+    getLimboCard(): CardInstance | undefined {
+        return this.activeLimbo?.card
+    }
+
+    moveCardToDestination(instanceId: string, zone: ChoiceZone, destination: CardDestination): CardInstance | undefined {
+        const source = this.getCardsInZone(zone)
+        const index = source.findIndex(card => card.instanceId === instanceId)
+        if (index < 0) return undefined
+        const [card] = source.splice(index, 1)
+        this.insertCard(card, destination)
+        return card
+    }
+
+    createCardsInDestination(
+        defId: string,
+        destination: Exclude<CardDestination, 'drawPileTop' | 'exhaustPile'>,
+        count = 1,
+        upgradeLevel = 0,
+    ): CardInstance[] {
+        const created: CardInstance[] = []
+        for (let i = 0; i < count; i++) {
+            const card = createCardInstance(defId, upgradeLevel)
+            created.push(card)
+            this.insertCard(card, destination)
+        }
+        return created
+    }
+
+    randomInt(min: number, max: number): number {
+        return this.rng.int(min, max)
+    }
+
+    upgradeCardInstance(instanceId: string, zones: ChoiceZone[] = ['hand', 'discard', 'exhaust']): CardInstance | undefined {
+        for (const zone of zones) {
+            const card = this.getCardsInZone(zone).find(entry => entry.instanceId === instanceId)
+            if (!card || !canUpgradeCard(card)) continue
+            if (card.defId === 'SEARING_BLOW') card.upgradeLevel += 1
+            else if (card.upgradeLevel === 0) card.upgradeLevel = 1
+            return card
+        }
+        return undefined
+    }
+
     usePotion(potionId: PotionId, targetIds: EntityId[]): EmittedEvent[] {
+        if (!this.canAcceptInput()) return []
         const def = POTION_DEFS[potionId]
         if (!def) return []
         if (def.target === 'player' && targetIds[0] !== this.state.player.id) return []
@@ -85,7 +202,7 @@ export class Engine {
                 const source = this.getEntity(action.source)
                 let damage = action.amount
                 if (action.damageType !== 'thorns' && source) {
-                    const weakStacks = source.powers.find(p => p.id === 'WEAK')?.stacks ?? 0
+                    const weakStacks = source.powers.find(power => power.id === 'WEAK')?.stacks ?? 0
                     if (weakStacks > 0) damage = Math.round(damage * 0.75)
                 }
                 damage = this.modifyIncomingDamage(target, damage)
@@ -111,7 +228,7 @@ export class Engine {
                 if ('name' in target) onEnemyDamaged(target, actualDamage)
 
                 if (source && action.damageType !== 'thorns') {
-                    const thorns = target.powers.find(p => p.id === 'THORNS')?.stacks ?? 0
+                    const thorns = target.powers.find(power => power.id === 'THORNS')?.stacks ?? 0
                     if (thorns > 0 && source.hp > 0 && source.id !== target.id) {
                         this.enqueue({ kind: 'DealDamage', source: target.id, target: source.id, amount: thorns, damageType: 'thorns' })
                     }
@@ -134,12 +251,12 @@ export class Engine {
                 target.block += action.amount
                 evts.push({ kind: 'BlockGained', target: action.target, amount: action.amount, resultingBlock: target.block })
                 if (target === this.state.player) {
-                    const jug = this.state.player.powers.find(p => p.id === 'JUGGERNAUT')?.stacks ?? 0
-                    if (jug > 0) {
+                    const juggernaut = this.state.player.powers.find(power => power.id === 'JUGGERNAUT')?.stacks ?? 0
+                    if (juggernaut > 0) {
                         const living = this.state.enemies.filter(enemy => enemy.hp > 0)
                         if (living.length > 0) {
                             const picked = living[this.rng.int(0, living.length - 1)]
-                            this.enqueue({ kind: 'DealDamage', source: this.state.player.id, target: picked.id, amount: 5 * jug })
+                            this.enqueue({ kind: 'DealDamage', source: this.state.player.id, target: picked.id, amount: 5 * juggernaut })
                         }
                     }
                 }
@@ -148,20 +265,21 @@ export class Engine {
             case 'ApplyPower': {
                 const target = this.getEntity(action.target)
                 if (!target) break
-                const current = target.powers.find(p => p.id === action.powerId)
+                const current = target.powers.find(power => power.id === action.powerId)
                 if (current) current.stacks += action.stacks
                 else target.powers.push({ id: action.powerId, stacks: action.stacks } as PowerInstance)
                 evts.push({ kind: 'PowerApplied', target: action.target, powerId: action.powerId, stacks: action.stacks })
                 break
             }
             case 'ExhaustCard': {
-                const owner = this.getEntity(action.owner)
-                if (!owner || owner.id !== this.state.player.id) break
-                const handIndex = action.cardId ? this.state.player.hand.findIndex(card => card.defId === action.cardId) : this.state.player.hand.length - 1
+                if (action.owner !== this.state.player.id) break
+                const handIndex = action.cardInstanceId
+                    ? this.state.player.hand.findIndex(card => card.instanceId === action.cardInstanceId)
+                    : this.state.player.hand.length - 1
                 if (handIndex < 0) break
                 const [card] = this.state.player.hand.splice(handIndex, 1)
                 this.handleExhaust(card)
-                evts.push({ kind: 'CardExhausted', owner: owner.id, cardId: card.defId })
+                evts.push({ kind: 'CardExhausted', owner: this.state.player.id, cardId: card.defId, instanceId: card.instanceId })
                 break
             }
             case 'DiscardHand': {
@@ -171,6 +289,7 @@ export class Engine {
             }
             case 'EndTurn': {
                 if (this.state.turn === 'player') {
+                    this.processEndOfTurnHand(evts)
                     this.enqueue({ kind: 'DiscardHand' })
                     this.state.turn = 'enemy'
                     evts.push({ kind: 'TurnChanged', turn: 'enemy' })
@@ -181,7 +300,7 @@ export class Engine {
                     for (const enemy of this.state.enemies) {
                         if (enemy.hp <= 0) continue
                         if (enemy.intent?.kind === 'attack') {
-                            const enemyStrength = enemy.powers.find(p => p.id === 'STRENGTH')?.stacks ?? 0
+                            const enemyStrength = enemy.powers.find(power => power.id === 'STRENGTH')?.stacks ?? 0
                             this.enqueue({ kind: 'DealDamage', source: enemy.id, target: this.state.player.id, amount: enemy.intent.amount + enemyStrength })
                         } else if (enemy.intent?.kind === 'block') {
                             const scaled = Math.round(enemy.intent.amount * this.enemyBlockMultiplier())
@@ -190,9 +309,7 @@ export class Engine {
                             this.enqueue({ kind: 'ApplyPower', target: this.state.player.id, powerId: enemy.intent.debuff, stacks: enemy.intent.stacks })
                         } else if (enemy.intent?.kind === 'buff') {
                             const strengthGain = this.resolveEnemyBuffStrength(enemy.intent.desc)
-                            if (strengthGain > 0) {
-                                this.enqueue({ kind: 'ApplyPower', target: enemy.id, powerId: 'STRENGTH', stacks: strengthGain })
-                            }
+                            if (strengthGain > 0) this.enqueue({ kind: 'ApplyPower', target: enemy.id, powerId: 'STRENGTH', stacks: strengthGain })
                         }
                     }
 
@@ -201,7 +318,7 @@ export class Engine {
                     for (const enemy of this.state.enemies) this.tickTemporaryDebuffs(enemy)
                     this.state.turn = 'player'
                     this.state.player.energy = 3
-                    const hasBarricade = this.state.player.powers.find(p => p.id === 'BARRICADE')?.stacks ?? 0
+                    const hasBarricade = this.state.player.powers.find(power => power.id === 'BARRICADE')?.stacks ?? 0
                     if (hasBarricade === 0) this.state.player.block = 0
                     for (const enemy of this.state.enemies) enemy.block = 0
                     this.normalizePlayerThorns()
@@ -222,71 +339,83 @@ export class Engine {
 
     runUntilIdle(): EmittedEvent[] {
         const all: EmittedEvent[] = []
-        while (this.queue.length > 0) {
-            all.push(...this.step())
-            if (this.state.victory || this.state.defeat) break
+        while (true) {
+            while (this.queue.length > 0) {
+                all.push(...this.step())
+                if (this.state.victory || this.state.defeat || this.pendingChoice) return all
+            }
+
+            if (this.activeLimbo?.pendingChoiceStarter && !this.pendingChoice) {
+                const startChoice = this.activeLimbo.pendingChoiceStarter
+                this.activeLimbo.pendingChoiceStarter = undefined
+                startChoice()
+                if (this.pendingChoice) return all
+                this.resolveActiveLimbo()
+                if (this.state.victory || this.state.defeat) return all
+                continue
+            }
+
+            return all
         }
-        return all
     }
 
     playCard(card: CardInstance, targetIds: EntityId[]): EmittedEvent[] {
         const def = CARD_DEFS[card.defId]
-        if (!def) return []
+        if (!def || !this.canAcceptInput()) return []
         const resolved = resolveCard(card)
-        if (!this.validateTargets(card, targetIds)) return []
-        const hasCorruption = this.state.player.powers.find(p => p.id === 'CORRUPTION')?.stacks ?? 0
-        const effectiveCost = hasCorruption > 0 && resolved.type === 'skill' ? 0 : resolved.cost
+        if (resolved.unplayable || !this.validateTargets(card, targetIds)) return []
+
+        const hasCorruption = this.state.player.powers.find(power => power.id === 'CORRUPTION')?.stacks ?? 0
+        const effectiveCost = hasCorruption > 0 && resolved.type === 'skill'
+            ? 0
+            : resolved.xCost
+                ? this.state.player.energy
+                : resolved.cost
         if (this.state.player.energy < effectiveCost) return []
+
         if (def.canPlay) {
-            const canPlay = def.canPlay({ engine: this as unknown as { state: CombatState }, source: this.state.player.id, targets: targetIds, card })
+            const canPlay = def.canPlay({ engine: this, source: this.state.player.id, targets: targetIds, card })
             if (!canPlay) return []
         }
 
+        const handIndex = this.state.player.hand.findIndex(entry => entry.instanceId === card.instanceId)
+        if (handIndex < 0) return []
+
         this.state.player.energy -= effectiveCost
-        const handIndex = this.state.player.hand.findIndex(c => c === card)
-        if (handIndex >= 0) this.state.player.hand.splice(handIndex, 1)
-        const shouldExhaust = resolved.exhaust || (hasCorruption > 0 && resolved.type === 'skill')
-        if (shouldExhaust) this.state.player.exhaustPile.push(card)
-        else this.state.player.discardPile.push(card)
+        const [playedCard] = this.state.player.hand.splice(handIndex, 1)
+        const repeatAttack = resolved.type === 'attack' && this.doubleTapCharges > 0
+        if (repeatAttack) this.doubleTapCharges -= 1
+
+        this.activeLimbo = {
+            card: playedCard,
+            targetIds,
+            exhaustOnResolve: resolved.exhaust || (hasCorruption > 0 && resolved.type === 'skill'),
+            spentEnergy: effectiveCost,
+            remainingRepeats: repeatAttack ? 2 : 1,
+        }
+        this.syncLimboState()
 
         const events: EmittedEvent[] = [
             { kind: 'EnergyChanged', energy: this.state.player.energy },
-            { kind: 'CardPlayed', cardId: card.defId },
+            { kind: 'CardPlayed', cardId: playedCard.defId, instanceId: playedCard.instanceId },
         ]
 
-        const performPlay = () => {
-            if (def.onPlay) {
-                def.onPlay({ engine: this as unknown as any, source: this.state.player.id, targets: targetIds, card })
-            } else {
-                if (resolved.baseDamage) {
-                    this.enqueue({ kind: 'DealDamage', source: this.state.player.id, target: targetIds[0], amount: this.modifyOutgoingDamageFromPlayer(resolved.baseDamage) })
-                }
-                if (resolved.baseBlock) {
-                    this.enqueue({ kind: 'GainBlock', target: this.state.player.id, amount: resolved.baseBlock })
-                }
-            }
-        }
-
-        performPlay()
-        if (this.doubleTapCharges > 0 && resolved.type === 'attack') {
-            this.doubleTapCharges -= 1
-            performPlay()
-        }
-
+        this.resolveActiveLimbo()
         for (const enemy of this.state.enemies) onPlayerCardPlayed(enemy, resolved.type)
         return events
     }
 
     handleExhaustFromHand(card: CardInstance): void {
-        const index = this.state.player.hand.findIndex(item => item === card)
+        const index = this.state.player.hand.findIndex(entry => entry.instanceId === card.instanceId)
         if (index >= 0) this.state.player.hand.splice(index, 1)
         this.handleExhaust(card)
     }
 
     handleExhaust(card: CardInstance): void {
         this.state.player.exhaustPile.push(card)
-        const fnp = this.state.player.powers.find(power => power.id === 'FEEL_NO_PAIN')?.stacks ?? 0
-        if (fnp > 0) this.enqueue({ kind: 'GainBlock', target: this.state.player.id, amount: fnp * 3 })
+        CARD_DEFS[card.defId]?.onExhaust?.({ engine: this, card })
+        const feelNoPain = this.state.player.powers.find(power => power.id === 'FEEL_NO_PAIN')?.stacks ?? 0
+        if (feelNoPain > 0) this.enqueue({ kind: 'GainBlock', target: this.state.player.id, amount: feelNoPain * 3 })
         const darkEmbrace = this.state.player.powers.find(power => power.id === 'DARK_EMBRACE')?.stacks ?? 0
         if (darkEmbrace > 0) this.enqueue({ kind: 'DrawCards', count: darkEmbrace })
     }
@@ -295,18 +424,80 @@ export class Engine {
         const entity = this.getEntity(target)
         if (!entity) return base
         let amount = base
-        const vulnerable = entity.powers.find(p => p.id === 'VULNERABLE')?.stacks ?? 0
+        const vulnerable = entity.powers.find(power => power.id === 'VULNERABLE')?.stacks ?? 0
         if (vulnerable > 0) amount = Math.round(amount * 1.5)
         return amount
     }
 
     modifyOutgoingDamageFromPlayer(base: number): number {
         let amount = base
-        const strength = this.state.player.powers.find(p => p.id === 'STRENGTH')?.stacks ?? 0
+        const strength = this.state.player.powers.find(power => power.id === 'STRENGTH')?.stacks ?? 0
         amount += strength
-        const weak = this.state.player.powers.find(p => p.id === 'WEAK')?.stacks ?? 0
+        const weak = this.state.player.powers.find(power => power.id === 'WEAK')?.stacks ?? 0
         if (weak > 0) amount = Math.round(amount * 0.75)
         return amount
+    }
+
+    private resolveActiveLimbo(): void {
+        while (this.activeLimbo && !this.pendingChoice) {
+            if (this.activeLimbo.remainingRepeats <= 0) {
+                if (!this.activeLimbo.pendingChoiceStarter) this.finalizeActiveLimbo()
+                return
+            }
+
+            const limbo = this.activeLimbo
+            limbo.remainingRepeats -= 1
+            limbo.pendingChoiceStarter = undefined
+            const def = CARD_DEFS[limbo.card.defId]
+            const resolved = resolveCard(limbo.card)
+
+            if (def.onPlay) {
+                def.onPlay({
+                    engine: this,
+                    source: this.state.player.id,
+                    targets: limbo.targetIds,
+                    card: limbo.card,
+                    spentEnergy: limbo.spentEnergy,
+                })
+            } else {
+                if (resolved.baseDamage) {
+                    this.enqueue({
+                        kind: 'DealDamage',
+                        source: this.state.player.id,
+                        target: limbo.targetIds[0],
+                        amount: this.modifyOutgoingDamageFromPlayer(resolved.baseDamage),
+                    })
+                }
+                if (resolved.baseBlock) {
+                    this.enqueue({ kind: 'GainBlock', target: this.state.player.id, amount: resolved.baseBlock })
+                }
+            }
+
+            if (this.pendingChoice || limbo.pendingChoiceStarter) return
+        }
+    }
+
+    private finalizeActiveLimbo(): void {
+        if (!this.activeLimbo) return
+        const card = this.activeLimbo.card
+        if (this.activeLimbo.exhaustOnResolve) this.handleExhaust(card)
+        else this.state.player.discardPile.push(card)
+        this.activeLimbo = undefined
+        this.syncLimboState()
+    }
+
+    private processEndOfTurnHand(events: EmittedEvent[]): void {
+        const remainingHand = [...this.state.player.hand]
+        for (const card of remainingHand) {
+            const resolved = resolveCard(card)
+            if (card.defId === 'BURN') this.enqueue({ kind: 'LoseHp', target: this.state.player.id, amount: 2 })
+            if (!resolved.ethereal) continue
+            const index = this.state.player.hand.findIndex(entry => entry.instanceId === card.instanceId)
+            if (index < 0) continue
+            const [etherealCard] = this.state.player.hand.splice(index, 1)
+            this.handleExhaust(etherealCard)
+            events.push({ kind: 'CardExhausted', owner: this.state.player.id, cardId: etherealCard.defId, instanceId: etherealCard.instanceId })
+        }
     }
 
     private validateTargets(card: CardInstance, targetIds: EntityId[]): boolean {
@@ -314,7 +505,7 @@ export class Engine {
         const livingEnemyIds = this.state.enemies.filter(enemy => enemy.hp > 0).map(enemy => enemy.id)
         const targetType = resolved.targeting?.type ?? 'none'
 
-        if (targetType === 'none') return true
+        if (targetType === 'none') return targetIds.length === 0 || targetIds.every(id => id === this.state.player.id)
         if (targetType === 'player') return targetIds.length === 1 && targetIds[0] === this.state.player.id
         if (targetType === 'single_enemy') return targetIds.length === 1 && livingEnemyIds.includes(targetIds[0])
         if (targetType === 'all_enemies') return targetIds.length === livingEnemyIds.length && targetIds.every(id => livingEnemyIds.includes(id))
@@ -336,6 +527,27 @@ export class Engine {
         return true
     }
 
+    private insertCard(card: CardInstance, destination: CardDestination): void {
+        if (destination === 'hand') {
+            this.state.player.hand.push(card)
+            return
+        }
+        if (destination === 'discardPile') {
+            this.state.player.discardPile.push(card)
+            return
+        }
+        if (destination === 'drawPileTop') {
+            this.state.player.drawPile.unshift(card)
+            return
+        }
+        if (destination === 'drawPile') {
+            const index = this.state.player.drawPile.length === 0 ? 0 : this.rng.int(0, this.state.player.drawPile.length)
+            this.state.player.drawPile.splice(index, 0, card)
+            return
+        }
+        this.state.player.exhaustPile.push(card)
+    }
+
     private getEntity(id: EntityId): PlayerState | EnemyState | undefined {
         if (id === this.state.player.id) return this.state.player
         return this.state.enemies.find(enemy => enemy.id === id)
@@ -354,7 +566,7 @@ export class Engine {
     }
 
     private modifyIncomingDamage(target: PlayerState | EnemyState, amount: number): number {
-        const vulnerable = target.powers.find(p => p.id === 'VULNERABLE')?.stacks ?? 0
+        const vulnerable = target.powers.find(power => power.id === 'VULNERABLE')?.stacks ?? 0
         let next = amount
         if (vulnerable > 0) next = Math.round(next * 1.5)
         if (target === this.state.player) next = Math.round(next * this.enemyDamageMultiplier())
@@ -420,13 +632,19 @@ export class Engine {
         if (current) current.stacks = stacks
         else target.powers.push({ id: powerId, stacks })
     }
+
+    private syncLimboState(): void {
+        this.state.limbo = this.activeLimbo ? [{
+            card: this.activeLimbo.card,
+            targetIds: this.activeLimbo.targetIds,
+            exhaustOnResolve: this.activeLimbo.exhaustOnResolve,
+            spentEnergy: this.activeLimbo.spentEnergy,
+        }] : []
+    }
 }
 
 export function createSimplePlayer(seed: string): PlayerState {
-    const deck: CardInstance[] = []
-    for (let i = 0; i < 5; i++) deck.push({ defId: 'STRIKE', upgraded: false })
-    for (let i = 0; i < 5; i++) deck.push({ defId: 'DEFEND', upgraded: false })
-    deck.push({ defId: 'BASH', upgraded: false })
+    const deck = createStarterDeck()
     const rng = new RNG(seed)
     rng.shuffleInPlace(deck)
     return {
@@ -458,7 +676,7 @@ export function createPlayerFromDeck(seed: string, deck: CardInstance[], hp: num
         hp,
         block: 0,
         energy: 3,
-        deck: fullDeck,
+        deck: [...deck],
         drawPile: [...fullDeck],
         discardPile: [],
         exhaustPile: [],

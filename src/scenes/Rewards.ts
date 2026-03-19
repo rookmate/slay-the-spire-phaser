@@ -2,6 +2,7 @@ import Phaser from 'phaser'
 import type { RunState } from '../core/run'
 import { saveRun } from '../core/run'
 import type { RewardBundle, RewardItem } from '../core/rewards'
+import { createCardInstance } from '../core/cards'
 import { Card } from '../ui/Card'
 import { applyRelicAcquisition, RELIC_DEFS } from '../core/relics'
 import { POTION_DEFS } from '../core/potions'
@@ -76,7 +77,7 @@ export class RewardsScene extends Phaser.Scene {
         }).setOrigin(0.5, 0)
 
         item.choices.forEach((id, index) => {
-            const view = new Card(this, { defId: id, upgraded: false }, {
+            const view = new Card(this, createCardInstance(id), {
                 x: startX + index * spacing,
                 y: cardY,
                 interactive: true,

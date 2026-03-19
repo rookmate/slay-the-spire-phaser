@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { CARD_DEFS } from '../core/cards'
+import { CARD_DEFS, createCardInstance } from '../core/cards'
 import type { RunState } from '../core/run'
 // import { saveRun } from '../core/run'
 import { Card } from '../ui/Card'
@@ -17,7 +17,9 @@ export class DeckBuilderScene extends Phaser.Scene {
         this.add.text(16, 16, 'Card Library', {
             fontFamily: 'monospace', fontSize: '18px', color: '#ffffff',
         })
-        const keys = Object.keys(CARD_DEFS)
+        const keys = Object.values(CARD_DEFS)
+            .filter(card => card.poolEnabled)
+            .map(card => card.id)
         keys.sort()
 
         // Scrollable grid of all cards
@@ -28,7 +30,7 @@ export class DeckBuilderScene extends Phaser.Scene {
         keys.forEach((id, i) => {
             const col = i % cols
             const row = Math.floor(i / cols)
-            const card = { defId: id, upgraded: false } as any
+            const card = createCardInstance(id)
             const view = new Card(this, card, { x: 16 + col * colW, y: row * rowHCard, scale: 1 })
             this.list.add(view)
         })
@@ -49,5 +51,4 @@ export class DeckBuilderScene extends Phaser.Scene {
 
     // No finish method; read-only library
 }
-
 

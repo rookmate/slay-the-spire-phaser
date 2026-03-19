@@ -1,3 +1,5 @@
+import type { PowerId } from './state'
+
 export type EntityId = string
 
 export type Action =
@@ -8,9 +10,9 @@ export type Action =
     | { kind: 'GainBlock'; target: EntityId; amount: number }
     | { kind: 'DiscardHand' }
     | { kind: 'EndTurn' }
-    | { kind: 'ApplyPower'; target: EntityId; powerId: 'VULNERABLE' | 'WEAK' | 'STRENGTH' | 'THORNS' | 'BARRICADE' | 'METALLICIZE' | 'DEMON_FORM' | 'CORRUPTION' | 'FEEL_NO_PAIN' | 'JUGGERNAUT' | 'DARK_EMBRACE' | 'BRUTALITY' | 'BERSERK'; stacks: number }
+    | { kind: 'ApplyPower'; target: EntityId; powerId: PowerId; stacks: number }
     | { kind: 'LoseHp'; target: EntityId; amount: number }
-    | { kind: 'ExhaustCard'; owner: EntityId; cardId?: string }
+    | { kind: 'ExhaustCard'; owner: EntityId; cardInstanceId?: string }
 
 export type EmittedEvent =
     | { kind: 'EnergyChanged'; energy: number }
@@ -19,10 +21,9 @@ export type EmittedEvent =
     | { kind: 'Healed'; target: EntityId; amount: number; resultingHp: number }
     | { kind: 'BlockGained'; target: EntityId; amount: number; resultingBlock: number }
     | { kind: 'TurnChanged'; turn: 'player' | 'enemy' }
-    | { kind: 'CardPlayed'; cardId: string }
+    | { kind: 'CardPlayed'; cardId: string; instanceId: string }
     | { kind: 'Victory' }
     | { kind: 'Defeat' }
-    | { kind: 'PowerApplied'; target: EntityId; powerId: 'VULNERABLE' | 'WEAK' | 'STRENGTH' | 'THORNS' | 'BARRICADE' | 'METALLICIZE' | 'DEMON_FORM' | 'CORRUPTION' | 'FEEL_NO_PAIN' | 'JUGGERNAUT' | 'DARK_EMBRACE' | 'BRUTALITY' | 'BERSERK'; stacks: number }
+    | { kind: 'PowerApplied'; target: EntityId; powerId: PowerId; stacks: number }
     | { kind: 'HpLost'; target: EntityId; amount: number; resultingHp: number }
-    | { kind: 'CardExhausted'; owner: EntityId; cardId: string }
-
+    | { kind: 'CardExhausted'; owner: EntityId; cardId: string; instanceId: string }

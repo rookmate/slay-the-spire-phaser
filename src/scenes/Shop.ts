@@ -2,7 +2,7 @@ import Phaser from 'phaser'
 import type { RunState, RelicId } from '../core/run'
 import { saveRun } from '../core/run'
 import { RNG } from '../core/rng'
-import { CARD_DEFS } from '../core/cards'
+import { CARD_DEFS, createCardInstance } from '../core/cards'
 import { MVP_RELIC_POOL, RELIC_DEFS, applyRelicAcquisition } from '../core/relics'
 import { POTION_DEFS, type PotionId } from '../core/potions'
 import { Card } from '../ui/Card'
@@ -54,7 +54,7 @@ export class ShopScene extends Phaser.Scene {
         this.inventory.cards.forEach((cardId, index) => {
             const rarity = CARD_DEFS[cardId].rarity
             const cost = rarity === 'common' ? 50 : rarity === 'uncommon' ? 75 : 150
-            const view = new Card(this, { defId: cardId, upgraded: false }, {
+            const view = new Card(this, createCardInstance(cardId), {
                 x: startX + index * spacing,
                 y,
                 interactive: false,
@@ -70,7 +70,7 @@ export class ShopScene extends Phaser.Scene {
             buy.on('pointerdown', () => {
                 if (this.run.gold < cost) return
                 this.run.gold -= cost
-                this.run.deck.push({ defId: cardId, upgraded: false })
+                this.run.deck.push(createCardInstance(cardId))
                 this.inventory.cards.splice(index, 1)
                 saveRun(this.run)
                 this.render()

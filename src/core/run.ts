@@ -1,4 +1,5 @@
 import { RNG } from './rng'
+import { createStarterDeck } from './cards'
 import type { CardInstance } from './state'
 import type { PotionId } from './potions'
 
@@ -30,11 +31,7 @@ export interface RunState {
 export function createNewRun(seed?: string): RunState {
     const s = seed ?? Math.random().toString(36).slice(2)
     const rng = new RNG(s)
-    // Starter deck similar to Ironclad-ish
-    const deck: CardInstance[] = []
-    for (let i = 0; i < 5; i++) deck.push({ defId: 'STRIKE', upgraded: false })
-    for (let i = 0; i < 4; i++) deck.push({ defId: 'DEFEND', upgraded: false })
-    deck.push({ defId: 'BASH', upgraded: false })
+    const deck: CardInstance[] = createStarterDeck()
     rng.shuffleInPlace(deck)
     return {
         seed: s,
@@ -51,7 +48,7 @@ export function createNewRun(seed?: string): RunState {
     }
 }
 
-const STORAGE_KEY = 'sts_run_v1'
+const STORAGE_KEY = 'sts_run_v2'
 
 export function saveRun(run: RunState): void {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(run))
@@ -61,21 +58,7 @@ export function loadRun(): RunState | undefined {
     const s = localStorage.getItem(STORAGE_KEY)
     if (!s) return undefined
     try {
-        const parsed = JSON.parse(s) as Partial<RunState>
-        return {
-            seed: parsed.seed ?? 'seedless',
-            floor: parsed.floor ?? 1,
-            gold: parsed.gold ?? 99,
-            player: parsed.player ?? { maxHp: 80, hp: 80 },
-            relics: parsed.relics ?? ['BURNING_BLOOD'],
-            potions: parsed.potions ?? [],
-            maxPotionSlots: parsed.maxPotionSlots ?? 3,
-            merchantRemoveCost: parsed.merchantRemoveCost ?? 75,
-            deck: parsed.deck ?? [],
-            asc: parsed.asc,
-            mapProgress: parsed.mapProgress ?? { act: 1 },
-            combatCount: parsed.combatCount ?? 0,
-        }
+        return JSON.parse(s) as RunState
     } catch {
         return undefined
     }
@@ -84,4 +67,3 @@ export function loadRun(): RunState | undefined {
 export function clearSavedRun(): void {
     localStorage.removeItem(STORAGE_KEY)
 }
-

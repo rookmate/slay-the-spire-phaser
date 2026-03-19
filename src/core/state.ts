@@ -1,6 +1,8 @@
 import type { EntityId } from './actions'
 
-export type CardType = 'attack' | 'skill' | 'power'
+export type CardType = 'attack' | 'skill' | 'power' | 'status' | 'curse'
+export type ChoiceZone = 'hand' | 'discard' | 'exhaust'
+export type CardDestination = 'hand' | 'drawPile' | 'drawPileTop' | 'discardPile' | 'exhaustPile'
 
 export type PowerId =
     | 'VULNERABLE'
@@ -22,6 +24,53 @@ export interface PowerInstance {
     stacks: number
 }
 
+export interface CardInstance {
+    instanceId: string
+    defId: string
+    upgradeLevel: number
+}
+
+export interface PendingChoiceView {
+    prompt: string
+    zone: ChoiceZone
+    eligibleInstanceIds: string[]
+    minSelections: number
+    maxSelections: number
+    canSkip: boolean
+    sourceCardInstanceId: string
+}
+
+export interface PendingChoice extends PendingChoiceView {}
+
+export interface LimboCardState {
+    card: CardInstance
+    targetIds: EntityId[]
+    exhaustOnResolve: boolean
+    spentEnergy: number
+}
+
+export interface CardChoiceRequest extends PendingChoiceView {
+    onSubmit: (instanceIds: string[]) => void
+    onCancel?: () => void
+}
+
+export interface CardEngineApi {
+    state: CombatState
+    enqueue: (a: any) => void
+    setDoubleTapCharges?: (charges: number) => void
+    handleExhaustFromHand?: (card: CardInstance) => void
+    handleExhaust?: (card: CardInstance) => void
+    addTemporaryThorns?: (amount: number) => void
+    beginChoice?: (choice: CardChoiceRequest) => void
+    deferChoice?: (startChoice: () => void) => void
+    getCardsInZone?: (zone: ChoiceZone) => CardInstance[]
+    moveCardToDestination?: (instanceId: string, zone: ChoiceZone, destination: CardDestination) => CardInstance | undefined
+    createCardsInDestination?: (defId: string, destination: Exclude<CardDestination, 'drawPileTop' | 'exhaustPile'>, count?: number, upgradeLevel?: number) => CardInstance[]
+    upgradeCardInstance?: (instanceId: string, zones?: ChoiceZone[]) => CardInstance | undefined
+    getLimboCard?: () => CardInstance | undefined
+    randomInt?: (min: number, max: number) => number
+}
+
 export interface CardDef {
     id: string
     name: string
@@ -33,47 +82,44 @@ export interface CardDef {
     rarity?: 'basic' | 'common' | 'uncommon' | 'rare'
     implemented?: boolean
     poolEnabled?: boolean
-    // If true, the card is moved to exhaust pile when played
     exhaust?: boolean
+    xCost?: boolean
+    unplayable?: boolean
+    ethereal?: boolean
     upgrade?: {
         name?: string
         cost?: number
         baseDamage?: number
         baseBlock?: number
         exhaust?: boolean
+        xCost?: boolean
+        unplayable?: boolean
+        ethereal?: boolean
     }
 
-    // Targeting requirements for the card
     targeting?: {
         type: 'none' | 'single_enemy' | 'all_enemies' | 'player' | 'any'
-        required?: boolean // If false, can be played without targeting
-        description?: string // UI hint for targeting
+        required?: boolean
+        description?: string
     }
 
-    // Optional play restriction. If returns false, the card is not played and energy is not spent
     canPlay?: (ctx: {
-        engine: { state: CombatState }
+        engine: CardEngineApi
         source: EntityId
         targets: EntityId[]
         card: CardInstance
     }) => boolean
     onPlay?: (ctx: {
-        engine: {
-            enqueue: (a: any) => void
-            state: CombatState
-            setDoubleTapCharges?: (charges: number) => void
-            handleExhaustFromHand?: (card: CardInstance) => void
-            addTemporaryThorns?: (amount: number) => void
-        }
+        engine: CardEngineApi
         source: EntityId
         targets: EntityId[]
         card: CardInstance
+        spentEnergy: number
     }) => void
-}
-
-export interface CardInstance {
-    defId: string
-    upgraded: boolean
+    onExhaust?: (ctx: {
+        engine: CardEngineApi
+        card: CardInstance
+    }) => void
 }
 
 export interface PlayerState {
@@ -113,4 +159,5 @@ export interface CombatState {
     turn: 'player' | 'enemy'
     victory: boolean
     defeat: boolean
+    limbo: LimboCardState[]
 }

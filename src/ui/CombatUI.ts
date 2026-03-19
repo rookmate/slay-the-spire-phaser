@@ -10,6 +10,7 @@ import { PlayerDisplay } from './PlayerDisplay'
 import { DragSystem } from './DragSystem'
 import { OverlayManager } from './OverlayManager'
 import { VisualEffects } from './VisualEffects'
+import { CombatChoiceOverlay } from './CombatChoiceOverlay'
 
 export class CombatUI {
     private scene: Phaser.Scene
@@ -21,12 +22,15 @@ export class CombatUI {
     private dragSystem: DragSystem
     private overlayManager: OverlayManager
     private visualEffects: VisualEffects
+    private choiceOverlay: CombatChoiceOverlay
     private pendingPotionIndex: number | null = null
     private pendingText?: Phaser.GameObjects.Text
 
     private onPlay?: (card: CardInstance, targets: string[]) => void
     private onPotion?: (potionIndex: number, targets: string[]) => void
     private onEnd?: () => void
+    private onSubmitChoice?: (instanceIds: string[]) => void
+    private onCancelChoice?: () => void
     private pointerMoveHandler?: (pointer: Phaser.Input.Pointer) => void
     private pointerUpHandler?: (pointer: Phaser.Input.Pointer) => void
     private resizeHandler?: () => void
@@ -41,6 +45,7 @@ export class CombatUI {
         this.dragSystem = new DragSystem(scene, engine)
         this.overlayManager = new OverlayManager(scene, engine)
         this.visualEffects = new VisualEffects(scene)
+        this.choiceOverlay = new CombatChoiceOverlay(scene, engine)
         this.setupEventHandlers()
         this.handManager.rebuildHand()
     }
@@ -57,13 +62,20 @@ export class CombatUI {
         this.onEnd = callback
     }
 
+    onSubmitPendingChoice(callback: (instanceIds: string[]) => void): void {
+        this.onSubmitChoice = callback
+    }
+
+    onCancelPendingChoice(callback: () => void): void {
+        this.onCancelChoice = callback
+    }
+
     refreshRunData(run: RunState): void {
         this.run = run
         this.playerDisplay.setRun(run)
     }
 
     apply(events: EmittedEvent[]): void {
-        if (events.length === 0) return
         for (const event of events) {
             if (event.kind === 'DamageApplied') {
                 const enemyIndex = this.engine.state.enemies.findIndex(enemy => enemy.id === event.target)
@@ -79,6 +91,7 @@ export class CombatUI {
         this.enemyDisplay.update()
         this.playerDisplay.update()
         this.overlayManager.refreshOverlays()
+        this.choiceOverlay.refresh(this.engine.getPendingChoice())
     }
 
     destroy(): void {
@@ -92,15 +105,17 @@ export class CombatUI {
         this.dragSystem.destroy()
         this.overlayManager.destroy()
         this.visualEffects.destroy()
+        this.choiceOverlay.destroy()
     }
 
     private setupEventHandlers(): void {
         this.handManager.setOnCardDrag((card, cardIndex, pointer) => {
-            if (this.pendingPotionIndex !== null) return
+            if (this.pendingPotionIndex !== null || this.engine.getPendingChoice()) return
             this.dragSystem.startDrag(card, cardIndex, pointer)
         })
 
         this.dragSystem.setOnCardPlay((card, targets) => {
+            if (this.engine.getPendingChoice()) return
             this.onPlay?.(card, targets)
             this.update()
         })
@@ -109,6 +124,7 @@ export class CombatUI {
         this.dragSystem.setGetPlayerSprite(() => this.playerDisplay.getPlayerSprite())
 
         this.enemyDisplay.setOnEnemyClick((enemyIndex) => {
+            if (this.engine.getPendingChoice()) return
             if (this.pendingPotionIndex === null) return
             const potionId = this.run.potions[this.pendingPotionIndex]
             if (!potionId) return
@@ -121,6 +137,7 @@ export class CombatUI {
         })
 
         this.playerDisplay.setOnUsePotion((potionIndex) => {
+            if (this.engine.getPendingChoice()) return
             const potionId = this.run.potions[potionIndex]
             if (!potionId) return
             const potion = POTION_DEFS[potionId]
@@ -141,11 +158,13 @@ export class CombatUI {
         })
 
         this.playerDisplay.setOnEndTurn(() => {
-            if (this.pendingPotionIndex !== null) return
+            if (this.pendingPotionIndex !== null || this.engine.getPendingChoice()) return
             this.onEnd?.()
             this.update()
         })
         this.playerDisplay.setOnOpenDeck(() => this.overlayManager.openDeckOverlay())
+        this.choiceOverlay.setOnSubmit((instanceIds) => this.onSubmitChoice?.(instanceIds))
+        this.choiceOverlay.setOnCancel(() => this.onCancelChoice?.())
 
         this.pointerMoveHandler = (pointer: Phaser.Input.Pointer) => {
             if (this.dragSystem.isCurrentlyDragging()) this.dragSystem.updateDrag(pointer)

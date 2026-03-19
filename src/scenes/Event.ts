@@ -2,6 +2,7 @@ import Phaser from 'phaser'
 import type { RunState } from '../core/run'
 import { saveRun } from '../core/run'
 import { EVENT_DEFS, generateEvent } from '../core/events'
+import { canUpgradeCard } from '../core/cards'
 import { DeckSelectionOverlay } from '../ui/DeckSelectionOverlay'
 
 export class EventScene extends Phaser.Scene {
@@ -63,9 +64,12 @@ export class EventScene extends Phaser.Scene {
             this.selector.open({
                 title: 'Choose a card to upgrade',
                 cards: this.run.deck,
-                filter: (card) => !card.upgraded,
+                filter: (card) => canUpgradeCard(card),
                 onSelect: (card, index) => {
-                    this.run.deck[index] = { ...card, upgraded: true }
+                    this.run.deck[index] = {
+                        ...card,
+                        upgradeLevel: card.defId === 'SEARING_BLOW' ? card.upgradeLevel + 1 : 1,
+                    }
                     this.leave()
                 },
             })

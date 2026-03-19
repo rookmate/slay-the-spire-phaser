@@ -43,12 +43,12 @@ export class DragSystem {
     }
 
     startDrag(card: Card, cardIndex: number, pointer: Phaser.Input.Pointer): void {
-        if (this.isDragging) return
+        if (this.isDragging || !this.engine.canAcceptInput()) return
 
         const cardInstance = this.engine.state.player.hand[cardIndex]
         if (!cardInstance) return
         const cardDef = resolveCard(cardInstance)
-        if (!cardDef) return
+        if (!cardDef || cardDef.unplayable) return
 
         // Mirror engine cost modifiers so drag availability matches actual playability.
         const effectiveCost = this.getEffectiveCost(cardDef)
@@ -57,7 +57,7 @@ export class DragSystem {
         }
         if (cardDef.canPlay) {
             const canPlay = cardDef.canPlay({
-                engine: this.engine as unknown as { state: any },
+                engine: this.engine,
                 source: this.engine.state.player.id,
                 targets: [],
                 card: cardInstance,
@@ -177,7 +177,7 @@ export class DragSystem {
 
         switch (cardDef.targeting?.type) {
             case 'none':
-                return ['player'] // Default to player for self-targeting cards
+                return []
             case 'all_enemies':
                 return this.engine.state.enemies
                     .filter(enemy => enemy.hp > 0)
@@ -304,6 +304,7 @@ export class DragSystem {
     private getEffectiveCost(cardDef: CardDef): number {
         const hasCorruption = this.engine.state.player.powers.find(p => p.id === 'CORRUPTION')?.stacks ?? 0
         if (hasCorruption > 0 && cardDef.type === 'skill') return 0
+        if ('xCost' in cardDef && (cardDef as any).xCost) return this.engine.state.player.energy
         return cardDef.cost ?? 0
     }
 

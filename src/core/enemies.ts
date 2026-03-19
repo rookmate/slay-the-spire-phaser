@@ -263,6 +263,7 @@ export function createEnemyFromSpec(rng: RNG, key: keyof typeof ENEMIES, id: str
         turn: 'player',
         victory: false,
         defeat: false,
+        limbo: [],
     }))
     return enemy
 }
