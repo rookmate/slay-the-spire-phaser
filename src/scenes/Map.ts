@@ -3,6 +3,8 @@ import type { RunState } from '../core/run'
 import { saveRun } from '../core/run'
 import { RNG } from '../core/rng'
 import { generateMap, resolveUnknown, updateUnknownWeights, defaultUnknownWeights, type GeneratedMap, type MapNode } from '../core/map'
+import { generateRewardBundle } from '../core/rewards'
+import { RELIC_DEFS } from '../core/relics'
 
 export class MapScene extends Phaser.Scene {
     run!: RunState
@@ -23,6 +25,11 @@ export class MapScene extends Phaser.Scene {
         this.run = data.run
         const style = { fontFamily: 'monospace', fontSize: '18px', color: '#ffffff' }
         this.add.text(16, 16, `Floor ${this.run.floor}  HP ${this.run.player.hp}/${this.run.player.maxHp}  Gold ${this.run.gold}`, style)
+        this.add.text(16, 40, `Relics: ${this.run.relics.map(id => RELIC_DEFS[id]?.name ?? id).join(', ') || 'None'}  Potions: ${this.run.potions.length}/${this.run.maxPotionSlots}`, {
+            fontFamily: 'monospace',
+            fontSize: '14px',
+            color: '#cccccc',
+        })
 
         // Generate map for this act
         this.gmap = generateMap(this.run.seed, this.run.mapProgress?.act ?? 1)
@@ -67,20 +74,37 @@ export class MapScene extends Phaser.Scene {
         this.children.removeAll()
         const style = { fontFamily: 'monospace', fontSize: '18px', color: '#ffffff' }
         this.add.text(16, 16, `Floor ${this.run.floor}  HP ${this.run.player.hp}/${this.run.player.maxHp}  Gold ${this.run.gold}`, style)
+        this.add.text(16, 40, `Relics: ${this.run.relics.map(id => RELIC_DEFS[id]?.name ?? id).join(', ') || 'None'}  Potions: ${this.run.potions.length}/${this.run.maxPotionSlots}`, {
+            fontFamily: 'monospace',
+            fontSize: '14px',
+            color: '#cccccc',
+        })
         this.drawGraph()
         if (node.kind === 'unknown') {
             const outcome = resolveUnknown(rng, this.unknownWeights)
             this.unknownWeights = updateUnknownWeights(this.unknownWeights, outcome)
             if (outcome === 'monster') { this.scene.start('Combat', { run: this.run, roomKind: 'monster' }); return }
             if (outcome === 'shop') { this.scene.start('Shop', { run: this.run }); return }
-            if (outcome === 'chest') { this.scene.start('Rewards', { run: this.run }); return }
+            if (outcome === 'chest') {
+                this.scene.start('Rewards', {
+                    run: this.run,
+                    rewards: generateRewardBundle(`${this.run.seed}-reward-${node.id}-unknown-chest`, 'chest', this.run.relics),
+                })
+                return
+            }
             this.scene.start('Event', { run: this.run }); return
         }
         const kind = node.kind
         if (kind === 'monster') { this.scene.start('Combat', { run: this.run, roomKind: 'monster' }); return }
         if (kind === 'rest') { this.scene.start('Campfire', { run: this.run }); return }
         if (kind === 'shop') { this.scene.start('Shop', { run: this.run }); return }
-        if (kind === 'chest') { this.scene.start('Rewards', { run: this.run }); return }
+        if (kind === 'chest') {
+            this.scene.start('Rewards', {
+                run: this.run,
+                rewards: generateRewardBundle(`${this.run.seed}-reward-${node.id}-chest`, 'chest', this.run.relics),
+            })
+            return
+        }
         if (kind === 'elite') { this.scene.start('Combat', { run: this.run, roomKind: 'elite' }); return }
         if (kind === 'boss') { this.scene.start('Combat', { run: this.run, roomKind: 'boss' }); return }
         this.scene.start('Event', { run: this.run })
@@ -94,7 +118,7 @@ export class MapScene extends Phaser.Scene {
         const top = 0
 
         if (this.mapLayer) this.mapLayer.destroy(true)
-        this.mapLayer = this.add.container(0, 60)
+        this.mapLayer = this.add.container(0, 80)
 
         // Draw edges
         const g = this.add.graphics()
@@ -167,4 +191,3 @@ export class MapScene extends Phaser.Scene {
         })
     }
 }
-

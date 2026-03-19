@@ -1,126 +1,184 @@
 import Phaser from 'phaser'
 import type { RunState } from '../core/run'
 import { saveRun } from '../core/run'
-import { CARD_DEFS } from '../core/cards'
+import type { RewardBundle, RewardItem } from '../core/rewards'
 import { Card } from '../ui/Card'
+import { applyRelicAcquisition, RELIC_DEFS } from '../core/relics'
+import { POTION_DEFS } from '../core/potions'
 
 export class RewardsScene extends Phaser.Scene {
     run!: RunState
-    constructor() { super('Rewards') }
+    private rewards!: RewardBundle
+    private pendingCardReward = false
+    private pendingPotionReward?: string
+    private continueButton?: Phaser.GameObjects.Text
+    private infoTexts: Phaser.GameObjects.Text[] = []
+    private choiceCards: Card[] = []
+    private potionTexts: Phaser.GameObjects.Text[] = []
 
-    create(data: { run: RunState }): void {
+    constructor() {
+        super('Rewards')
+    }
+
+    create(data: { run: RunState; rewards: RewardBundle }): void {
         this.run = data.run
+        this.rewards = data.rewards
+        this.infoTexts = []
+        this.choiceCards = []
+        this.potionTexts = []
         const style = { fontFamily: 'monospace', fontSize: '18px', color: '#ffffff' }
 
-        // Title at the top
-        this.add.text(this.scale.width / 2, 30, 'Victory! Choose a card:', { ...style, fontSize: '24px' })
-            .setOrigin(0.5, 0)
+        this.add.text(this.scale.width / 2, 20, 'Rewards', { ...style, fontSize: '24px' }).setOrigin(0.5, 0)
 
-        // Generate card choices
-        const pool = Object.entries(CARD_DEFS)
-            .filter(([_, def]) => def.rarity && def.rarity !== 'basic')
-            .map(([id]) => id)
-        const rng = new Phaser.Math.RandomDataGenerator([this.run.seed + ':' + this.run.floor])
-        const choices = [] as string[]
-        const copy = [...pool]
-        for (let i = 0; i < 3 && copy.length > 0; i++) {
-            const idx = Math.floor(rng.frac() * copy.length)
-            const [id] = copy.splice(idx, 1)
-            choices.push(id)
+        let y = 60
+        for (const item of this.rewards.items) {
+            if (item.kind === 'gold') {
+                this.run.gold += item.amount
+                this.infoTexts.push(this.add.text(24, y, `Gold +${item.amount}`, style))
+                y += 28
+            } else if (item.kind === 'relic') {
+                applyRelicAcquisition(this.run, item.relicId)
+                this.infoTexts.push(this.add.text(24, y, `Relic: ${RELIC_DEFS[item.relicId].name}`, style))
+                y += 28
+            } else if (item.kind === 'potion') {
+                this.pendingPotionReward = item.potionId
+            } else if (item.kind === 'cards') {
+                this.pendingCardReward = true
+                this.renderCardChoices(item)
+            }
         }
 
-        // Display cards horizontally centered
-        const cardSpacing = 140
-        const startX = this.scale.width / 2 - (choices.length - 1) * cardSpacing / 2
-        const cardY = this.scale.height / 2 - 50
+        if (this.pendingPotionReward) this.renderPotionReward(this.pendingPotionReward)
 
-        // Store all card objects so we can hide them later
-        const cardObjects: Card[] = []
-
-        choices.forEach((id, i) => {
-            const card = { defId: id, upgraded: false } as any
-            const cardX = startX + i * cardSpacing
-
-            const cardObj = new Card(this, card, {
-                x: cardX,
-                y: cardY,
-                scale: 0.8,
-                interactive: false // Don't make individual cards interactive
-            })
-
-            // Add the card directly to the scene
-            this.add.existing(cardObj)
-            cardObjects.push(cardObj)
-        })
-
-        // Set up input handling for the cards area
-        const setupCardInput = () => {
-            // Create a large invisible rectangle that covers the cards area
-            const inputArea = this.add.rectangle(
-                this.scale.width / 2,
-                cardY,
-                this.scale.width,
-                200,
-                0x000000,
-                0 // Completely transparent
-            )
-            inputArea.setDepth(100) // Below cards but above background
-            inputArea.setInteractive()
-
-            inputArea.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-                const topCard = Card.getTopCardAtPoint(pointer.worldX, pointer.worldY)
-                if (topCard) {
-                    const cardIndex = cardObjects.indexOf(topCard)
-                    if (cardIndex !== -1) {
-                        const selectedId = choices[cardIndex]
-
-                        // Add card to deck
-                        this.run.deck.push({ defId: selectedId, upgraded: false })
-
-                        // Hide all cards (including the selected one)
-                        cardObjects.forEach((otherCard) => {
-                            otherCard.setVisible(false)
-                        })
-
-                        // Enable continue button
-                        enableContinueButton()
-                    }
-                }
-            })
-        }
-
-        setupCardInput()
-
-        // Continue button centered at bottom, slightly off the bottom (initially disabled)
-        const continueButton = this.add.text(this.scale.width / 2, this.scale.height - 40, 'Continue', {
+        this.continueButton = this.add.text(this.scale.width / 2, this.scale.height - 36, 'Continue', {
             ...style,
             backgroundColor: '#666',
             padding: { x: 12, y: 8 },
-            fontSize: '20px'
+        }).setOrigin(0.5, 0.5)
+        this.continueButton.on('pointerdown', () => {
+            if (!this.canContinue()) return
+            this.run.floor += 1
+            saveRun(this.run)
+            this.scene.start('Map', { run: this.run })
         })
-            .setOrigin(0.5, 0.5)
-            .setInteractive({ useHandCursor: false })
+        this.updateContinueButton()
+    }
 
-        // Store reference to continue button for later activation
-        let cardSelected = false
+    private renderCardChoices(item: Extract<RewardItem, { kind: 'cards' }>): void {
+        const cardY = this.scale.height / 2 - 30
+        const spacing = 140
+        const startX = this.scale.width / 2 - ((item.choices.length - 1) * spacing) / 2
 
-        // Update continue button click handler
-        continueButton.on('pointerdown', () => {
-            if (cardSelected) {
-                this.run.gold += 20
-                this.run.floor += 1
-                saveRun(this.run)
-                this.scene.start('Map', { run: this.run })
-            }
+        this.add.text(this.scale.width / 2, cardY - 90, 'Choose a card or skip', {
+            fontFamily: 'monospace',
+            fontSize: '18px',
+            color: '#ffffff',
+        }).setOrigin(0.5, 0)
+
+        item.choices.forEach((id, index) => {
+            const view = new Card(this, { defId: id, upgraded: false }, {
+                x: startX + index * spacing,
+                y: cardY,
+                interactive: true,
+            })
+            view.on('pointerdown', () => {
+                if (!this.pendingCardReward) return
+                this.run.deck.push(view.getCardInstance())
+                this.pendingCardReward = false
+                this.choiceCards.forEach(card => card.destroy())
+                this.choiceCards = []
+                this.updateContinueButton()
+            })
+            this.add.existing(view)
+            this.choiceCards.push(view)
         })
 
-        // Function to enable continue button after card selection
-        const enableContinueButton = () => {
-            cardSelected = true
-            continueButton.setStyle({ backgroundColor: '#333' })
-            continueButton.setInteractive({ useHandCursor: true })
+        const skip = this.add.text(this.scale.width / 2, cardY + 170, 'Skip', {
+            fontFamily: 'monospace',
+            fontSize: '18px',
+            color: '#ffffff',
+            backgroundColor: '#333',
+            padding: { x: 8, y: 6 },
+        }).setOrigin(0.5, 0).setInteractive({ useHandCursor: true })
+        skip.on('pointerdown', () => {
+            this.pendingCardReward = false
+            this.choiceCards.forEach(card => card.destroy())
+            this.choiceCards = []
+            skip.destroy()
+            this.updateContinueButton()
+        })
+    }
+
+    private renderPotionReward(potionId: string): void {
+        const titleY = this.scale.height - 160
+        this.add.text(24, titleY, `Potion: ${POTION_DEFS[potionId as keyof typeof POTION_DEFS].name}`, {
+            fontFamily: 'monospace',
+            fontSize: '18px',
+            color: '#ffffff',
+        })
+
+        if (this.run.potions.length < this.run.maxPotionSlots) {
+            this.run.potions.push(potionId as keyof typeof POTION_DEFS)
+            this.pendingPotionReward = undefined
+            this.add.text(24, titleY + 26, 'Added to inventory.', {
+                fontFamily: 'monospace',
+                fontSize: '16px',
+                color: '#9ccc65',
+            })
+            return
         }
+
+        this.add.text(24, titleY + 26, 'Replace a potion or skip:', {
+            fontFamily: 'monospace',
+            fontSize: '16px',
+            color: '#ffffff',
+        })
+
+        this.run.potions.forEach((ownedPotion, index) => {
+            const text = this.add.text(24 + index * 180, titleY + 56, POTION_DEFS[ownedPotion].name, {
+                fontFamily: 'monospace',
+                fontSize: '15px',
+                color: '#ffffff',
+                backgroundColor: '#444',
+                padding: { x: 8, y: 6 },
+            }).setInteractive({ useHandCursor: true })
+            text.on('pointerdown', () => {
+                if (!this.pendingPotionReward) return
+                this.run.potions[index] = this.pendingPotionReward as keyof typeof POTION_DEFS
+                this.pendingPotionReward = undefined
+                this.potionTexts.forEach(entry => entry.destroy())
+                this.potionTexts = []
+                this.updateContinueButton()
+            })
+            this.potionTexts.push(text)
+        })
+
+        const skip = this.add.text(24, titleY + 92, 'Skip Potion', {
+            fontFamily: 'monospace',
+            fontSize: '15px',
+            color: '#ffffff',
+            backgroundColor: '#333',
+            padding: { x: 8, y: 6 },
+        }).setInteractive({ useHandCursor: true })
+        skip.on('pointerdown', () => {
+            this.pendingPotionReward = undefined
+            this.potionTexts.forEach(entry => entry.destroy())
+            this.potionTexts = []
+            skip.destroy()
+            this.updateContinueButton()
+        })
+        this.potionTexts.push(skip)
+    }
+
+    private canContinue(): boolean {
+        return !this.pendingCardReward && !this.pendingPotionReward
+    }
+
+    private updateContinueButton(): void {
+        if (!this.continueButton) return
+        const enabled = this.canContinue()
+        this.continueButton.setStyle({ backgroundColor: enabled ? '#333' : '#666' })
+        if (enabled) this.continueButton.setInteractive({ useHandCursor: true })
+        else this.continueButton.disableInteractive()
     }
 }
-
-

@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { CARD_DEFS } from '../core/cards'
+import { CARD_DEFS, resolveCard } from '../core/cards'
 import type { CardInstance } from '../core/state'
 
 export interface CardOptions {
@@ -17,6 +17,7 @@ export class Card extends Phaser.GameObjects.Container {
     private cost: Phaser.GameObjects.Text
     private subtype: Phaser.GameObjects.Text
     private stats: Phaser.GameObjects.Text
+    private implementedBadge?: Phaser.GameObjects.Text
 
     // Card dimensions - optimized for fan layout
     public static readonly CARD_WIDTH = 120
@@ -28,7 +29,7 @@ export class Card extends Phaser.GameObjects.Container {
     constructor(scene: Phaser.Scene, card: CardInstance, opts: CardOptions) {
         super(scene, opts.x, opts.y)
         this.card = card
-        const def = CARD_DEFS[card.defId]
+        const def = resolveCard(card)
         const w = Card.CARD_WIDTH
         const h = Card.CARD_HEIGHT
         const scale = opts.scale ?? 1
@@ -37,6 +38,7 @@ export class Card extends Phaser.GameObjects.Container {
         const bgColor = this.getBackgroundColor(def.type)
         this.bg = scene.add.rectangle(0, 0, w, h, bgColor, 1)
         this.bg.setOrigin(0, 0)
+        if (!CARD_DEFS[card.defId].poolEnabled) this.bg.setFillStyle(bgColor, 0.4)
 
         // Create transparent selection area rectangle
         this.selectionArea = scene.add.rectangle(0, 0, w, h, 0x000000, 0).setStrokeStyle(4, 0xffffff)
@@ -67,15 +69,25 @@ export class Card extends Phaser.GameObjects.Container {
         const stats: string[] = []
         if (def.baseDamage) stats.push(`DMG ${def.baseDamage}`)
         if (def.baseBlock) stats.push(`BLK ${def.baseBlock}`)
+        if (def.exhaust) stats.push('EXH')
         this.stats = scene.add.text(8, h - 24, stats.join('  '), {
             fontFamily: 'monospace',
             fontSize: '10px',
             color: '#ddd'
         })
 
+        if (!CARD_DEFS[card.defId].poolEnabled) {
+            this.implementedBadge = scene.add.text(8, h - 44, 'COMING LATER', {
+                fontFamily: 'monospace',
+                fontSize: '9px',
+                color: '#ffcc80',
+            })
+        }
+
         // Add in correct z-order: background -> texts -> selectionArea
         this.add(this.bg)
         this.add([this.title, this.cost, this.subtype, this.stats, this.selectionArea])
+        if (this.implementedBadge) this.add(this.implementedBadge)
 
         // Set Container bounds
         this.setSize(w, h)
@@ -152,7 +164,7 @@ export class Card extends Phaser.GameObjects.Container {
     }
 
     updateCardVisuals(): void {
-        const cardDef = CARD_DEFS[this.card.defId]
+        const cardDef = resolveCard(this.card)
 
         // Add visual indicators for targeting type
         if (cardDef.targeting?.type === 'none') {
@@ -162,6 +174,10 @@ export class Card extends Phaser.GameObjects.Container {
             // Add upward arrow indicator for drag-up-to-play
             this.addUpwardDragIndicator()
         }
+    }
+
+    getCardInstance(): CardInstance {
+        return this.card
     }
 
     private addUpwardDragIndicator(): void {

@@ -1,7 +1,16 @@
 import { RNG } from './rng'
 import type { CardInstance } from './state'
+import type { PotionId } from './potions'
 
-export type RelicId = 'BURNING_BLOOD'
+export type RelicId =
+    | 'BURNING_BLOOD'
+    | 'ANCHOR'
+    | 'LANTERN'
+    | 'VAJRA'
+    | 'BAG_OF_PREPARATION'
+    | 'BRONZE_SCALES'
+    | 'STRAWBERRY'
+    | 'PRESERVED_INSECT'
 
 export interface RunState {
     seed: string
@@ -9,6 +18,9 @@ export interface RunState {
     gold: number
     player: { maxHp: number; hp: number }
     relics: RelicId[]
+    potions: PotionId[]
+    maxPotionSlots: number
+    merchantRemoveCost: number
     deck: CardInstance[]
     asc?: number
     mapProgress?: { act: number; currentNodeId?: string }
@@ -30,6 +42,9 @@ export function createNewRun(seed?: string): RunState {
         gold: 99,
         player: { maxHp: 80, hp: 80 },
         relics: ['BURNING_BLOOD'],
+        potions: [],
+        maxPotionSlots: 3,
+        merchantRemoveCost: 75,
         deck,
         mapProgress: { act: 1 },
         combatCount: 0,
@@ -46,7 +61,21 @@ export function loadRun(): RunState | undefined {
     const s = localStorage.getItem(STORAGE_KEY)
     if (!s) return undefined
     try {
-        return JSON.parse(s) as RunState
+        const parsed = JSON.parse(s) as Partial<RunState>
+        return {
+            seed: parsed.seed ?? 'seedless',
+            floor: parsed.floor ?? 1,
+            gold: parsed.gold ?? 99,
+            player: parsed.player ?? { maxHp: 80, hp: 80 },
+            relics: parsed.relics ?? ['BURNING_BLOOD'],
+            potions: parsed.potions ?? [],
+            maxPotionSlots: parsed.maxPotionSlots ?? 3,
+            merchantRemoveCost: parsed.merchantRemoveCost ?? 75,
+            deck: parsed.deck ?? [],
+            asc: parsed.asc,
+            mapProgress: parsed.mapProgress ?? { act: 1 },
+            combatCount: parsed.combatCount ?? 0,
+        }
     } catch {
         return undefined
     }
@@ -55,5 +84,4 @@ export function loadRun(): RunState | undefined {
 export function clearSavedRun(): void {
     localStorage.removeItem(STORAGE_KEY)
 }
-
 

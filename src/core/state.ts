@@ -6,6 +6,7 @@ export type PowerId =
     | 'VULNERABLE'
     | 'WEAK'
     | 'STRENGTH'
+    | 'THORNS'
     | 'BARRICADE'
     | 'METALLICIZE'
     | 'DEMON_FORM'
@@ -30,8 +31,17 @@ export interface CardDef {
     baseBlock?: number
     // Optional rarity metadata used by UI/builders; not used by engine rules
     rarity?: 'basic' | 'common' | 'uncommon' | 'rare'
+    implemented?: boolean
+    poolEnabled?: boolean
     // If true, the card is moved to exhaust pile when played
     exhaust?: boolean
+    upgrade?: {
+        name?: string
+        cost?: number
+        baseDamage?: number
+        baseBlock?: number
+        exhaust?: boolean
+    }
 
     // Targeting requirements for the card
     targeting?: {
@@ -48,7 +58,13 @@ export interface CardDef {
         card: CardInstance
     }) => boolean
     onPlay?: (ctx: {
-        engine: { enqueue: (a: any) => void; state: CombatState }
+        engine: {
+            enqueue: (a: any) => void
+            state: CombatState
+            setDoubleTapCharges?: (charges: number) => void
+            handleExhaustFromHand?: (card: CardInstance) => void
+            addTemporaryThorns?: (amount: number) => void
+        }
         source: EntityId
         targets: EntityId[]
         card: CardInstance
@@ -88,6 +104,7 @@ export interface EnemyState {
     | { kind: 'debuff'; debuff: 'WEAK' | 'VULNERABLE'; stacks: number }
     // Optional spec reference to drive intent generation
     specId?: string
+    aiState?: Record<string, number | boolean | string>
 }
 
 export interface CombatState {
@@ -97,5 +114,3 @@ export interface CombatState {
     victory: boolean
     defeat: boolean
 }
-
-

@@ -2,7 +2,7 @@ import Phaser from 'phaser'
 import type { Engine } from '../core/engine'
 import type { CardInstance, CardDef } from '../core/state'
 import { Card } from './Card'
-import { CARD_DEFS } from '../core/cards'
+import { CARD_DEFS, resolveCard } from '../core/cards'
 import { COMBAT_UI_CONFIG } from './CombatUIConfig'
 
 export class DragSystem {
@@ -47,7 +47,7 @@ export class DragSystem {
 
         const cardInstance = this.engine.state.player.hand[cardIndex]
         if (!cardInstance) return
-        const cardDef = CARD_DEFS[cardInstance.defId]
+        const cardDef = resolveCard(cardInstance)
         if (!cardDef) return
 
         // Mirror engine cost modifiers so drag availability matches actual playability.
@@ -111,6 +111,7 @@ export class DragSystem {
             return false
         }
         const cardDef = CARD_DEFS[cardInstance.defId]
+        const resolvedCard = resolveCard(cardInstance)
         if (!cardDef) {
             this.cleanupDrag()
             return false
@@ -118,12 +119,12 @@ export class DragSystem {
         let targetFound = false
 
         // Check if this is a non-targeting or all-enemies card dragged upward
-        if (this.isUpwardDrag(pointer) && this.canAutoPlay(cardDef)) {
+        if (this.isUpwardDrag(pointer) && this.canAutoPlay(resolvedCard)) {
             // Auto-play the card
             const targets = this.getAutoPlayTargets(cardInstance)
             this.onCardPlay?.(cardInstance, targets)
             targetFound = true
-        } else if (cardDef.targeting?.type === 'single_enemy' || cardDef.targeting?.type === 'any') {
+        } else if (resolvedCard.targeting?.type === 'single_enemy' || resolvedCard.targeting?.type === 'any') {
             // Check if dropped on a valid target for targeting cards
             if (this.getEnemyAtPoint) {
                 const targetEnemy = this.getEnemyAtPoint(pointer.worldX, pointer.worldY)
@@ -172,7 +173,7 @@ export class DragSystem {
 
 
     private getAutoPlayTargets(cardInstance: CardInstance): string[] {
-        const cardDef = CARD_DEFS[cardInstance.defId]
+        const cardDef = resolveCard(cardInstance)
 
         switch (cardDef.targeting?.type) {
             case 'none':

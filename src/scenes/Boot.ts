@@ -40,6 +40,9 @@ export class BootScene extends Phaser.Scene {
         this.load.image('enemy:ACID_SLIME_S', acidSlimeWebp)
         this.load.image('enemy:ACID_SLIME_M', acidSlimeWebp)
         this.load.image('enemy:ACID_SLIME_L', acidSlimeWebp)
+        this.load.image('enemy:GREMLIN_NOB', gremlinWebp)
+        this.load.image('enemy:LAGAVULIN', cultistWebp)
+        this.load.image('enemy:THE_GUARDIAN', spikeSlimeWebp)
     }
 
     create(): void {
@@ -47,5 +50,4 @@ export class BootScene extends Phaser.Scene {
         this.scene.start('MainMenu')
     }
 }
-
 

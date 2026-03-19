@@ -7,6 +7,8 @@ import type { RunState } from '../core/run'
 import { saveRun } from '../core/run'
 import { CombatUI } from '../ui/CombatUI'
 import type { RoomKind } from '../core/map'
+import { getCombatRelicBonuses, getPostCombatHeal } from '../core/relics'
+import { generateRewardBundle, type EncounterTier } from '../core/rewards'
 
 export class CombatScene extends Phaser.Scene {
     private engine!: Engine
@@ -24,83 +26,92 @@ export class CombatScene extends Phaser.Scene {
         const seed = this.run.seed
         const player = createPlayerFromDeck(seed, this.run.deck, this.run.player.hp, this.run.player.maxHp)
         const combatIndex = this.run.combatCount ?? 0
-        const encounterRng = new RNG(`${seed}-encounter-${combatIndex}`)
-        const keys = generateEncounter(encounterRng, combatIndex)
-        const enemies = keys.map((k, i) => {
-            const enemyRng = new RNG(`${seed}-enemy-${combatIndex}-${i}`)
-            return createEnemyFromSpec(enemyRng, k as any, `e${i + 1}`)
-        })
+        const tier = this.getEncounterTier()
+        const encounterRng = new RNG(`${seed}-encounter-${combatIndex}-${tier}`)
+        const keys = generateEncounter(encounterRng, tier, combatIndex)
+        const enemies = keys.map((key, index) => createEnemyFromSpec(new RNG(`${seed}-enemy-${combatIndex}-${index}`), key as any, `e${index + 1}`))
+        const relicBonuses = getCombatRelicBonuses(this.run.relics, this.roomKind)
+
+        if (relicBonuses.eliteHpMultiplier !== 1) {
+            for (const enemy of enemies) {
+                enemy.maxHp = Math.max(1, Math.round(enemy.maxHp * relicBonuses.eliteHpMultiplier))
+                enemy.hp = Math.min(enemy.hp, enemy.maxHp)
+            }
+        }
+
         this.engine = new Engine(seed, player, enemies, { asc: this.run.asc ?? 0 })
-        // opening draw
-        this.engine.enqueue({ kind: 'DrawCards', count: 5 })
+        this.engine.configurePlayerCombatBonuses({ baseThorns: relicBonuses.startingThorns })
+        if (relicBonuses.startingBlock > 0) this.engine.enqueue({ kind: 'GainBlock', target: player.id, amount: relicBonuses.startingBlock })
+        if (relicBonuses.startingStrength > 0) this.engine.enqueue({ kind: 'ApplyPower', target: player.id, powerId: 'STRENGTH', stacks: relicBonuses.startingStrength })
+        if (relicBonuses.energyBonus > 0) this.engine.enqueue({ kind: 'GainEnergy', amount: relicBonuses.energyBonus })
+        this.engine.enqueue({ kind: 'DrawCards', count: 5 + relicBonuses.drawBonus })
         this.engine.runUntilIdle()
 
-        // Check for immediate victory/defeat after setup (unlikely but possible)
         if (this.engine.state.victory) {
             this.handleVictory()
             return
-        } else if (this.engine.state.defeat) {
+        }
+        if (this.engine.state.defeat) {
             this.handleDefeat()
             return
         }
 
-        this.ui = new CombatUI(this, this.engine)
+        this.ui = new CombatUI(this, this.engine, this.run)
         this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.ui?.destroy())
         this.events.once(Phaser.Scenes.Events.DESTROY, () => this.ui?.destroy())
-        this.ui.onPlayCard((card, targets) => {
-            const evStart = this.engine.playCard(card, targets)
-            this.ui.apply(evStart)
-            const evts = this.engine.runUntilIdle()
-            this.ui.apply(evts)
 
-            // Check for victory/defeat immediately after card effects resolve
-            if (this.engine.state.victory) {
-                this.handleVictory()
-            } else if (this.engine.state.defeat) {
-                this.handleDefeat()
-            }
+        this.ui.onPlayCard((card, targets) => {
+            this.ui.apply(this.engine.playCard(card, targets))
+            this.ui.apply(this.engine.runUntilIdle())
+            this.checkOutcome()
         })
+
+        this.ui.onUsePotion((potionIndex, targets) => {
+            const potionId = this.run.potions[potionIndex]
+            if (!potionId) return
+            const events = this.engine.usePotion(potionId, targets)
+            this.run.potions.splice(potionIndex, 1)
+            this.ui.apply(events)
+            this.ui.refreshRunData(this.run)
+            saveRun(this.run)
+            this.checkOutcome()
+        })
+
         this.ui.onEndTurn(() => {
             this.engine.enqueue({ kind: 'EndTurn' })
-            const evts = this.engine.runUntilIdle()
-            this.ui.apply(evts)
-            if (this.engine.state.victory) {
-                this.handleVictory()
-            } else if (this.engine.state.defeat) {
-                this.handleDefeat()
-            }
+            this.ui.apply(this.engine.runUntilIdle())
+            this.checkOutcome()
         })
     }
 
+    private checkOutcome(): void {
+        if (this.engine.state.victory) this.handleVictory()
+        else if (this.engine.state.defeat) this.handleDefeat()
+    }
+
     private handleVictory(): void {
-        // Burning Blood: heal 6 after combat if owned
-        if (this.run.relics.includes('BURNING_BLOOD')) {
-            this.run.player.hp = Math.min(this.run.player.maxHp, this.engine.state.player.hp + 6)
-        } else {
-            this.run.player.hp = this.engine.state.player.hp
-        }
+        this.run.player.hp = Math.min(this.run.player.maxHp, this.engine.state.player.hp + getPostCombatHeal(this.run.relics))
         this.run.combatCount = (this.run.combatCount ?? 0) + 1
 
         if (this.roomKind === 'boss') {
-            const currentAct = this.run.mapProgress?.act ?? 1
-            if (currentAct >= 3) {
-                this.scene.start('RunSummary', { run: this.run, result: 'victory' as const })
-                return
-            }
-
-            this.run.floor += 1
-            this.run.mapProgress = { act: currentAct + 1 }
-            saveRun(this.run)
-            this.scene.start('Map', { run: this.run })
+            this.scene.start('RunSummary', { run: this.run, result: 'victory' as const })
             return
         }
 
         saveRun(this.run)
-        this.scene.start('Rewards', { run: this.run })
+        const nodeId = this.run.mapProgress?.currentNodeId ?? `floor-${this.run.floor}`
+        const rewards = generateRewardBundle(`${this.run.seed}-reward-${nodeId}-${this.roomKind}`, this.getEncounterTier(), this.run.relics)
+        this.scene.start('Rewards', { run: this.run, rewards })
     }
 
     private handleDefeat(): void {
         this.run.player.hp = 0
         this.scene.start('RunSummary', { run: this.run, result: 'defeat' as const })
+    }
+
+    private getEncounterTier(): EncounterTier {
+        if (this.roomKind === 'elite') return 'elite'
+        if (this.roomKind === 'boss') return 'boss'
+        return 'hallway'
     }
 }
