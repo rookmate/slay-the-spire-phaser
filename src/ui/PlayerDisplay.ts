@@ -117,7 +117,17 @@ export class PlayerDisplay {
             color: COMBAT_UI_CONFIG.styles.color,
             backgroundColor: COMBAT_UI_CONFIG.colors.endTurnBg,
             padding: { x: 6, y: 4 },
-        }).setOrigin(1, 1).setInteractive({ useHandCursor: true }).on('pointerdown', () => this.onEndTurn?.())
+        }).setOrigin(1, 1)
+        this.endTurnButton.setInteractive({
+            hitArea: new Phaser.Geom.Rectangle(
+                -this.endTurnButton.displayOriginX,
+                -this.endTurnButton.displayOriginY,
+                this.endTurnButton.width,
+                this.endTurnButton.height,
+            ),
+            hitAreaCallback: Phaser.Geom.Rectangle.Contains,
+            useHandCursor: true,
+        }).on('pointerdown', () => this.onEndTurn?.())
     }
 
     private createPowerText(): void {
