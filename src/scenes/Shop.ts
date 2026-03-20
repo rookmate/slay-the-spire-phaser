@@ -1,9 +1,9 @@
 import Phaser from 'phaser'
 import type { RunState, RelicId } from '../core/run'
-import { saveRun } from '../core/run'
+import { removeCardByInstanceId, saveRun } from '../core/run'
 import { RNG } from '../core/rng'
-import { CARD_DEFS, createCardInstance } from '../core/cards'
-import { MVP_RELIC_POOL, RELIC_DEFS, applyRelicAcquisition, blocksPotionGain } from '../core/relics'
+import { CARD_DEFS, createCardInstance, isCurseCard, resolveCard } from '../core/cards'
+import { MVP_RELIC_POOL, RELIC_DEFS, applyRelicAcquisition, canObtainPotion } from '../core/relics'
 import { POTION_DEFS, type PotionId } from '../core/potions'
 import { Card } from '../ui/Card'
 import { DeckSelectionOverlay } from '../ui/DeckSelectionOverlay'
@@ -93,7 +93,7 @@ export class ShopScene extends Phaser.Scene {
             })
 
         this.inventory.potions.forEach((potion, index) => {
-            const canBuyPotion = !blocksPotionGain(this.run.relics)
+            const canBuyPotion = canObtainPotion(this.run)
             this.add.text(leftX, baseY + 40 + index * 32, `${POTION_DEFS[potion].name} (${canBuyPotion ? 50 : 'blocked'})`, {
                 ...style,
                 color: canBuyPotion ? style.color : '#777777',
@@ -111,9 +111,15 @@ export class ShopScene extends Phaser.Scene {
     }
 
     private renderRemove(style: Phaser.Types.GameObjects.Text.TextStyle): void {
+        const canPurge = this.run.gold >= this.run.merchantRemoveCost && this.run.deck.length > 0
+        this.add.text(420, 268, `Purge cost: ${this.run.merchantRemoveCost}`, {
+            ...style,
+            fontSize: '15px',
+            color: canPurge ? '#d8d8d8' : '#777777',
+        })
         this.add.text(420, 300, `Remove a card (${this.run.merchantRemoveCost})`, {
             ...style,
-            backgroundColor: '#333',
+            backgroundColor: canPurge ? '#333' : '#555',
             padding: { x: 8, y: 6 },
         }).setInteractive({ useHandCursor: true })
             .on('pointerdown', () => {
@@ -121,15 +127,22 @@ export class ShopScene extends Phaser.Scene {
                 this.selector.open({
                     title: 'Choose a card to remove',
                     cards: this.run.deck,
-                    onSelect: (_card, index) => {
+                    onSelect: (card) => {
                         this.run.gold -= this.run.merchantRemoveCost
                         this.run.merchantRemoveCost += 25
-                        this.run.deck.splice(index, 1)
+                        removeCardByInstanceId(this.run, card.instanceId)
                         saveRun(this.run)
                         this.render()
                     },
                 })
             })
+        const curses = this.run.deck.filter(card => isCurseCard(card)).map(card => resolveCard(card).name)
+        this.add.text(420, 340, `Curses in deck: ${curses.length > 0 ? curses.join(', ') : 'None'}`, {
+            fontFamily: 'monospace',
+            fontSize: '13px',
+            color: curses.length > 0 ? '#d9bdd9' : '#bcbcbc',
+            wordWrap: { width: 260 },
+        })
     }
 
     private generateInventory(): ShopInventory {

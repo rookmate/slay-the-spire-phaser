@@ -985,6 +985,52 @@ export const CARD_DEFS: Record<string, CardDef> = {
         poolEnabled: false,
         targeting: { type: 'none' },
     },
+    INJURY: {
+        id: 'INJURY',
+        name: 'Injury',
+        type: 'curse',
+        cost: 0,
+        unplayable: true,
+        poolEnabled: false,
+        targeting: { type: 'none' },
+    },
+    CLUMSY: {
+        id: 'CLUMSY',
+        name: 'Clumsy',
+        type: 'curse',
+        cost: 0,
+        unplayable: true,
+        ethereal: true,
+        poolEnabled: false,
+        targeting: { type: 'none' },
+    },
+    REGRET: {
+        id: 'REGRET',
+        name: 'Regret',
+        type: 'curse',
+        cost: 0,
+        unplayable: true,
+        poolEnabled: false,
+        targeting: { type: 'none' },
+    },
+    PAIN: {
+        id: 'PAIN',
+        name: 'Pain',
+        type: 'curse',
+        cost: 0,
+        unplayable: true,
+        poolEnabled: false,
+        targeting: { type: 'none' },
+    },
+    PARASITE: {
+        id: 'PARASITE',
+        name: 'Parasite',
+        type: 'curse',
+        cost: 0,
+        unplayable: true,
+        poolEnabled: false,
+        targeting: { type: 'none' },
+    },
 }
 
 for (const def of Object.values(CARD_DEFS)) {
@@ -1025,4 +1071,8 @@ export function resolveCard(card: CardInstance): ResolvedCardDef {
         baseDamage,
         baseBlock,
     }
+}
+
+export function isCurseCard(card: CardInstance | { defId: string }): boolean {
+    return CARD_DEFS[card.defId]?.type === 'curse'
 }

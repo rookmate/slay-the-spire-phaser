@@ -38,7 +38,7 @@ export class Card extends Phaser.GameObjects.Container {
         const bgColor = this.getBackgroundColor(def.type)
         this.bg = scene.add.rectangle(0, 0, w, h, bgColor, 1)
         this.bg.setOrigin(0, 0)
-        if (!CARD_DEFS[card.defId].poolEnabled) this.bg.setFillStyle(bgColor, 0.4)
+        if (!CARD_DEFS[card.defId].poolEnabled && !CARD_DEFS[card.defId].implemented) this.bg.setFillStyle(bgColor, 0.4)
 
         // Create transparent selection area rectangle
         this.selectionArea = scene.add.rectangle(0, 0, w, h, 0x000000, 0).setStrokeStyle(4, 0xffffff)
@@ -64,7 +64,7 @@ export class Card extends Phaser.GameObjects.Container {
         this.subtype = scene.add.text(8, 32, typeLabel, {
             fontFamily: 'monospace',
             fontSize: '10px',
-            color: '#aaa'
+            color: def.type === 'curse' ? '#f3c6f3' : '#aaa'
         })
 
         const stats: string[] = []
@@ -78,7 +78,7 @@ export class Card extends Phaser.GameObjects.Container {
             color: '#ddd'
         })
 
-        if (!CARD_DEFS[card.defId].poolEnabled) {
+        if (CARD_DEFS[card.defId].implemented === false) {
             this.implementedBadge = scene.add.text(8, h - 44, 'COMING LATER', {
                 fontFamily: 'monospace',
                 fontSize: '9px',
@@ -126,7 +126,7 @@ export class Card extends Phaser.GameObjects.Container {
             case 'status':
                 return 0x4a4a4a
             case 'curse':
-                return 0x3f1d3f
+                return 0x4b173c
             default:
                 return 0x8B4513 // Default brown
         }

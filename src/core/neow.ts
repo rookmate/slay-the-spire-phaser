@@ -2,38 +2,48 @@ import { CARD_DEFS, canUpgradeCard, createCardInstance } from './cards'
 import { MVP_RELIC_POOL, applyRelicAcquisition } from './relics'
 import { RNG } from './rng'
 import type { RelicId, RunState } from './run'
+import { obtainCurse, removeCardByInstanceId } from './run'
 
 export type NeowOptionId =
     | 'GAIN_100_GOLD'
     | 'REMOVE_CARD'
     | 'UPGRADE_CARD'
     | 'GAIN_7_MAX_HP'
-    | 'GAIN_COMMON_RELIC'
-    | 'GAIN_COMMON_CARD'
+    | 'GAIN_250_GOLD_INJURY'
+    | 'GAIN_COMMON_RELIC_REGRET'
+    | 'GAIN_RARE_CARD_PAIN'
+    | 'GAIN_10_MAX_HP_CLUMSY'
 
 export interface NeowOption {
     id: NeowOptionId
     label: string
     description: string
+    category: 'benefit' | 'tradeoff'
+    requiresSelection?: 'remove' | 'upgrade' | 'rare_card'
+    preview?: { gold?: number; maxHp?: number; curseId?: string; relicId?: RelicId; cardId?: string }
 }
 
-export const NEOW_OPTIONS: Record<NeowOptionId, NeowOption> = {
-    GAIN_100_GOLD: { id: 'GAIN_100_GOLD', label: 'Gain 100 Gold', description: 'Obtain 100 gold.' },
-    REMOVE_CARD: { id: 'REMOVE_CARD', label: 'Remove a Card', description: 'Remove 1 card from your deck.' },
-    UPGRADE_CARD: { id: 'UPGRADE_CARD', label: 'Upgrade a Card', description: 'Upgrade 1 card.' },
-    GAIN_7_MAX_HP: { id: 'GAIN_7_MAX_HP', label: 'Gain 7 Max HP', description: 'Increase max HP by 7.' },
-    GAIN_COMMON_RELIC: { id: 'GAIN_COMMON_RELIC', label: 'Gain a Common Relic', description: 'Obtain a random common relic.' },
-    GAIN_COMMON_CARD: { id: 'GAIN_COMMON_CARD', label: 'Gain a Common Card', description: 'Add a random common card to your deck.' },
-}
+const BENEFIT_OPTIONS: NeowOption[] = [
+    { id: 'GAIN_100_GOLD', label: 'Gain 100 Gold', description: 'Obtain 100 gold.', category: 'benefit', preview: { gold: 100 } },
+    { id: 'REMOVE_CARD', label: 'Remove a Card', description: 'Remove 1 card from your deck.', category: 'benefit', requiresSelection: 'remove' },
+    { id: 'UPGRADE_CARD', label: 'Upgrade a Card', description: 'Upgrade 1 card.', category: 'benefit', requiresSelection: 'upgrade' },
+    { id: 'GAIN_7_MAX_HP', label: 'Gain 7 Max HP', description: 'Increase max HP by 7.', category: 'benefit', preview: { maxHp: 7 } },
+]
+
+const TRADEOFF_OPTIONS: NeowOption[] = [
+    { id: 'GAIN_250_GOLD_INJURY', label: 'Gain 250 Gold', description: 'Obtain 250 gold. Obtain Injury.', category: 'tradeoff', preview: { gold: 250, curseId: 'INJURY' } },
+    { id: 'GAIN_COMMON_RELIC_REGRET', label: 'Gain a Common Relic', description: 'Obtain a random common relic. Obtain Regret.', category: 'tradeoff', preview: { curseId: 'REGRET' } },
+    { id: 'GAIN_RARE_CARD_PAIN', label: 'Choose a Rare Card', description: 'Choose 1 rare card. Obtain Pain.', category: 'tradeoff', requiresSelection: 'rare_card', preview: { curseId: 'PAIN' } },
+    { id: 'GAIN_10_MAX_HP_CLUMSY', label: 'Gain 10 Max HP', description: 'Increase max HP by 10. Obtain Clumsy.', category: 'tradeoff', preview: { maxHp: 10, curseId: 'CLUMSY' } },
+]
 
 export function rollNeowOptions(seed: string): NeowOption[] {
     const rng = new RNG(seed)
-    const ids = Object.keys(NEOW_OPTIONS) as NeowOptionId[]
-    const chosen = new Set<NeowOptionId>()
-    while (chosen.size < 4) {
-        chosen.add(ids[rng.int(0, ids.length - 1)])
-    }
-    return [...chosen].map(id => NEOW_OPTIONS[id])
+    const benefits = [...BENEFIT_OPTIONS]
+    const tradeoffs = [...TRADEOFF_OPTIONS]
+    rng.shuffleInPlace(benefits)
+    rng.shuffleInPlace(tradeoffs)
+    return [...benefits.slice(0, 2), ...tradeoffs.slice(0, 2)]
 }
 
 export function getRandomNeowRelic(seed: string, run: RunState): RelicId {
@@ -49,29 +59,51 @@ export function getRandomNeowCommonCard(seed: string): string {
     return pool[rng.int(0, pool.length - 1)]
 }
 
-export function applyNeowOption(run: RunState, optionId: NeowOptionId, args?: { removeIndex?: number; upgradeIndex?: number; rewardCardId?: string; rewardRelicId?: RelicId }): void {
+export function getNeowRareCardChoices(seed: string): string[] {
+    const rng = new RNG(`${seed}-rare`)
+    const pool = Object.values(CARD_DEFS)
+        .filter(card => card.poolEnabled && card.rarity === 'rare')
+        .map(card => card.id)
+    rng.shuffleInPlace(pool)
+    return pool.slice(0, Math.min(3, pool.length))
+}
+
+export function getNeowOptionById(id: NeowOptionId): NeowOption {
+    return [...BENEFIT_OPTIONS, ...TRADEOFF_OPTIONS].find(option => option.id === id) ?? BENEFIT_OPTIONS[0]
+}
+
+export function applyNeowOption(
+    run: RunState,
+    optionId: NeowOptionId,
+    args?: { removeInstanceId?: string; upgradeInstanceId?: string; rewardCardId?: string; rewardRelicId?: RelicId },
+): void {
     if (optionId === 'GAIN_100_GOLD') {
         run.gold += 100
+    } else if (optionId === 'REMOVE_CARD') {
+        if (args?.removeInstanceId) removeCardByInstanceId(run, args.removeInstanceId)
+    } else if (optionId === 'UPGRADE_CARD') {
+        const card = run.deck.find(entry => entry.instanceId === args?.upgradeInstanceId)
+        if (card && canUpgradeCard(card)) {
+            card.upgradeLevel = card.defId === 'SEARING_BLOW' ? card.upgradeLevel + 1 : 1
+        }
     } else if (optionId === 'GAIN_7_MAX_HP') {
         run.player.maxHp += 7
         run.player.hp += 7
-    } else if (optionId === 'GAIN_COMMON_RELIC') {
+    } else if (optionId === 'GAIN_250_GOLD_INJURY') {
+        run.gold += 250
+        obtainCurse(run, 'INJURY')
+    } else if (optionId === 'GAIN_COMMON_RELIC_REGRET') {
         if (args?.rewardRelicId) applyRelicAcquisition(run, args.rewardRelicId)
-    } else if (optionId === 'GAIN_COMMON_CARD') {
+        obtainCurse(run, 'REGRET')
+    } else if (optionId === 'GAIN_RARE_CARD_PAIN') {
         if (args?.rewardCardId) run.deck.push(createCardInstance(args.rewardCardId))
-    } else if (optionId === 'REMOVE_CARD') {
-        if (typeof args?.removeIndex === 'number') run.deck.splice(args.removeIndex, 1)
-    } else if (optionId === 'UPGRADE_CARD') {
-        if (typeof args?.upgradeIndex === 'number') {
-            const card = run.deck[args.upgradeIndex]
-            if (card && canUpgradeCard(card)) {
-                run.deck[args.upgradeIndex] = {
-                    ...card,
-                    upgradeLevel: card.defId === 'SEARING_BLOW' ? card.upgradeLevel + 1 : 1,
-                }
-            }
-        }
+        obtainCurse(run, 'PAIN')
+    } else if (optionId === 'GAIN_10_MAX_HP_CLUMSY') {
+        run.player.maxHp += 10
+        run.player.hp += 10
+        obtainCurse(run, 'CLUMSY')
     }
 
     run.neowCompleted = true
+    run.neowChoiceId = optionId
 }

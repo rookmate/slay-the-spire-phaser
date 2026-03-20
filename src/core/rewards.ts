@@ -1,7 +1,7 @@
 import { RNG } from './rng'
 import { CARD_DEFS } from './cards'
-import type { RelicId } from './run'
-import { BOSS_RELIC_POOL, MVP_RELIC_POOL, blocksPotionGain, getCardRewardChoiceCount } from './relics'
+import type { RelicId, RunState } from './run'
+import { BOSS_RELIC_POOL, MVP_RELIC_POOL, canObtainPotion, getCardRewardChoiceCount } from './relics'
 import type { PotionId } from './potions'
 
 export type EncounterTier = 'hallway' | 'elite' | 'boss' | 'chest'
@@ -25,7 +25,7 @@ export function generateRewardBundle(seed: string, tier: EncounterTier, ownedRel
     const rng = new RNG(seed)
     const items: RewardItem[] = []
     const cardChoiceCount = getCardRewardChoiceCount(ownedRelics)
-    const canGainPotion = !blocksPotionGain(ownedRelics)
+    const canGainPotion = canObtainPotion({ relics: ownedRelics, potions: [], maxPotionSlots: 3 } satisfies Pick<RunState, 'relics' | 'potions' | 'maxPotionSlots'>)
 
     if (tier === 'hallway') {
         items.push({ kind: 'gold', amount: rng.int(10, 20) })

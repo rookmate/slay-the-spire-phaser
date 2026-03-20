@@ -87,6 +87,10 @@ export function getPostCombatHeal(relics: RelicId[]): number {
     return relics.reduce((highest, relicId) => Math.max(highest, RELIC_DEFS[relicId]?.postCombatHeal ?? 0), 0)
 }
 
+export function canObtainPotion(run: Pick<RunState, 'relics' | 'potions' | 'maxPotionSlots'>): boolean {
+    return !blocksPotionGain(run.relics) && run.potions.length < run.maxPotionSlots
+}
+
 export function getRelicEnergyBonus(relics: RelicId[]): number {
     return relics.reduce((sum, relicId) => sum + (RELIC_DEFS[relicId]?.energyPerTurn ?? 0), 0)
 }

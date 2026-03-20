@@ -7,8 +7,9 @@ import { createEnemyFromSpec } from './enemies'
 import { applyRelicAcquisition, blocksPotionGain, getCardRewardChoiceCount, getCombatRelicBonuses, getPostCombatHeal, getRelicEnergyBonus } from './relics'
 import { generateRewardBundle } from './rewards'
 import { createNewRun } from './run'
-import { applyNeowOption, getRandomNeowCommonCard, getRandomNeowRelic, rollNeowOptions } from './neow'
+import { applyNeowOption, getNeowRareCardChoices, getRandomNeowRelic, rollNeowOptions } from './neow'
 import { generateEncounter } from './encounters'
+import { generateEvent, resolveEventChoice } from './events'
 
 function createPlayerWithHand(handIds: string[]): PlayerState {
     const player = createSimplePlayer('test-player')
@@ -44,18 +45,23 @@ describe('deferred card systems', () => {
         const run = createNewRun('neow-seed')
         const options = rollNeowOptions(run.neowSeed)
         const rerolled = rollNeowOptions(run.neowSeed)
-        const relicId = getRandomNeowRelic(`${run.neowSeed}-GAIN_COMMON_RELIC`, run)
-        const cardId = getRandomNeowCommonCard(`${run.neowSeed}-GAIN_COMMON_CARD`)
+        const relicId = getRandomNeowRelic(`${run.neowSeed}-GAIN_COMMON_RELIC_REGRET`, run)
+        const rareChoices = getNeowRareCardChoices(`${run.neowSeed}-GAIN_RARE_CARD_PAIN`)
 
         expect(options.map(option => option.id)).toEqual(rerolled.map(option => option.id))
+        expect(options.filter(option => option.category === 'benefit')).toHaveLength(2)
+        expect(options.filter(option => option.category === 'tradeoff')).toHaveLength(2)
 
-        applyNeowOption(run, 'GAIN_COMMON_RELIC', { rewardRelicId: relicId })
+        applyNeowOption(run, 'GAIN_COMMON_RELIC_REGRET', { rewardRelicId: relicId })
         expect(run.relics).toContain(relicId)
+        expect(run.deck.some(card => card.defId === 'REGRET')).toBe(true)
         expect(run.neowCompleted).toBe(true)
+        expect(run.neowChoiceId).toBe('GAIN_COMMON_RELIC_REGRET')
 
         const secondRun = createNewRun('neow-seed-2')
-        applyNeowOption(secondRun, 'GAIN_COMMON_CARD', { rewardCardId: cardId })
-        expect(secondRun.deck.some(card => card.defId === cardId)).toBe(true)
+        applyNeowOption(secondRun, 'GAIN_RARE_CARD_PAIN', { rewardCardId: rareChoices[0] })
+        expect(secondRun.deck.some(card => card.defId === rareChoices[0])).toBe(true)
+        expect(secondRun.deck.some(card => card.defId === 'PAIN')).toBe(true)
     })
 
     it('resolves upgrade levels and searing blow scaling', () => {
@@ -196,6 +202,28 @@ describe('deferred card systems', () => {
 
         expect(engine.state.player.energy).toBe(2)
         expect(engine.state.player.exhaustPile.map(card => card.defId)).toContain('SLIMED')
+    })
+
+    it('clumsy exhausts at end of turn and regret loses hp based on hand size', () => {
+        const player = createPlayerWithHand(['CLUMSY', 'REGRET', 'STRIKE'])
+        const enemy = createDummyEnemy('e1')
+        enemy.intent = { kind: 'buff', desc: 'Idle' }
+        const engine = new Engine('curse-turn-seed', player, [enemy])
+
+        engine.enqueue({ kind: 'EndTurn' })
+        engine.runUntilIdle()
+
+        expect(engine.state.player.exhaustPile.map(card => card.defId)).toContain('CLUMSY')
+        expect(engine.state.player.hp).toBe(197)
+    })
+
+    it('pain causes hp loss whenever a card is played', () => {
+        const player = createPlayerWithHand(['PAIN', 'STRIKE'])
+        const engine = new Engine('pain-seed', player, [createDummyEnemy('e1')])
+
+        playAndResolve(engine, player.hand[1], ['e1'])
+
+        expect(engine.state.player.hp).toBe(199)
     })
 
     it('whirlwind spends all remaining energy and is repeated by double tap', () => {
@@ -385,5 +413,21 @@ describe('deferred card systems', () => {
         expect(['SHELLED_PARASITE', 'SNECKO', 'LOOTER', 'CULTIST']).toContain(hallway[0])
         expect(elite).toEqual(['BOOK_OF_STABBING'])
         expect(boss).toEqual(['THE_CHAMP'])
+    })
+
+    it('resolves seeded act one events with curse and economy effects', () => {
+        const run = createNewRun('event-seed')
+        const eventId = generateEvent(1, `${run.seed}-event-floor`)
+
+        expect(['WORLD_OF_GOOP', 'CLERIC', 'UPGRADE_SHRINE', 'GOLDEN_IDOL', 'BIG_FISH', 'THE_JOUST']).toContain(eventId)
+
+        resolveEventChoice(run, 'GOLDEN_IDOL', 'GOLDEN_IDOL_TAKE', 'idol-seed')
+        expect(run.gold).toBe(199)
+        expect(run.deck.some(card => card.defId === 'INJURY')).toBe(true)
+
+        const secondRun = createNewRun('event-seed-2')
+        resolveEventChoice(secondRun, 'BIG_FISH', 'BIG_FISH_BOX', 'fish-seed')
+        expect(secondRun.relics.length).toBeGreaterThan(1)
+        expect(secondRun.deck.some(card => card.defId === 'REGRET')).toBe(true)
     })
 })

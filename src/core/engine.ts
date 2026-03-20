@@ -423,6 +423,11 @@ export class Engine {
             { kind: 'CardPlayed', cardId: playedCard.defId, instanceId: playedCard.instanceId },
         ]
 
+        const painCards = this.state.player.hand.filter(entry => entry.defId === 'PAIN').length
+        for (let i = 0; i < painCards; i++) {
+            this.enqueue({ kind: 'LoseHp', target: this.state.player.id, amount: 1 })
+        }
+
         this.resolveActiveLimbo()
         for (const enemy of this.state.enemies) onPlayerCardPlayed(enemy, resolved.type)
         return events
@@ -511,10 +516,14 @@ export class Engine {
 
     private processEndOfTurnHand(events: EmittedEvent[]): void {
         const remainingHand = [...this.state.player.hand]
+        const regretCards = remainingHand.filter(card => card.defId === 'REGRET').length
+        if (regretCards > 0) {
+            this.enqueue({ kind: 'LoseHp', target: this.state.player.id, amount: remainingHand.length * regretCards })
+        }
         for (const card of remainingHand) {
             const resolved = resolveCard(card)
             if (card.defId === 'BURN') this.enqueue({ kind: 'LoseHp', target: this.state.player.id, amount: 2 })
-            if (!resolved.ethereal) continue
+            if (!(resolved.ethereal || card.defId === 'DAZED')) continue
             const index = this.state.player.hand.findIndex(entry => entry.instanceId === card.instanceId)
             if (index < 0) continue
             const [etherealCard] = this.state.player.hand.splice(index, 1)
