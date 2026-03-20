@@ -2,6 +2,17 @@ import { RNG } from './rng'
 import { CARD_DEFS, canUpgradeCard, createCardInstance, createStarterDeck, resolveCard } from './cards'
 import { onEnemyDamaged, onEnemyIntentResolved, onPlayerCardPlayed, rollEngineIntentForEnemy } from './enemies'
 import { POTION_DEFS, type PotionId } from './potions'
+import {
+    createRelicCombatContext,
+    modifyAttackDamageFromRelics,
+    triggerRelicAttackPlayed,
+    triggerRelicCombatStart,
+    triggerRelicPlayerHpLost,
+    triggerRelicPlayerTurnEnd,
+    triggerRelicPlayerTurnStart,
+    type RelicCombatRuntimeEntry,
+} from './relics'
+import type { RelicId, RunState } from './run'
 import type { Action, EmittedEvent, EntityId } from './actions'
 import type {
     CardChoiceRequest,
@@ -38,8 +49,10 @@ export class Engine {
     private temporaryThorns = 0
     private activeLimbo?: InternalLimboCardState
     private pendingChoice?: InternalPendingChoice
+    private run?: RunState
+    private relicRuntime: Partial<Record<RelicId, RelicCombatRuntimeEntry>> = {}
 
-    constructor(seed: string, player: PlayerState, enemies: EnemyState[], opts?: { asc?: number }) {
+    constructor(seed: string, player: PlayerState, enemies: EnemyState[], opts?: { asc?: number; run?: RunState }) {
         this.rng = new RNG(seed)
         this.state = {
             player,
@@ -50,6 +63,7 @@ export class Engine {
             limbo: [],
         }
         this.ascension = opts?.asc ?? 0
+        this.run = opts?.run
     }
 
     enqueue(a: Action): void {
@@ -67,9 +81,23 @@ export class Engine {
         if (this.basePlayerThorns > 0) this.setPowerStacks(this.state.player, 'THORNS', this.basePlayerThorns + this.temporaryThorns)
     }
 
+    initializeCombat(): void {
+        if (!this.run) return
+        triggerRelicCombatStart(this.getRelicContext())
+        triggerRelicPlayerTurnStart(this.getRelicContext())
+    }
+
     addTemporaryThorns(amount: number): void {
         this.temporaryThorns += amount
         this.setPowerStacks(this.state.player, 'THORNS', this.basePlayerThorns + this.temporaryThorns)
+    }
+
+    getBaseThorns(): number {
+        return this.basePlayerThorns
+    }
+
+    getBaseEnergyPerTurn(): number {
+        return this.baseEnergyPerTurn
     }
 
     canAcceptInput(): boolean {
@@ -236,6 +264,10 @@ export class Engine {
                     this.enqueue({ kind: 'Heal', target: action.lifestealTo, amount: actualDamage })
                 }
 
+                if (target === this.state.player && actualDamage > 0 && this.run) {
+                    triggerRelicPlayerHpLost(this.getRelicContext(), actualDamage)
+                }
+
                 if ('name' in target) onEnemyDamaged(this, target, actualDamage)
 
                 if (source && action.damageType !== 'thorns') {
@@ -259,6 +291,9 @@ export class Engine {
                 if (!target) break
                 target.hp = Math.max(0, target.hp - action.amount)
                 evts.push({ kind: 'HpLost', target: action.target, amount: action.amount, resultingHp: target.hp })
+                if (target === this.state.player && action.amount > 0 && this.run) {
+                    triggerRelicPlayerHpLost(this.getRelicContext(), action.amount)
+                }
                 this.checkWinLose(evts)
                 break
             }
@@ -428,6 +463,10 @@ export class Engine {
             this.enqueue({ kind: 'LoseHp', target: this.state.player.id, amount: 1 })
         }
 
+        if (resolved.type === 'attack' && this.run) {
+            triggerRelicAttackPlayed(this.getRelicContext(), playedCard.instanceId)
+        }
+
         this.resolveActiveLimbo()
         for (const enemy of this.state.enemies) onPlayerCardPlayed(enemy, resolved.type)
         return events
@@ -457,12 +496,13 @@ export class Engine {
         return amount
     }
 
-    modifyOutgoingDamageFromPlayer(base: number): number {
+    modifyOutgoingAttackDamageFromPlayer(base: number, cardInstanceId?: string): number {
         let amount = base
         const strength = this.state.player.powers.find(power => power.id === 'STRENGTH')?.stacks ?? 0
         amount += strength
         const weak = this.state.player.powers.find(power => power.id === 'WEAK')?.stacks ?? 0
         if (weak > 0) amount = Math.round(amount * 0.75)
+        if (this.run && cardInstanceId) amount = modifyAttackDamageFromRelics(this.getRelicContext(), amount, cardInstanceId)
         return amount
     }
 
@@ -493,7 +533,7 @@ export class Engine {
                         kind: 'DealDamage',
                         source: this.state.player.id,
                         target: limbo.targetIds[0],
-                        amount: this.modifyOutgoingDamageFromPlayer(resolved.baseDamage),
+                        amount: this.modifyOutgoingAttackDamageFromPlayer(resolved.baseDamage, limbo.card.instanceId),
                     })
                 }
                 if (resolved.baseBlock) {
@@ -632,6 +672,7 @@ export class Engine {
 
     private onStartOfPlayerTurn(): void {
         const player = this.state.player
+        if (this.run) triggerRelicPlayerTurnStart(this.getRelicContext())
         const demonForm = player.powers.find(power => power.id === 'DEMON_FORM')?.stacks ?? 0
         if (demonForm > 0) this.enqueue({ kind: 'ApplyPower', target: player.id, powerId: 'STRENGTH', stacks: demonForm })
 
@@ -646,8 +687,14 @@ export class Engine {
     }
 
     private onEndOfPlayerTurn(): void {
+        if (this.run) triggerRelicPlayerTurnEnd(this.getRelicContext())
         const metallicize = this.state.player.powers.find(power => power.id === 'METALLICIZE')?.stacks ?? 0
         if (metallicize > 0) this.enqueue({ kind: 'GainBlock', target: this.state.player.id, amount: metallicize })
+    }
+
+    private getRelicContext() {
+        if (!this.run) throw new Error('Relic context requested without run state')
+        return createRelicCombatContext(this, this.run, this.relicRuntime)
     }
 
     private normalizePlayerThorns(): void {

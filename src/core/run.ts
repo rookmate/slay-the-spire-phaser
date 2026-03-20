@@ -1,5 +1,6 @@
 import { RNG } from './rng'
 import { CARD_DEFS, createCardInstance, createStarterDeck } from './cards'
+import { tryPreventCurse } from './relics'
 import type { CardInstance } from './state'
 import type { PotionId } from './potions'
 
@@ -15,6 +16,17 @@ export type RelicId =
     | 'BRONZE_SCALES'
     | 'STRAWBERRY'
     | 'PRESERVED_INSECT'
+    | 'OMAMORI'
+    | 'AKABEKO'
+    | 'ORICHALCUM'
+    | 'CENTENNIAL_PUZZLE'
+    | 'BAG_OF_MARBLES'
+    | 'HORN_CLEAT'
+
+export interface RelicStateEntry {
+    charges?: number
+    counter?: number
+}
 
 export interface RunState {
     seed: string
@@ -35,6 +47,8 @@ export interface RunState {
     actsCleared?: number[]
     cursesObtained?: number
     cardsRemoved?: number
+    relicState?: Partial<Record<RelicId, RelicStateEntry>>
+    eventHistory?: Partial<Record<string, boolean>>
     runFlags?: Record<string, boolean>
     asc?: number
     mapProgress?: { currentNodeId?: string }
@@ -66,11 +80,13 @@ export function createNewRun(seed?: string): RunState {
         actsCleared: [],
         cursesObtained: 0,
         cardsRemoved: 0,
+        relicState: {},
+        eventHistory: {},
         runFlags: {},
     }
 }
 
-const STORAGE_KEY = 'sts_run_v4'
+const STORAGE_KEY = 'sts_run_v5'
 
 export function obtainCard(run: RunState, defId: string, destination: 'deck' = 'deck', upgradeLevel = 0): CardInstance {
     const card = createCardInstance(defId, upgradeLevel)
@@ -79,6 +95,9 @@ export function obtainCard(run: RunState, defId: string, destination: 'deck' = '
 }
 
 export function obtainCurse(run: RunState, curseId: string): CardInstance {
+    if (tryPreventCurse(run, curseId)) {
+        return createCardInstance(curseId)
+    }
     const card = obtainCard(run, curseId)
     run.cursesObtained = (run.cursesObtained ?? 0) + 1
     if (curseId === 'PARASITE') {

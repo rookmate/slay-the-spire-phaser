@@ -1,7 +1,7 @@
 import { RNG } from './rng'
 import { CARD_DEFS } from './cards'
 import type { RelicId, RunState } from './run'
-import { BOSS_RELIC_POOL, MVP_RELIC_POOL, canObtainPotion, getCardRewardChoiceCount } from './relics'
+import { BOSS_RELIC_POOL, MVP_RELIC_POOL, blocksPotionGain, getCardRewardChoiceCount } from './relics'
 import type { PotionId } from './potions'
 
 export type EncounterTier = 'hallway' | 'elite' | 'boss' | 'chest'
@@ -21,11 +21,18 @@ export interface RewardBundle {
 const RARITY_ORDER: Array<'common' | 'uncommon' | 'rare'> = ['common', 'common', 'common', 'common', 'common', 'common', 'uncommon', 'uncommon', 'uncommon', 'rare']
 const POTION_POOL: PotionId[] = ['FIRE_POTION', 'BLOCK_POTION', 'STRENGTH_POTION']
 
-export function generateRewardBundle(seed: string, tier: EncounterTier, ownedRelics: RelicId[]): RewardBundle {
+export function generateRewardBundle(
+    seed: string,
+    tier: EncounterTier,
+    run: Pick<RunState, 'relics' | 'potions' | 'maxPotionSlots'> | RelicId[],
+): RewardBundle {
     const rng = new RNG(seed)
     const items: RewardItem[] = []
-    const cardChoiceCount = getCardRewardChoiceCount(ownedRelics)
-    const canGainPotion = canObtainPotion({ relics: ownedRelics, potions: [], maxPotionSlots: 3 } satisfies Pick<RunState, 'relics' | 'potions' | 'maxPotionSlots'>)
+    const runView = Array.isArray(run)
+        ? { relics: run, potions: [], maxPotionSlots: 3 }
+        : run
+    const cardChoiceCount = getCardRewardChoiceCount(runView)
+    const canGainPotion = !blocksPotionGain(runView)
 
     if (tier === 'hallway') {
         items.push({ kind: 'gold', amount: rng.int(10, 20) })
@@ -34,12 +41,12 @@ export function generateRewardBundle(seed: string, tier: EncounterTier, ownedRel
     } else if (tier === 'elite') {
         items.push({ kind: 'gold', amount: rng.int(25, 35) })
         items.push({ kind: 'cards', choices: drawCardChoices(rng, cardChoiceCount) })
-        items.push({ kind: 'relic', relicId: drawRelic(rng, ownedRelics) })
+        items.push({ kind: 'relic', relicId: drawRelic(rng, runView.relics) })
         if (canGainPotion && rng.random() < 0.6) items.push({ kind: 'potion', potionId: POTION_POOL[rng.int(0, POTION_POOL.length - 1)] })
     } else if (tier === 'boss') {
-        items.push({ kind: 'boss_relics', choices: drawBossRelics(rng, ownedRelics) })
+        items.push({ kind: 'boss_relics', choices: drawBossRelics(rng, runView.relics) })
     } else if (tier === 'chest') {
-        items.push({ kind: 'relic', relicId: drawRelic(rng, ownedRelics) })
+        items.push({ kind: 'relic', relicId: drawRelic(rng, runView.relics) })
         items.push({ kind: 'gold', amount: rng.int(25, 35) })
     }
 

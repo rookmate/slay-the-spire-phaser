@@ -1,5 +1,5 @@
 import { CARD_DEFS, canUpgradeCard, createCardInstance } from './cards'
-import { MVP_RELIC_POOL, applyRelicAcquisition } from './relics'
+import { MVP_RELIC_POOL, RELIC_DEFS, applyRelicAcquisition } from './relics'
 import { RNG } from './rng'
 import type { RelicId, RunState } from './run'
 import { obtainCurse, removeCardByInstanceId } from './run'
@@ -48,8 +48,9 @@ export function rollNeowOptions(seed: string): NeowOption[] {
 
 export function getRandomNeowRelic(seed: string, run: RunState): RelicId {
     const rng = new RNG(`${seed}-relic`)
-    const pool = MVP_RELIC_POOL.filter(id => !run.relics.includes(id))
-    const source = pool.length > 0 ? pool : MVP_RELIC_POOL
+    const commonRelics = MVP_RELIC_POOL.filter(id => RELIC_DEFS[id].rarity === 'common')
+    const pool = commonRelics.filter(id => !run.relics.includes(id))
+    const source = pool.length > 0 ? pool : commonRelics
     return source[rng.int(0, source.length - 1)]
 }
 

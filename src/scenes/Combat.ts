@@ -7,7 +7,7 @@ import type { RunState } from '../core/run'
 import { saveRun } from '../core/run'
 import { CombatUI } from '../ui/CombatUI'
 import type { RoomKind } from '../core/map'
-import { getCombatRelicBonuses, getPostCombatHeal, getRelicEnergyBonus } from '../core/relics'
+import { getEncounterEliteHpMultiplier, getPostCombatHeal, getRelicEnergyBonus } from '../core/relics'
 import { generateRewardBundle, type EncounterTier } from '../core/rewards'
 import { getEncounterActSeed, getEnemyActSeed } from '../core/acts'
 
@@ -32,24 +32,21 @@ export class CombatScene extends Phaser.Scene {
         const encounterRng = new RNG(getEncounterActSeed(seed, act, tier, combatIndex))
         const keys = generateEncounter(encounterRng, act, tier, combatIndex)
         const enemies = keys.map((key, index) => createEnemyFromSpec(new RNG(getEnemyActSeed(seed, act, combatIndex, index)), key as any, `e${index + 1}`))
-        const relicBonuses = getCombatRelicBonuses(this.run.relics, this.roomKind)
+        const eliteHpMultiplier = getEncounterEliteHpMultiplier(this.run, this.roomKind)
 
-        if (relicBonuses.eliteHpMultiplier !== 1) {
+        if (eliteHpMultiplier !== 1) {
             for (const enemy of enemies) {
-                enemy.maxHp = Math.max(1, Math.round(enemy.maxHp * relicBonuses.eliteHpMultiplier))
+                enemy.maxHp = Math.max(1, Math.round(enemy.maxHp * eliteHpMultiplier))
                 enemy.hp = Math.min(enemy.hp, enemy.maxHp)
             }
         }
 
-        this.engine = new Engine(seed, player, enemies, { asc: this.run.asc ?? 0 })
+        this.engine = new Engine(seed, player, enemies, { asc: this.run.asc ?? 0, run: this.run })
         this.engine.configurePlayerCombatBonuses({
-            baseThorns: relicBonuses.startingThorns,
-            baseEnergyPerTurn: 3 + getRelicEnergyBonus(this.run.relics),
+            baseEnergyPerTurn: 3 + getRelicEnergyBonus(this.run),
         })
-        if (relicBonuses.startingBlock > 0) this.engine.enqueue({ kind: 'GainBlock', target: player.id, amount: relicBonuses.startingBlock })
-        if (relicBonuses.startingStrength > 0) this.engine.enqueue({ kind: 'ApplyPower', target: player.id, powerId: 'STRENGTH', stacks: relicBonuses.startingStrength })
-        if (relicBonuses.energyBonus > 0) this.engine.enqueue({ kind: 'GainEnergy', amount: relicBonuses.energyBonus })
-        this.engine.enqueue({ kind: 'DrawCards', count: 5 + relicBonuses.drawBonus })
+        this.engine.initializeCombat()
+        this.engine.enqueue({ kind: 'DrawCards', count: 5 })
         this.engine.runUntilIdle()
 
         if (this.engine.state.victory) {
@@ -107,7 +104,7 @@ export class CombatScene extends Phaser.Scene {
     }
 
     private handleVictory(): void {
-        this.run.player.hp = Math.min(this.run.player.maxHp, this.engine.state.player.hp + getPostCombatHeal(this.run.relics))
+        this.run.player.hp = Math.min(this.run.player.maxHp, this.engine.state.player.hp + getPostCombatHeal(this.run))
         this.run.combatCount = (this.run.combatCount ?? 0) + 1
 
         if (this.roomKind === 'boss') {
@@ -116,7 +113,7 @@ export class CombatScene extends Phaser.Scene {
                 return
             }
             const sourceBossId = this.engine.state.enemies[0]?.specId ?? 'BOSS'
-            const bossRewards = generateRewardBundle(`${this.run.seed}-boss-relics-act-${this.run.act}-floor-${this.run.floor}`, 'boss', this.run.relics)
+            const bossRewards = generateRewardBundle(`${this.run.seed}-boss-relics-act-${this.run.act}-floor-${this.run.floor}`, 'boss', this.run)
             const bossRelicChoices = bossRewards.items.find(item => item.kind === 'boss_relics')
             this.run.bossRelicChoicePending = {
                 sourceBossId,
@@ -130,7 +127,7 @@ export class CombatScene extends Phaser.Scene {
 
         saveRun(this.run)
         const nodeId = this.run.mapProgress?.currentNodeId ?? `floor-${this.run.floor}`
-        const rewards = generateRewardBundle(`${this.run.seed}-reward-${nodeId}-${this.roomKind}`, this.getEncounterTier(), this.run.relics)
+        const rewards = generateRewardBundle(`${this.run.seed}-reward-${nodeId}-${this.roomKind}`, this.getEncounterTier(), this.run)
         this.scene.start('Rewards', { run: this.run, rewards })
     }
 

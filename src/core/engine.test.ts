@@ -4,12 +4,12 @@ import type { CardInstance, PlayerState } from './state'
 import { Engine, createDummyEnemy, createSimplePlayer } from './engine'
 import { RNG } from './rng'
 import { createEnemyFromSpec } from './enemies'
-import { applyRelicAcquisition, blocksPotionGain, getCardRewardChoiceCount, getCombatRelicBonuses, getPostCombatHeal, getRelicEnergyBonus } from './relics'
+import { applyRelicAcquisition, blocksPotionGain, getCardRewardChoiceCount, getCombatRelicBonuses, getPostCombatHeal, getRelicEnergyBonus, getRelicState } from './relics'
 import { generateRewardBundle } from './rewards'
-import { createNewRun } from './run'
+import { createNewRun, obtainCurse } from './run'
 import { applyNeowOption, getNeowRareCardChoices, getRandomNeowRelic, rollNeowOptions } from './neow'
 import { generateEncounter } from './encounters'
-import { generateEvent, resolveEventChoice } from './events'
+import { generateEvent, getEventPool, resolveEventChoice, transformCard } from './events'
 
 function createPlayerWithHand(handIds: string[]): PlayerState {
     const player = createSimplePlayer('test-player')
@@ -226,6 +226,63 @@ describe('deferred card systems', () => {
         expect(engine.state.player.hp).toBe(199)
     })
 
+    it('omamori blocks the next two curses, including parasite max hp loss', () => {
+        const run = createNewRun('omamori-seed')
+        applyRelicAcquisition(run, 'OMAMORI')
+
+        const beforeMaxHp = run.player.maxHp
+        obtainCurse(run, 'PARASITE')
+        obtainCurse(run, 'REGRET')
+        obtainCurse(run, 'INJURY')
+
+        expect(run.player.maxHp).toBe(beforeMaxHp)
+        expect(run.deck.some(card => card.defId === 'PARASITE')).toBe(false)
+        expect(run.deck.some(card => card.defId === 'REGRET')).toBe(false)
+        expect(run.deck.some(card => card.defId === 'INJURY')).toBe(true)
+        expect(getRelicState(run, 'OMAMORI').charges).toBe(0)
+    })
+
+    it('akabeko buffs the first attack card across repeated hits and bag of marbles applies vulnerable at combat start', () => {
+        const run = createNewRun('akabeko-seed')
+        run.relics = ['AKABEKO', 'BAG_OF_MARBLES']
+        run.relicState = {}
+        const player = createPlayerWithHand(['WHIRLWIND'])
+        player.energy = 2
+        const enemy = createDummyEnemy('e1')
+        const engine = new Engine('akabeko-engine', player, [enemy], { run })
+        engine.configurePlayerCombatBonuses({ baseEnergyPerTurn: 3 })
+        engine.initializeCombat()
+        engine.runUntilIdle()
+
+        playAndResolve(engine, player.hand[0], ['e1'])
+
+        expect(engine.state.enemies[0].powers.find(power => power.id === 'VULNERABLE')?.stacks).toBe(1)
+        expect(engine.state.enemies[0].hp).toBe(0)
+    })
+
+    it('orichalcum, centennial puzzle, and horn cleat trigger from relic hooks', () => {
+        const run = createNewRun('hook-relics')
+        run.relics = ['ORICHALCUM', 'CENTENNIAL_PUZZLE', 'HORN_CLEAT']
+        run.relicState = {}
+        const player = createPlayerWithHand([])
+        player.drawPile = [createCardInstance('STRIKE'), createCardInstance('DEFEND'), createCardInstance('BASH')]
+        const enemy = createDummyEnemy('e1')
+        enemy.intent = { kind: 'buff', desc: 'Idle' }
+        const engine = new Engine('hook-engine', player, [enemy], { run })
+        engine.configurePlayerCombatBonuses({ baseEnergyPerTurn: 3 })
+        engine.initializeCombat()
+        engine.runUntilIdle()
+
+        engine.enqueue({ kind: 'LoseHp', target: player.id, amount: 2 })
+        engine.runUntilIdle()
+        expect(engine.state.player.hand.map(card => card.defId)).toEqual(['STRIKE', 'DEFEND', 'BASH'])
+
+        engine.enqueue({ kind: 'EndTurn' })
+        engine.runUntilIdle()
+
+        expect(engine.state.player.block).toBe(14)
+    })
+
     it('whirlwind spends all remaining energy and is repeated by double tap', () => {
         const player = createPlayerWithHand(['DOUBLE_TAP', 'WHIRLWIND'])
         const engine = new Engine('whirlwind-seed', player, [createDummyEnemy('e1')])
@@ -419,7 +476,7 @@ describe('deferred card systems', () => {
         const run = createNewRun('event-seed')
         const eventId = generateEvent(1, `${run.seed}-event-floor`)
 
-        expect(['WORLD_OF_GOOP', 'CLERIC', 'UPGRADE_SHRINE', 'GOLDEN_IDOL', 'BIG_FISH', 'THE_JOUST']).toContain(eventId)
+        expect(getEventPool(1)).toContain(eventId)
 
         resolveEventChoice(run, 'GOLDEN_IDOL', 'GOLDEN_IDOL_TAKE', 'idol-seed')
         expect(run.gold).toBe(199)
@@ -429,5 +486,18 @@ describe('deferred card systems', () => {
         resolveEventChoice(secondRun, 'BIG_FISH', 'BIG_FISH_BOX', 'fish-seed')
         expect(secondRun.relics.length).toBeGreaterThan(1)
         expect(secondRun.deck.some(card => card.defId === 'REGRET')).toBe(true)
+    })
+
+    it('supports transform events deterministically and act two event pools', () => {
+        const run = createNewRun('transform-seed')
+        const original = run.deck[0]
+        const transformed = transformCard(run, original.instanceId, 'living-wall-seed')
+
+        expect(transformed).toBeDefined()
+        expect(transformed?.defId).not.toBe(original.defId)
+        expect(transformed?.upgradeLevel).toBe(0)
+        expect(CARD_DEFS[transformed!.defId].type).not.toBe('status')
+        expect(CARD_DEFS[transformed!.defId].type).not.toBe('curse')
+        expect(getEventPool(2)).toEqual(['CLERIC', 'UPGRADE_SHRINE', 'FORGOTTEN_ALTAR', 'THE_MAUSOLEUM', 'BEGGAR'])
     })
 })

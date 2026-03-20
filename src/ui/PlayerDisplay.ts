@@ -2,7 +2,7 @@ import Phaser from 'phaser'
 import type { Engine } from '../core/engine'
 import type { RunState } from '../core/run'
 import { POTION_DEFS } from '../core/potions'
-import { RELIC_DEFS } from '../core/relics'
+import { getRelicDisplayName } from '../core/relics'
 import { COMBAT_UI_CONFIG } from './CombatUIConfig'
 
 export class PlayerDisplay {
@@ -179,7 +179,7 @@ export class PlayerDisplay {
     }
 
     private getPlayerStatsText(): string {
-        return `⚡ ${this.engine.state.player.energy}/${COMBAT_UI_CONFIG.layout.maxEnergyPerTurn}`
+        return `⚡ ${this.engine.state.player.energy}/${this.engine.getBaseEnergyPerTurn()}`
     }
 
     private getPlayerPowers(): string {
@@ -188,7 +188,7 @@ export class PlayerDisplay {
     }
 
     private getRelicText(): string {
-        return `Relics: ${this.run.relics.map(id => RELIC_DEFS[id]?.name ?? id).join(', ')}`
+        return `Relics: ${this.run.relics.map(id => getRelicDisplayName(this.run, id)).join(', ')}`
     }
 
     update(): void {

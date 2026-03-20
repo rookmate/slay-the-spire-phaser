@@ -58,6 +58,7 @@ export interface CardEngineApi {
     state: CombatState
     enqueue: (a: any) => void
     setDoubleTapCharges?: (charges: number) => void
+    modifyOutgoingAttackDamageFromPlayer?: (base: number, cardInstanceId?: string) => number
     handleExhaustFromHand?: (card: CardInstance) => void
     handleExhaust?: (card: CardInstance) => void
     addTemporaryThorns?: (amount: number) => void

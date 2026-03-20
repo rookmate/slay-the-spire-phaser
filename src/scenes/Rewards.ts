@@ -4,7 +4,7 @@ import { saveRun } from '../core/run'
 import type { RewardBundle, RewardItem } from '../core/rewards'
 import { createCardInstance } from '../core/cards'
 import { Card } from '../ui/Card'
-import { applyRelicAcquisition, RELIC_DEFS } from '../core/relics'
+import { applyRelicAcquisition, getRelicDisplayName } from '../core/relics'
 import { POTION_DEFS } from '../core/potions'
 
 export class RewardsScene extends Phaser.Scene {
@@ -39,7 +39,7 @@ export class RewardsScene extends Phaser.Scene {
                 y += 28
             } else if (item.kind === 'relic') {
                 applyRelicAcquisition(this.run, item.relicId)
-                this.infoTexts.push(this.add.text(24, y, `Relic: ${RELIC_DEFS[item.relicId].name}`, style))
+                this.infoTexts.push(this.add.text(24, y, `Relic: ${getRelicDisplayName(this.run, item.relicId)}`, style))
                 y += 28
             } else if (item.kind === 'potion') {
                 this.pendingPotionReward = item.potionId

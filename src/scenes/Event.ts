@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
 import { canUpgradeCard, resolveCard } from '../core/cards'
 import { EVENT_DEFS, generateEvent, resolveEventChoice, type EventChoiceDef, type EventId } from '../core/events'
-import { RELIC_DEFS } from '../core/relics'
+import { getRelicDisplayName } from '../core/relics'
 import { saveRun, type RunState } from '../core/run'
 import { DeckSelectionOverlay } from '../ui/DeckSelectionOverlay'
 
@@ -32,7 +32,14 @@ export class EventScene extends Phaser.Scene {
         this.add.rectangle(0, 0, this.scale.width, this.scale.height, 0x171717, 1).setOrigin(0, 0)
         this.add.text(20, 18, event.title, titleStyle)
         this.add.text(20, 60, event.body, bodyStyle)
-        this.renderEventNotes(event)
+        if (event.note) {
+            this.add.text(20, 104, event.note, {
+                fontFamily: 'monospace',
+                fontSize: '14px',
+                color: '#d9bdd9',
+                wordWrap: { width: 760 },
+            })
+        }
 
         let y = 178
         for (const choice of event.choices) {
@@ -48,20 +55,6 @@ export class EventScene extends Phaser.Scene {
             backgroundColor: '#313131',
             padding: { x: 10, y: 7 },
         }).setInteractive({ useHandCursor: true }).on('pointerdown', () => this.leave())
-    }
-
-    private renderEventNotes(event: { id: EventId }): void {
-        let note = ''
-        if (event.id === 'GOLDEN_IDOL') note = 'Take Idol adds Injury to your deck.'
-        if (event.id === 'BIG_FISH') note = 'The box offers a relic, but adds Regret.'
-        if (event.id === 'THE_JOUST') note = 'Bet results are deterministic from this node seed.'
-        if (!note) return
-        this.add.text(20, 104, note, {
-            fontFamily: 'monospace',
-            fontSize: '14px',
-            color: '#d9bdd9',
-            wordWrap: { width: 760 },
-        })
     }
 
     private renderChoice(choice: EventChoiceDef, y: number): void {
@@ -105,6 +98,14 @@ export class EventScene extends Phaser.Scene {
             })
             return
         }
+        if (choice.requiresSelection === 'transform') {
+            this.selector.open({
+                title: 'Choose a card to transform',
+                cards: this.run.deck,
+                onSelect: (card) => this.applyChoice(choice.id, { cardInstanceId: card.instanceId }),
+            })
+            return
+        }
         this.applyChoice(choice.id)
     }
 
@@ -117,7 +118,8 @@ export class EventScene extends Phaser.Scene {
             selection,
         )
         const notes = [...(result.notes ?? [])]
-        if (result.grantedRelicId) notes.push(`Relic: ${RELIC_DEFS[result.grantedRelicId]?.name ?? result.grantedRelicId}`)
+        if (result.grantedRelicId) notes.push(`Relic: ${getRelicDisplayName(this.run, result.grantedRelicId)}`)
+        if (result.transformedCard) notes.push(`New card: ${resolveCard(result.transformedCard).name}`)
         if (selection?.cardInstanceId) {
             const card = this.run.deck.find(entry => entry.instanceId === selection.cardInstanceId)
             if (card) notes.push(`Card: ${resolveCard(card).name}`)

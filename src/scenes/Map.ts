@@ -4,7 +4,7 @@ import { saveRun } from '../core/run'
 import { RNG } from '../core/rng'
 import { generateMap, resolveUnknown, updateUnknownWeights, defaultUnknownWeights, type GeneratedMap, type MapNode } from '../core/map'
 import { generateRewardBundle } from '../core/rewards'
-import { RELIC_DEFS } from '../core/relics'
+import { getRelicDisplayName } from '../core/relics'
 
 export class MapScene extends Phaser.Scene {
     run!: RunState
@@ -25,7 +25,7 @@ export class MapScene extends Phaser.Scene {
         this.run = data.run
         const style = { fontFamily: 'monospace', fontSize: '18px', color: '#ffffff' }
         this.add.text(16, 16, `Floor ${this.run.floor}  HP ${this.run.player.hp}/${this.run.player.maxHp}  Gold ${this.run.gold}`, style)
-        this.add.text(16, 40, `Relics: ${this.run.relics.map(id => RELIC_DEFS[id]?.name ?? id).join(', ') || 'None'}  Potions: ${this.run.potions.length}/${this.run.maxPotionSlots}`, {
+        this.add.text(16, 40, `Relics: ${this.run.relics.map(id => getRelicDisplayName(this.run, id)).join(', ') || 'None'}  Potions: ${this.run.potions.length}/${this.run.maxPotionSlots}`, {
             fontFamily: 'monospace',
             fontSize: '14px',
             color: '#cccccc',
@@ -79,7 +79,7 @@ export class MapScene extends Phaser.Scene {
         this.children.removeAll()
         const style = { fontFamily: 'monospace', fontSize: '18px', color: '#ffffff' }
         this.add.text(16, 16, `Floor ${this.run.floor}  HP ${this.run.player.hp}/${this.run.player.maxHp}  Gold ${this.run.gold}`, style)
-        this.add.text(16, 40, `Relics: ${this.run.relics.map(id => RELIC_DEFS[id]?.name ?? id).join(', ') || 'None'}  Potions: ${this.run.potions.length}/${this.run.maxPotionSlots}`, {
+        this.add.text(16, 40, `Relics: ${this.run.relics.map(id => getRelicDisplayName(this.run, id)).join(', ') || 'None'}  Potions: ${this.run.potions.length}/${this.run.maxPotionSlots}`, {
             fontFamily: 'monospace',
             fontSize: '14px',
             color: '#cccccc',
@@ -98,7 +98,7 @@ export class MapScene extends Phaser.Scene {
             if (outcome === 'chest') {
                 this.scene.start('Rewards', {
                     run: this.run,
-                    rewards: generateRewardBundle(`${this.run.seed}-reward-${node.id}-unknown-chest`, 'chest', this.run.relics),
+                    rewards: generateRewardBundle(`${this.run.seed}-reward-${node.id}-unknown-chest`, 'chest', this.run),
                 })
                 return
             }
@@ -111,7 +111,7 @@ export class MapScene extends Phaser.Scene {
         if (kind === 'chest') {
             this.scene.start('Rewards', {
                 run: this.run,
-                rewards: generateRewardBundle(`${this.run.seed}-reward-${node.id}-chest`, 'chest', this.run.relics),
+                rewards: generateRewardBundle(`${this.run.seed}-reward-${node.id}-chest`, 'chest', this.run),
             })
             return
         }

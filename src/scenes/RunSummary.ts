@@ -2,7 +2,7 @@ import Phaser from 'phaser'
 import { CARD_DEFS } from '../core/cards'
 import { loadMeta, saveMeta } from '../core/meta'
 import { clearSavedRun, type RunState } from '../core/run'
-import { RELIC_DEFS } from '../core/relics'
+import { getRelicDisplayName } from '../core/relics'
 
 export class RunSummaryScene extends Phaser.Scene {
     constructor() { super('RunSummary') }
@@ -27,7 +27,7 @@ export class RunSummaryScene extends Phaser.Scene {
             color: '#d4b2d4',
             wordWrap: { width: 720 },
         })
-        this.add.text(16, 142, `Relics: ${data.run.relics.map(id => RELIC_DEFS[id]?.name ?? id).join(', ') || 'None'}`, {
+        this.add.text(16, 142, `Relics: ${data.run.relics.map(id => getRelicDisplayName(data.run, id)).join(', ') || 'None'}`, {
             fontFamily: 'monospace',
             fontSize: '14px',
             color: '#cccccc',
