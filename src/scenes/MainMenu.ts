@@ -1,6 +1,7 @@
 import Phaser from 'phaser'
 import { createNewRun, loadRun, saveRun, /*type RunState */ } from '../core/run'
-import { /*getDailySeed, */loadMeta } from '../core/meta'
+import { /*getDailySeed, */getSelectableAscensions, loadMeta } from '../core/meta'
+import { getAscensionLabel } from '../core/ascension'
 
 export class MainMenuScene extends Phaser.Scene {
     constructor() { super('MainMenu') }
@@ -8,6 +9,8 @@ export class MainMenuScene extends Phaser.Scene {
     create(): void {
         const style = { fontFamily: 'monospace', fontSize: '20px', color: '#ffffff' }
         const meta = loadMeta()
+        const selectableAscensions = getSelectableAscensions(meta)
+        let ascension = selectableAscensions[0] ?? 0
         this.add.text(16, 16, 'Slay the Spire (Phaser) - Main Menu', style)
         this.add.text(16, 50, `Ascension unlocked: ${meta.bestAscensionUnlocked}`, style)
 
@@ -21,10 +24,10 @@ export class MainMenuScene extends Phaser.Scene {
                 else this.scene.start('Map', { run })
             })
 
-        this.add.text(16, 140, 'New Run (A0)', { ...style, backgroundColor: '#333', padding: { x: 8, y: 6 } })
+        this.add.text(16, 140, 'New Run', { ...style, backgroundColor: '#333', padding: { x: 8, y: 6 } })
             .setInteractive({ useHandCursor: true })
             .on('pointerdown', () => {
-                const run = createNewRun()
+                const run = createNewRun(undefined, ascension)
                 saveRun(run)
                 this.scene.start('Neow', { run })
             })
@@ -37,24 +40,20 @@ export class MainMenuScene extends Phaser.Scene {
         //         this.scene.start('Map', { run })
         //     })
 
-        // // Quick Ascension toggle (A0/A1)
-        // const ascLabel = this.add.text(16, 220, 'Ascension: 0', style)
-        // let ascension = 0
-        // this.add.text(200, 216, '(click to increase)', { fontFamily: 'monospace', fontSize: '14px', color: '#aaa' })
-        //     .setInteractive({ useHandCursor: true })
-        //     .on('pointerdown', () => {
-        //         ascension = (ascension + 1) % (meta.bestAscensionUnlocked + 2)
-        //         ascLabel.setText(`Ascension: ${ascension}`)
-        //     })
-        // this.add.text(16, 260, 'New Run (Ascension)', { ...style, backgroundColor: '#333', padding: { x: 8, y: 6 } })
-        //     .setInteractive({ useHandCursor: true })
-        //     .on('pointerdown', () => {
-        //         const run = createNewRun()
-        //             // stash ascension in run via gold field hack for simplicity (or extend RunState)
-        //             ; (run as RunState & { asc?: number }).asc = ascension
-        //         saveRun(run)
-        //         this.scene.start('Map', { run })
-        //     })
+        const ascLabel = this.add.text(16, 220, `Ascension: ${getAscensionLabel(ascension)}`, style)
+        const updateAscensionLabel = () => ascLabel.setText(`Ascension: ${getAscensionLabel(ascension)}`)
+        this.add.text(220, 220, '-', { ...style, backgroundColor: '#333', padding: { x: 10, y: 6 } })
+            .setInteractive({ useHandCursor: true })
+            .on('pointerdown', () => {
+                ascension = Math.max(0, ascension - 1)
+                updateAscensionLabel()
+            })
+        this.add.text(270, 220, '+', { ...style, backgroundColor: '#333', padding: { x: 10, y: 6 } })
+            .setInteractive({ useHandCursor: true })
+            .on('pointerdown', () => {
+                ascension = Math.min(meta.bestAscensionUnlocked, ascension + 1)
+                updateAscensionLabel()
+            })
 
         this.add.text(16, 300, 'Card Library', { ...style, backgroundColor: '#333', padding: { x: 8, y: 6 } })
             .setInteractive({ useHandCursor: true })
@@ -65,4 +64,3 @@ export class MainMenuScene extends Phaser.Scene {
             })
     }
 }
-

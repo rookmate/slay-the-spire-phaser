@@ -3,7 +3,7 @@ import type { RunState, RelicId } from '../core/run'
 import { removeCardByInstanceId, saveRun } from '../core/run'
 import { RNG } from '../core/rng'
 import { CARD_DEFS, createCardInstance, isCurseCard, resolveCard } from '../core/cards'
-import { MVP_RELIC_POOL, RELIC_DEFS, applyRelicAcquisition, canObtainPotion } from '../core/relics'
+import { MVP_RELIC_POOL, RELIC_DEFS, applyRelicAcquisition, canObtainPotion, getMerchantRemoveBaseCost, getShopPriceMultiplier } from '../core/relics'
 import { POTION_DEFS, type PotionId } from '../core/potions'
 import { Card } from '../ui/Card'
 import { DeckSelectionOverlay } from '../ui/DeckSelectionOverlay'
@@ -33,7 +33,7 @@ export class ShopScene extends Phaser.Scene {
     private render(): void {
         this.children.removeAll()
         const style = { fontFamily: 'monospace', fontSize: '18px', color: '#ffffff' }
-        this.add.text(16, 16, `Shop (gold ${this.run.gold})`, style)
+        this.add.text(16, 16, `Shop (gold ${this.run.gold})  Ascension A${this.run.asc}`, style)
         this.add.text(16, this.scale.height - 44, 'Leave', { ...style, backgroundColor: '#333', padding: { x: 6, y: 4 } })
             .setInteractive({ useHandCursor: true })
             .on('pointerdown', () => {
@@ -53,7 +53,7 @@ export class ShopScene extends Phaser.Scene {
         const spacing = 130
         this.inventory.cards.forEach((cardId, index) => {
             const rarity = CARD_DEFS[cardId].rarity
-            const cost = rarity === 'common' ? 50 : rarity === 'uncommon' ? 75 : 150
+            const cost = this.priceFor(rarity === 'common' ? 50 : rarity === 'uncommon' ? 75 : 150)
             const view = new Card(this, createCardInstance(cardId), {
                 x: startX + index * spacing,
                 y,
@@ -81,11 +81,12 @@ export class ShopScene extends Phaser.Scene {
     private renderConsumables(style: Phaser.Types.GameObjects.Text.TextStyle): void {
         const leftX = 20
         const baseY = 300
-        this.add.text(leftX, baseY, `Relic: ${RELIC_DEFS[this.inventory.relic].name} (150)`, style)
+        const relicCost = this.priceFor(150)
+        this.add.text(leftX, baseY, `Relic: ${RELIC_DEFS[this.inventory.relic].name} (${relicCost})`, style)
             .setInteractive({ useHandCursor: true })
             .on('pointerdown', () => {
-                if (this.run.gold < 150) return
-                this.run.gold -= 150
+                if (this.run.gold < relicCost) return
+                this.run.gold -= relicCost
                 applyRelicAcquisition(this.run, this.inventory.relic)
                 this.inventory.relic = MVP_RELIC_POOL.find(id => !this.run.relics.includes(id)) ?? this.inventory.relic
                 saveRun(this.run)
@@ -94,14 +95,15 @@ export class ShopScene extends Phaser.Scene {
 
         this.inventory.potions.forEach((potion, index) => {
             const canBuyPotion = canObtainPotion(this.run)
-            this.add.text(leftX, baseY + 40 + index * 32, `${POTION_DEFS[potion].name} (${canBuyPotion ? 50 : 'blocked'})`, {
+            const potionCost = this.priceFor(50)
+            this.add.text(leftX, baseY + 40 + index * 32, `${POTION_DEFS[potion].name} (${canBuyPotion ? potionCost : 'blocked'})`, {
                 ...style,
                 color: canBuyPotion ? style.color : '#777777',
             })
                 .setInteractive({ useHandCursor: true })
                 .on('pointerdown', () => {
-                    if (!canBuyPotion || this.run.gold < 50 || this.run.potions.length >= this.run.maxPotionSlots) return
-                    this.run.gold -= 50
+                    if (!canBuyPotion || this.run.gold < potionCost || this.run.potions.length >= this.run.maxPotionSlots) return
+                    this.run.gold -= potionCost
                     this.run.potions.push(potion)
                     this.inventory.potions.splice(index, 1)
                     saveRun(this.run)
@@ -111,6 +113,9 @@ export class ShopScene extends Phaser.Scene {
     }
 
     private renderRemove(style: Phaser.Types.GameObjects.Text.TextStyle): void {
+        if (this.run.merchantRemoveCost < getMerchantRemoveBaseCost(this.run)) {
+            this.run.merchantRemoveCost = getMerchantRemoveBaseCost(this.run)
+        }
         const canPurge = this.run.gold >= this.run.merchantRemoveCost && this.run.deck.length > 0
         this.add.text(420, 268, `Purge cost: ${this.run.merchantRemoveCost}`, {
             ...style,
@@ -171,5 +176,9 @@ export class ShopScene extends Phaser.Scene {
     private pickPotion(rng: RNG): PotionId {
         const ids = Object.keys(POTION_DEFS) as PotionId[]
         return ids[rng.int(0, ids.length - 1)]
+    }
+
+    private priceFor(basePrice: number): number {
+        return Math.ceil(basePrice * getShopPriceMultiplier(this.run))
     }
 }

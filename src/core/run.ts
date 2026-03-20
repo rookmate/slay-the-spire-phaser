@@ -1,5 +1,6 @@
 import { RNG } from './rng'
 import { CARD_DEFS, createCardInstance, createStarterDeck } from './cards'
+import { clampAscension as clampAscensionLevel } from './ascension'
 import { tryPreventCurse } from './relics'
 import type { CardInstance } from './state'
 import type { PotionId } from './potions'
@@ -50,26 +51,28 @@ export interface RunState {
     relicState?: Partial<Record<RelicId, RelicStateEntry>>
     eventHistory?: Partial<Record<string, boolean>>
     runFlags?: Record<string, boolean>
-    asc?: number
+    asc: number
     mapProgress?: { currentNodeId?: string }
     combatCount?: number
 }
 
-export function createNewRun(seed?: string): RunState {
+export function createNewRun(seed?: string, asc = 0): RunState {
     const s = seed ?? Math.random().toString(36).slice(2)
     const rng = new RNG(s)
     const deck: CardInstance[] = createStarterDeck()
     rng.shuffleInPlace(deck)
+    const normalizedAsc = clampAscensionLevel(asc)
+    const startingMaxHp = normalizedAsc >= 5 ? 75 : 80
     return {
         seed: s,
         act: 1,
         floor: 1,
         gold: 99,
-        player: { maxHp: 80, hp: 80 },
+        player: { maxHp: startingMaxHp, hp: startingMaxHp },
         relics: ['BURNING_BLOOD'],
         potions: [],
         maxPotionSlots: 3,
-        merchantRemoveCost: 75,
+        merchantRemoveCost: normalizedAsc >= 8 ? 100 : 75,
         deck,
         neowCompleted: false,
         neowSeed: `${s}-neow`,
@@ -83,10 +86,11 @@ export function createNewRun(seed?: string): RunState {
         relicState: {},
         eventHistory: {},
         runFlags: {},
+        asc: normalizedAsc,
     }
 }
 
-const STORAGE_KEY = 'sts_run_v5'
+const STORAGE_KEY = 'sts_run_v6'
 
 export function obtainCard(run: RunState, defId: string, destination: 'deck' = 'deck', upgradeLevel = 0): CardInstance {
     const card = createCardInstance(defId, upgradeLevel)

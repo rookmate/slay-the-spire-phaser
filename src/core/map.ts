@@ -1,4 +1,5 @@
 import { RNG } from './rng'
+import { getAscensionEliteTargetCount } from './ascension'
 
 export type RoomKind = 'start' | 'monster' | 'elite' | 'rest' | 'shop' | 'unknown' | 'chest' | 'boss'
 
@@ -22,7 +23,7 @@ function nodeId(row: number, col: number): string {
     return `${row}:${col}`
 }
 
-export function generateMap(seed: string, act: number = 1, rows = 15, cols = 7): GeneratedMap {
+export function generateMap(seed: string, act: number = 1, rows = 15, cols = 7, asc = 0): GeneratedMap {
     const rng = new RNG(`${seed}-act-${act}`)
     const grid: (MapNode | null)[][] = Array.from({ length: rows }, () => Array.from({ length: cols }, () => null))
 
@@ -81,13 +82,24 @@ export function generateMap(seed: string, act: number = 1, rows = 15, cols = 7):
         }
     }
     // Place elites spaced out
-    let elitesToPlace = 2
+    let elitesToPlace = getAscensionEliteTargetCount(asc, 2)
     for (let r = rows - 2; r >= 2 && elitesToPlace > 0; r--) {
         if (rng.random() < 0.15) {
             const colsHere = grid[r].map((n, i) => ({ n, i })).filter(x => x.n)
             if (colsHere.length > 0) {
                 const pick = colsHere[rng.int(0, colsHere.length - 1)].n!
                 if (pick.kind === 'unknown') { pick.kind = 'elite'; elitesToPlace-- }
+            }
+        }
+    }
+    if (elitesToPlace > 0) {
+        for (let r = rows - 2; r >= 2 && elitesToPlace > 0; r--) {
+            const colsHere = grid[r].map((n, i) => ({ n, i })).filter(x => x.n)
+            for (const entry of colsHere) {
+                if (elitesToPlace <= 0) break
+                if (entry.n!.kind !== 'unknown') continue
+                entry.n!.kind = 'elite'
+                elitesToPlace--
             }
         }
     }
@@ -163,5 +175,3 @@ export function updateUnknownWeights(w: UnknownWeights, picked: UnknownOutcome):
     }
     return next
 }
-
-

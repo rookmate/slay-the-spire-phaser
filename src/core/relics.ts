@@ -1,6 +1,7 @@
 import type { RoomKind } from './map'
 import type { Engine } from './engine'
 import type { CombatState } from './state'
+import { getAscensionMerchantRemoveBaseCost, getAscensionShopPriceMultiplier } from './ascension'
 import type { RelicId, RelicStateEntry, RunState } from './run'
 
 export interface RelicDef {
@@ -331,6 +332,14 @@ export function getCardRewardChoiceCount(run: Pick<RunState, 'relics'> | RelicId
     const relics = Array.isArray(run) ? run : run.relics
     const delta = relics.reduce((sum, relicId) => sum + (RELIC_DEFS[relicId]?.cardRewardChoiceDelta ?? 0), 0)
     return Math.max(1, baseChoices + delta)
+}
+
+export function getShopPriceMultiplier(run: Pick<RunState, 'asc'>): number {
+    return getAscensionShopPriceMultiplier(run.asc)
+}
+
+export function getMerchantRemoveBaseCost(run: Pick<RunState, 'asc'>): number {
+    return getAscensionMerchantRemoveBaseCost(run.asc)
 }
 
 export function getRelicDisplayName(run: Pick<RunState, 'relicState'>, relicId: RelicId): string {

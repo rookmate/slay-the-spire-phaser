@@ -1,15 +1,18 @@
 import { describe, expect, it } from 'vitest'
+import { getAscensionEnemyDamageMultiplier, getAscensionEnemyHpMultiplier, pickMoreAggressiveIntent } from './ascension'
 import { CARD_DEFS, createCardInstance, resolveCard } from './cards'
 import type { CardInstance, PlayerState } from './state'
 import { Engine, createDummyEnemy, createSimplePlayer } from './engine'
 import { RNG } from './rng'
 import { createEnemyFromSpec, rollEngineIntentForEnemy } from './enemies'
-import { applyRelicAcquisition, blocksPotionGain, getCardRewardChoiceCount, getCombatRelicBonuses, getPostCombatHeal, getRelicEnergyBonus, getRelicState } from './relics'
+import { applyRelicAcquisition, blocksPotionGain, getCardRewardChoiceCount, getCombatRelicBonuses, getMerchantRemoveBaseCost, getPostCombatHeal, getRelicEnergyBonus, getRelicState, getShopPriceMultiplier } from './relics'
 import { generateRewardBundle } from './rewards'
+import { clampAscension, getSelectableAscensions, unlockNextAscension } from './meta'
 import { createNewRun, obtainCurse } from './run'
 import { applyNeowOption, getNeowRareCardChoices, getRandomNeowRelic, rollNeowOptions } from './neow'
 import { generateEncounter } from './encounters'
 import { generateEvent, getEventPool, resolveEventChoice, transformCard } from './events'
+import { generateMap } from './map'
 
 function createPlayerWithHand(handIds: string[]): PlayerState {
     const player = createSimplePlayer('test-player')
@@ -39,6 +42,27 @@ describe('deferred card systems', () => {
         expect(run.deck.every(card => typeof card.instanceId === 'string' && card.upgradeLevel === 0)).toBe(true)
         expect(run.neowCompleted).toBe(false)
         expect(run.act).toBe(1)
+        expect(run.asc).toBe(0)
+    })
+
+    it('creates ascension runs with lowered starting hp at a5+', () => {
+        const run = createNewRun('a5-seed', 5)
+
+        expect(run.asc).toBe(5)
+        expect(run.player.maxHp).toBe(75)
+        expect(run.player.hp).toBe(75)
+    })
+
+    it('unlocks ascensions sequentially and clamps progression at a10', () => {
+        const meta = { bestAscensionUnlocked: 0, totalWins: 0, totalRuns: 0 }
+
+        expect(getSelectableAscensions(meta)).toEqual([0])
+        expect(unlockNextAscension(meta, 0)).toBe(true)
+        expect(meta.bestAscensionUnlocked).toBe(1)
+        expect(unlockNextAscension(meta, 0)).toBe(false)
+        meta.bestAscensionUnlocked = 10
+        expect(unlockNextAscension(meta, 10)).toBe(false)
+        expect(clampAscension(14)).toBe(10)
     })
 
     it('rolls deterministic neow options and applies rewards', () => {
@@ -510,6 +534,32 @@ describe('deferred card systems', () => {
         expect(bonuses.eliteHpMultiplier).toBe(0.75)
         expect(rewards.items.some(item => item.kind === 'relic')).toBe(true)
         expect(rewards.items.some(item => item.kind === 'cards')).toBe(true)
+    })
+
+    it('applies ascension hallway gold, shop, and map modifiers', () => {
+        const ascRun = createNewRun('asc-run', 8)
+        const hallwayRewards = generateRewardBundle('a4-reward', 'hallway', ascRun, { roomKind: 'monster' })
+        const map = generateMap('a6-map', 1, 15, 7, 6)
+        const eliteCount = map.nodes.filter(node => node.kind === 'elite').length
+
+        const goldReward = hallwayRewards.items.find(item => item.kind === 'gold')
+        expect(goldReward && goldReward.kind === 'gold' && goldReward.amount).toBeLessThanOrEqual(16)
+        expect(getShopPriceMultiplier(ascRun)).toBe(1.1)
+        expect(getMerchantRemoveBaseCost(ascRun)).toBe(100)
+        expect(eliteCount).toBeGreaterThanOrEqual(3)
+    })
+
+    it('applies ascension combat scaling helpers and hallway intent upgrades', () => {
+        const boss = createEnemyFromSpec(new RNG('champ-boss'), 'THE_CHAMP', 'e1')
+        const elite = createEnemyFromSpec(new RNG('book-elite'), 'BOOK_OF_STABBING', 'e2')
+        const first = { kind: 'block', amount: 12 } as const
+        const second = { kind: 'attack', amount: 9 } as const
+
+        expect(getAscensionEnemyHpMultiplier(1, 'elite')).toBeCloseTo(1.15)
+        expect(getAscensionEnemyHpMultiplier(3, 'elite')).toBeCloseTo(1.265)
+        expect(getAscensionEnemyDamageMultiplier(2, elite)).toBeCloseTo(1.1)
+        expect(getAscensionEnemyDamageMultiplier(10, boss)).toBeCloseTo(1.265)
+        expect(pickMoreAggressiveIntent(first, second)).toEqual(second)
     })
 
     it('applies boss relic hooks and boss reward generation', () => {

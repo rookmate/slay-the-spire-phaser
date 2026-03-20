@@ -1,5 +1,7 @@
 import { RNG } from './rng'
+import { getAscensionHallwayGoldMultiplier } from './ascension'
 import { CARD_DEFS } from './cards'
+import type { RoomKind } from './map'
 import type { RelicId, RunState } from './run'
 import { BOSS_RELIC_POOL, MVP_RELIC_POOL, blocksPotionGain, getCardRewardChoiceCount } from './relics'
 import type { PotionId } from './potions'
@@ -25,6 +27,7 @@ export function generateRewardBundle(
     seed: string,
     tier: EncounterTier,
     run: Pick<RunState, 'relics' | 'potions' | 'maxPotionSlots'> | RelicId[],
+    opts?: { roomKind?: RoomKind; asc?: number },
 ): RewardBundle {
     const rng = new RNG(seed)
     const items: RewardItem[] = []
@@ -35,7 +38,13 @@ export function generateRewardBundle(
     const canGainPotion = !blocksPotionGain(runView)
 
     if (tier === 'hallway') {
-        items.push({ kind: 'gold', amount: rng.int(10, 20) })
+        const baseGold = rng.int(10, 20)
+        const asc = Array.isArray(run) ? (opts?.asc ?? 0) : (run as RunState).asc
+        const roomKind = opts?.roomKind ?? 'monster'
+        const amount = roomKind === 'monster'
+            ? Math.floor(baseGold * getAscensionHallwayGoldMultiplier(asc))
+            : baseGold
+        items.push({ kind: 'gold', amount })
         items.push({ kind: 'cards', choices: drawCardChoices(rng, cardChoiceCount) })
         if (canGainPotion && rng.random() < 0.4) items.push({ kind: 'potion', potionId: POTION_POOL[rng.int(0, POTION_POOL.length - 1)] })
     } else if (tier === 'elite') {

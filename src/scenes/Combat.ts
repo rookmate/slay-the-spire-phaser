@@ -1,4 +1,5 @@
 import Phaser from 'phaser'
+import { affectsRoomTier, getAscensionEnemyHpMultiplier, pickMoreAggressiveIntent, shouldUpgradeHallwayOpeningIntent } from '../core/ascension'
 import { Engine, createPlayerFromDeck } from '../core/engine'
 import { RNG } from '../core/rng'
 import { createEnemyFromSpec, rollEngineIntentForEnemy } from '../core/enemies'
@@ -33,10 +34,12 @@ export class CombatScene extends Phaser.Scene {
         const keys = generateEncounter(encounterRng, act, tier, combatIndex)
         const enemies = keys.map((key, index) => createEnemyFromSpec(new RNG(getEnemyActSeed(seed, act, combatIndex, index)), key as any, `e${index + 1}`))
         const eliteHpMultiplier = getEncounterEliteHpMultiplier(this.run, this.roomKind)
+        const ascensionHpMultiplier = getAscensionEnemyHpMultiplier(this.run.asc, affectsRoomTier(this.roomKind))
+        const totalHpMultiplier = eliteHpMultiplier * ascensionHpMultiplier
 
-        if (eliteHpMultiplier !== 1) {
+        if (totalHpMultiplier !== 1) {
             for (const enemy of enemies) {
-                enemy.maxHp = Math.max(1, Math.round(enemy.maxHp * eliteHpMultiplier))
+                enemy.maxHp = Math.max(1, Math.round(enemy.maxHp * totalHpMultiplier))
                 enemy.hp = Math.min(enemy.hp, enemy.maxHp)
             }
         }
@@ -44,7 +47,20 @@ export class CombatScene extends Phaser.Scene {
         this.engine = new Engine(seed, player, enemies, { asc: this.run.asc ?? 0, run: this.run })
         for (let index = 0; index < this.engine.state.enemies.length; index++) {
             const enemy = this.engine.state.enemies[index]
-            enemy.intent = rollEngineIntentForEnemy(new RNG(`${getEnemyActSeed(seed, act, combatIndex, index)}-intent`), enemy, this.engine.state)
+            const intentSeed = `${getEnemyActSeed(seed, act, combatIndex, index)}-intent`
+            const initialState = JSON.parse(JSON.stringify(enemy.aiState ?? {}))
+            const firstIntent = rollEngineIntentForEnemy(new RNG(intentSeed), enemy, this.engine.state)
+            const firstState = JSON.parse(JSON.stringify(enemy.aiState ?? {}))
+            if (this.roomKind === 'monster' && shouldUpgradeHallwayOpeningIntent(this.run.asc)) {
+                enemy.aiState = JSON.parse(JSON.stringify(initialState))
+                const secondIntent = rollEngineIntentForEnemy(new RNG(`${intentSeed}-asc7`), enemy, this.engine.state)
+                const secondState = JSON.parse(JSON.stringify(enemy.aiState ?? {}))
+                const pickedIntent = pickMoreAggressiveIntent(firstIntent, secondIntent)
+                enemy.intent = pickedIntent
+                enemy.aiState = pickedIntent === firstIntent ? firstState : secondState
+            } else {
+                enemy.intent = firstIntent
+            }
         }
         this.engine.configurePlayerCombatBonuses({
             baseEnergyPerTurn: 3 + getRelicEnergyBonus(this.run),
@@ -117,7 +133,7 @@ export class CombatScene extends Phaser.Scene {
                 return
             }
             const sourceBossId = this.engine.state.enemies[0]?.specId ?? 'BOSS'
-            const bossRewards = generateRewardBundle(`${this.run.seed}-boss-relics-act-${this.run.act}-floor-${this.run.floor}`, 'boss', this.run)
+            const bossRewards = generateRewardBundle(`${this.run.seed}-boss-relics-act-${this.run.act}-floor-${this.run.floor}`, 'boss', this.run, { roomKind: 'boss' })
             const bossRelicChoices = bossRewards.items.find(item => item.kind === 'boss_relics')
             this.run.bossRelicChoicePending = {
                 sourceBossId,
@@ -131,7 +147,7 @@ export class CombatScene extends Phaser.Scene {
 
         saveRun(this.run)
         const nodeId = this.run.mapProgress?.currentNodeId ?? `floor-${this.run.floor}`
-        const rewards = generateRewardBundle(`${this.run.seed}-reward-${nodeId}-${this.roomKind}`, this.getEncounterTier(), this.run)
+        const rewards = generateRewardBundle(`${this.run.seed}-reward-${nodeId}-${this.roomKind}`, this.getEncounterTier(), this.run, { roomKind: this.roomKind, asc: this.run.asc })
         this.scene.start('Rewards', { run: this.run, rewards })
     }
 

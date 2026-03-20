@@ -1,4 +1,5 @@
 import { RNG } from './rng'
+import { getBossBuffBonus, getAscensionEnemyDamageMultiplier } from './ascension'
 import { CARD_DEFS, canUpgradeCard, createCardInstance, createStarterDeck, resolveCard } from './cards'
 import { onEnemyDamaged, onEnemyHitByPlayerAttack, onEnemyIntentResolved, onPlayerCardPlayed, rollEngineIntentForEnemy } from './enemies'
 import { POTION_DEFS, type PotionId } from './potions'
@@ -374,10 +375,21 @@ export class Engine {
                         if (enemy.hp <= 0) continue
                         if (enemy.intent?.kind === 'attack') {
                             const enemyStrength = enemy.powers.find(power => power.id === 'STRENGTH')?.stacks ?? 0
-                            this.enqueue({ kind: 'DealDamage', source: enemy.id, target: this.state.player.id, amount: enemy.intent.amount + enemyStrength })
+                            this.enqueue({
+                                kind: 'DealDamage',
+                                source: enemy.id,
+                                target: this.state.player.id,
+                                amount: Math.round((enemy.intent.amount + enemyStrength) * this.getEnemyDamageMultiplier(enemy)),
+                            })
                         } else if (enemy.intent?.kind === 'multi_attack') {
                             const enemyStrength = enemy.powers.find(power => power.id === 'STRENGTH')?.stacks ?? 0
-                            this.enqueue({ kind: 'DealMultiDamage', source: enemy.id, target: this.state.player.id, amount: enemy.intent.amount + enemyStrength, hits: enemy.intent.hits })
+                            this.enqueue({
+                                kind: 'DealMultiDamage',
+                                source: enemy.id,
+                                target: this.state.player.id,
+                                amount: Math.round((enemy.intent.amount + enemyStrength) * this.getEnemyDamageMultiplier(enemy)),
+                                hits: enemy.intent.hits,
+                            })
                         } else if (enemy.intent?.kind === 'block') {
                             const scaled = Math.round(enemy.intent.amount * this.enemyBlockMultiplier())
                             this.enqueue({ kind: 'GainBlock', target: enemy.id, amount: scaled })
@@ -388,7 +400,7 @@ export class Engine {
                         } else if (enemy.intent?.kind === 'summon') {
                             // Summons are handled by enemy hooks so new units do not act immediately.
                         } else if (enemy.intent?.kind === 'buff') {
-                            const strengthGain = this.resolveEnemyBuffStrength(enemy.intent.desc)
+                            const strengthGain = this.resolveEnemyBuffStrength(enemy, enemy.intent.desc)
                             if (strengthGain > 0) this.enqueue({ kind: 'ApplyPower', target: enemy.id, powerId: 'STRENGTH', stacks: strengthGain })
                         }
                         onEnemyIntentResolved(this, enemy, enemy.intent)
@@ -673,18 +685,23 @@ export class Engine {
     }
 
     private enemyDamageMultiplier(): number {
-        return this.ascension >= 1 ? 1.2 : 1
+        return 1
     }
 
     private enemyBlockMultiplier(): number {
-        return this.ascension >= 1 ? 1.2 : 1
+        return 1
     }
 
-    private resolveEnemyBuffStrength(desc?: string): number {
+    private resolveEnemyBuffStrength(enemy: EnemyState, desc?: string): number {
         const text = (desc ?? '').toLowerCase()
-        if (text.includes('ritual') || text.includes('strength') || text.includes('bellow')) return 2
-        if (text.includes('charging')) return 2
+        const bossBonus = getBossBuffBonus(this.ascension, enemy)
+        if (text.includes('ritual') || text.includes('strength') || text.includes('bellow')) return 2 + bossBonus
+        if (text.includes('charging')) return 2 + bossBonus
         return 0
+    }
+
+    private getEnemyDamageMultiplier(enemy: EnemyState): number {
+        return getAscensionEnemyDamageMultiplier(this.ascension, enemy)
     }
 
     private tickTemporaryDebuffs(target: PlayerState | EnemyState): void {
