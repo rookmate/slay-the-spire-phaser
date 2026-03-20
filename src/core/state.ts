@@ -78,6 +78,10 @@ export interface EnemyEngineApi {
     spawnEnemies: (enemies: EnemyState[]) => void
     removeEnemy: (enemyId: EntityId) => void
     createCardsInDestination: (defId: string, destination: Exclude<CardDestination, 'drawPileTop' | 'exhaustPile'>, count?: number, upgradeLevel?: number) => CardInstance[]
+    countLivingEnemies: () => number
+    countLivingNonMinions: () => number
+    gainBlock: (target: EntityId, amount: number) => void
+    applyPowerToPlayer: (powerId: PowerId, stacks: number) => void
 }
 
 export interface CardDef {
@@ -159,9 +163,11 @@ export interface EnemyState {
     | { kind: 'buff'; desc?: string }
     | { kind: 'debuff'; debuff: 'WEAK' | 'VULNERABLE'; stacks: number }
     | { kind: 'status'; createdDefId: 'DAZED' | 'SLIMED'; destination: 'discardPile'; count: number }
+    | { kind: 'summon'; desc?: string }
     // Optional spec reference to drive intent generation
     specId?: string
     aiState?: Record<string, number | boolean | string>
+    tags?: string[]
 }
 
 export interface CombatState {

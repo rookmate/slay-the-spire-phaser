@@ -30,6 +30,16 @@ export type EnemyKey =
     | 'SNECKO'
     | 'BOOK_OF_STABBING'
     | 'THE_CHAMP'
+    | 'CHOSEN'
+    | 'BYRD'
+    | 'SPHERIC_GUARDIAN'
+    | 'GREMLIN_LEADER'
+    | 'RED_SLAVER'
+    | 'BLUE_SLAVER'
+    | 'TASKMASTER'
+    | 'THE_COLLECTOR'
+    | 'TORCH_HEAD'
+    | 'GREMLIN_MINION'
 
 export function pickWeighted<T>(rng: RNG, items: { item: T; weight: number }[]): T {
     const total = items.reduce((sum, item) => sum + item.weight, 0)
@@ -55,11 +65,25 @@ function generateActOneElite(rng: RNG): EnemyKey[] {
 }
 
 function generateActTwoEncounter(rng: RNG, tier: EncounterTier): EnemyKey[] {
-    if (tier === 'elite') return ['BOOK_OF_STABBING']
-    if (tier === 'boss') return ['THE_CHAMP']
-    const pick = rng.int(0, 2)
-    if (pick === 0) return ['SHELLED_PARASITE']
-    if (pick === 1) return ['SNECKO']
+    if (tier === 'elite') {
+        const pick = rng.int(0, 2)
+        if (pick === 0) return ['BOOK_OF_STABBING']
+        if (pick === 1) return ['GREMLIN_LEADER']
+        return ['RED_SLAVER', 'BLUE_SLAVER', 'TASKMASTER']
+    }
+    if (tier === 'boss') {
+        return rng.random() < 0.5
+            ? ['THE_CHAMP']
+            : ['THE_COLLECTOR', 'TORCH_HEAD', 'TORCH_HEAD']
+    }
+    const pick = rng.int(0, 7)
+    if (pick === 0) return ['CHOSEN']
+    if (pick === 1) return ['BYRD']
+    if (pick === 2) return ['SPHERIC_GUARDIAN']
+    if (pick === 3) return ['CHOSEN', 'BYRD']
+    if (pick === 4) return ['SPHERIC_GUARDIAN', 'BYRD']
+    if (pick === 5) return ['SHELLED_PARASITE']
+    if (pick === 6) return ['SNECKO']
     return ['LOOTER', 'CULTIST']
 }
 

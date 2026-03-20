@@ -49,6 +49,16 @@ export class BootScene extends Phaser.Scene {
         this.load.image('enemy:SNECKO', cultistWebp)
         this.load.image('enemy:BOOK_OF_STABBING', slaverWebp)
         this.load.image('enemy:THE_CHAMP', slaverWebp)
+        this.load.image('enemy:CHOSEN', cultistWebp)
+        this.load.image('enemy:BYRD', louseWebp)
+        this.load.image('enemy:SPHERIC_GUARDIAN', jawwarmWebp)
+        this.load.image('enemy:GREMLIN_LEADER', gremlinWebp)
+        this.load.image('enemy:GREMLIN_MINION', gremlinWebp)
+        this.load.image('enemy:RED_SLAVER', slaverWebp)
+        this.load.image('enemy:BLUE_SLAVER', slaverWebp)
+        this.load.image('enemy:TASKMASTER', slaverWebp)
+        this.load.image('enemy:THE_COLLECTOR', cultistWebp)
+        this.load.image('enemy:TORCH_HEAD', cultistWebp)
     }
 
     create(): void {

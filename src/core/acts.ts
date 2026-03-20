@@ -22,9 +22,9 @@ export function getActMapSeed(seed: string, act: 1 | 2): string {
 export function getActEncounterPools(act: 1 | 2): ActEncounterPools {
     if (act === 2) {
         return {
-            hallwayBosses: ['SHELLED_PARASITE', 'SNECKO', 'LOOTER', 'CULTIST'],
-            elites: ['BOOK_OF_STABBING'],
-            bosses: ['THE_CHAMP'],
+            hallwayBosses: ['CHOSEN', 'BYRD', 'SPHERIC_GUARDIAN', 'SHELLED_PARASITE', 'SNECKO', 'LOOTER', 'CULTIST'],
+            elites: ['BOOK_OF_STABBING', 'GREMLIN_LEADER', 'RED_SLAVER', 'BLUE_SLAVER', 'TASKMASTER'],
+            bosses: ['THE_CHAMP', 'THE_COLLECTOR'],
         }
     }
 

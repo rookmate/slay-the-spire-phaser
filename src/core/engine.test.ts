@@ -3,7 +3,7 @@ import { CARD_DEFS, createCardInstance, resolveCard } from './cards'
 import type { CardInstance, PlayerState } from './state'
 import { Engine, createDummyEnemy, createSimplePlayer } from './engine'
 import { RNG } from './rng'
-import { createEnemyFromSpec } from './enemies'
+import { createEnemyFromSpec, rollEngineIntentForEnemy } from './enemies'
 import { applyRelicAcquisition, blocksPotionGain, getCardRewardChoiceCount, getCombatRelicBonuses, getPostCombatHeal, getRelicEnergyBonus, getRelicState } from './relics'
 import { generateRewardBundle } from './rewards'
 import { createNewRun, obtainCurse } from './run'
@@ -420,6 +420,75 @@ describe('deferred card systems', () => {
         expect(engine.state.enemies).toHaveLength(2)
     })
 
+    it('byrd becomes downed after three player attack hits and then recovers flying', () => {
+        const player = createPlayerWithHand([])
+        const enemy = createEnemyFromSpec(new RNG('byrd-seed'), 'BYRD', 'e1')
+        const engine = new Engine('byrd-engine', player, [enemy])
+
+        engine.enqueue({ kind: 'DealDamage', source: player.id, target: enemy.id, amount: 8 })
+        engine.enqueue({ kind: 'DealDamage', source: player.id, target: enemy.id, amount: 8 })
+        engine.enqueue({ kind: 'DealDamage', source: player.id, target: enemy.id, amount: 8 })
+        engine.runUntilIdle()
+
+        expect(engine.state.enemies[0].aiState?.downed).toBe(true)
+        expect(engine.state.enemies[0].aiState?.flying).toBe(false)
+
+        engine.state.enemies[0].intent = rollEngineIntentForEnemy(new RNG('byrd-recover'), engine.state.enemies[0], engine.state)
+        engine.enqueue({ kind: 'EndTurn' })
+        engine.runUntilIdle()
+
+        expect(engine.state.enemies[0].aiState?.flying).toBe(true)
+    })
+
+    it('gremlin leader summons minions up to the battlefield cap', () => {
+        const player = createPlayerWithHand([])
+        const leader = createEnemyFromSpec(new RNG('leader-seed'), 'GREMLIN_LEADER', 'e1')
+        const engine = new Engine('leader-engine', player, [leader])
+
+        engine.state.enemies[0].intent = { kind: 'summon', desc: 'Call Reinforcements' }
+        engine.enqueue({ kind: 'EndTurn' })
+        engine.runUntilIdle()
+
+        expect(engine.state.enemies.filter(enemy => enemy.hp > 0)).toHaveLength(3)
+        expect(engine.state.enemies.some(enemy => enemy.specId === 'GREMLIN_MINION')).toBe(true)
+    })
+
+    it('taskmaster adds wounds to discard pile on lash turns', () => {
+        const player = createPlayerWithHand([])
+        const taskmaster = createEnemyFromSpec(new RNG('taskmaster-seed'), 'TASKMASTER', 'e1')
+        taskmaster.aiState = { cycle: 1, move: 'lash' }
+        taskmaster.intent = { kind: 'attack', amount: 9 }
+        const engine = new Engine('taskmaster-engine', player, [taskmaster])
+
+        engine.enqueue({ kind: 'EndTurn' })
+        engine.runUntilIdle()
+
+        const woundCount = [...engine.state.player.hand, ...engine.state.player.discardPile, ...engine.state.player.drawPile]
+            .filter(card => card.defId === 'WOUND')
+        expect(woundCount).toHaveLength(2)
+    })
+
+    it('the collector resummons torch heads and phase shifts below half hp', () => {
+        const player = createPlayerWithHand([])
+        const collector = createEnemyFromSpec(new RNG('collector-seed'), 'THE_COLLECTOR', 'e1')
+        const torchOne = createEnemyFromSpec(new RNG('torch-1'), 'TORCH_HEAD', 'e2')
+        const torchTwo = createEnemyFromSpec(new RNG('torch-2'), 'TORCH_HEAD', 'e3')
+        const engine = new Engine('collector-engine', player, [collector, torchOne, torchTwo])
+
+        engine.removeEnemy('e2')
+        engine.removeEnemy('e3')
+        engine.state.enemies[0].intent = { kind: 'summon', desc: 'Raise Torch Heads' }
+        engine.enqueue({ kind: 'EndTurn' })
+        engine.runUntilIdle()
+
+        expect(engine.state.enemies.filter(enemy => enemy.specId === 'TORCH_HEAD' && enemy.hp > 0)).toHaveLength(2)
+
+        engine.enqueue({ kind: 'DealDamage', source: player.id, target: 'e1', amount: 160 })
+        engine.runUntilIdle()
+
+        expect(engine.state.enemies.find(enemy => enemy.id === 'e1')?.aiState?.enraged).toBe(true)
+    })
+
     it('keeps status cards out of collectible pools and reward bundles', () => {
         const rewards = generateRewardBundle('reward-seed', 'elite', ['BURNING_BLOOD'])
         const rewardCards = rewards.items.find(item => item.kind === 'cards')
@@ -467,9 +536,23 @@ describe('deferred card systems', () => {
         const elite = generateEncounter(new RNG('act2-elite'), 2, 'elite', 0)
         const boss = generateEncounter(new RNG('act2-boss'), 2, 'boss', 0)
 
-        expect(['SHELLED_PARASITE', 'SNECKO', 'LOOTER', 'CULTIST']).toContain(hallway[0])
-        expect(elite).toEqual(['BOOK_OF_STABBING'])
-        expect(boss).toEqual(['THE_CHAMP'])
+        expect([
+            'CHOSEN',
+            'BYRD',
+            'SPHERIC_GUARDIAN',
+            'SHELLED_PARASITE',
+            'SNECKO',
+            'LOOTER',
+        ]).toContain(hallway[0])
+        expect([
+            ['BOOK_OF_STABBING'],
+            ['GREMLIN_LEADER'],
+            ['RED_SLAVER', 'BLUE_SLAVER', 'TASKMASTER'],
+        ]).toContainEqual(elite)
+        expect([
+            ['THE_CHAMP'],
+            ['THE_COLLECTOR', 'TORCH_HEAD', 'TORCH_HEAD'],
+        ]).toContainEqual(boss)
     })
 
     it('resolves seeded act one events with curse and economy effects', () => {

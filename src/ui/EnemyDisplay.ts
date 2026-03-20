@@ -72,6 +72,7 @@ export class EnemyDisplay {
         if (enemy.intent?.kind === 'block') return `${enemy.intent.amount} 🛡`
         if (enemy.intent?.kind === 'debuff') return `${enemy.intent.debuff} ↓`
         if (enemy.intent?.kind === 'status') return `${enemy.intent.createdDefId} x${enemy.intent.count}`
+        if (enemy.intent?.kind === 'summon') return `Summon`
         return enemy.intent?.desc ?? 'Buff'
     }
 
@@ -80,8 +81,12 @@ export class EnemyDisplay {
     }
 
     private getEnemyPowers(enemy: EnemyState): string {
-        if (enemy.powers.length === 0) return ''
-        return enemy.powers.map(power => `${power.id}:${power.stacks}`).join('  ')
+        const parts = enemy.powers.map(power => `${power.id}:${power.stacks}`)
+        if (enemy.specId === 'BYRD') {
+            if (enemy.aiState?.flying) parts.push(`FLYING:${Math.max(0, 3 - Number(enemy.aiState?.hitsTaken ?? 0))}`)
+            if (enemy.aiState?.downed) parts.push('DOWNED')
+        }
+        return parts.join('  ')
     }
 
     private calculateEnemyPosition(index: number): { x: number; y: number } {

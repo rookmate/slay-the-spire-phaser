@@ -1,6 +1,6 @@
 import { RNG } from './rng'
 import { CARD_DEFS, canUpgradeCard, createCardInstance, createStarterDeck, resolveCard } from './cards'
-import { onEnemyDamaged, onEnemyIntentResolved, onPlayerCardPlayed, rollEngineIntentForEnemy } from './enemies'
+import { onEnemyDamaged, onEnemyHitByPlayerAttack, onEnemyIntentResolved, onPlayerCardPlayed, rollEngineIntentForEnemy } from './enemies'
 import { POTION_DEFS, type PotionId } from './potions'
 import {
     createRelicCombatContext,
@@ -179,11 +179,29 @@ export class Engine {
     }
 
     spawnEnemies(enemies: EnemyState[]): void {
-        this.state.enemies.push(...enemies)
+        const openSlots = Math.max(0, 5 - this.countLivingEnemies())
+        if (openSlots <= 0) return
+        this.state.enemies.push(...enemies.slice(0, openSlots))
     }
 
     removeEnemy(enemyId: EntityId): void {
         this.state.enemies = this.state.enemies.filter(enemy => enemy.id !== enemyId)
+    }
+
+    countLivingEnemies(): number {
+        return this.state.enemies.filter(enemy => enemy.hp > 0).length
+    }
+
+    countLivingNonMinions(): number {
+        return this.state.enemies.filter(enemy => enemy.hp > 0 && !enemy.tags?.includes('minion')).length
+    }
+
+    gainBlock(target: EntityId, amount: number): void {
+        this.enqueue({ kind: 'GainBlock', target, amount })
+    }
+
+    applyPowerToPlayer(powerId: PowerInstance['id'], stacks: number): void {
+        this.enqueue({ kind: 'ApplyPower', target: this.state.player.id, powerId, stacks })
     }
 
     randomInt(min: number, max: number): number {
@@ -244,7 +262,7 @@ export class Engine {
                     const weakStacks = source.powers.find(power => power.id === 'WEAK')?.stacks ?? 0
                     if (weakStacks > 0) damage = Math.round(damage * 0.75)
                 }
-                damage = this.modifyIncomingDamage(target, damage)
+                damage = this.modifyIncomingDamage(target, damage, action.damageType ?? 'attack')
                 const blockUsed = Math.min(target.block, damage)
                 target.block -= blockUsed
                 const actualDamage = Math.max(0, damage - blockUsed)
@@ -269,6 +287,9 @@ export class Engine {
                 }
 
                 if ('name' in target) onEnemyDamaged(this, target, actualDamage)
+                if ('name' in target && source?.id === this.state.player.id && (action.damageType ?? 'attack') === 'attack') {
+                    onEnemyHitByPlayerAttack(this, target, actualDamage)
+                }
 
                 if (source && action.damageType !== 'thorns') {
                     const thorns = target.powers.find(power => power.id === 'THORNS')?.stacks ?? 0
@@ -349,7 +370,7 @@ export class Engine {
                     this.onEndOfPlayerTurn()
                     this.tickTemporaryDebuffs(this.state.player)
 
-                    for (const enemy of this.state.enemies) {
+                    for (const enemy of [...this.state.enemies]) {
                         if (enemy.hp <= 0) continue
                         if (enemy.intent?.kind === 'attack') {
                             const enemyStrength = enemy.powers.find(power => power.id === 'STRENGTH')?.stacks ?? 0
@@ -364,6 +385,8 @@ export class Engine {
                             this.enqueue({ kind: 'ApplyPower', target: this.state.player.id, powerId: enemy.intent.debuff, stacks: enemy.intent.stacks })
                         } else if (enemy.intent?.kind === 'status') {
                             this.createCardsInDestination(enemy.intent.createdDefId, enemy.intent.destination, enemy.intent.count)
+                        } else if (enemy.intent?.kind === 'summon') {
+                            // Summons are handled by enemy hooks so new units do not act immediately.
                         } else if (enemy.intent?.kind === 'buff') {
                             const strengthGain = this.resolveEnemyBuffStrength(enemy.intent.desc)
                             if (strengthGain > 0) this.enqueue({ kind: 'ApplyPower', target: enemy.id, powerId: 'STRENGTH', stacks: strengthGain })
@@ -638,10 +661,13 @@ export class Engine {
         }
     }
 
-    private modifyIncomingDamage(target: PlayerState | EnemyState, amount: number): number {
+    private modifyIncomingDamage(target: PlayerState | EnemyState, amount: number, damageType: 'attack' | 'thorns'): number {
         const vulnerable = target.powers.find(power => power.id === 'VULNERABLE')?.stacks ?? 0
         let next = amount
         if (vulnerable > 0) next = Math.round(next * 1.5)
+        if ('name' in target && target.specId === 'BYRD' && damageType === 'attack' && target.aiState?.flying) {
+            next = Math.min(next, 3)
+        }
         if (target === this.state.player) next = Math.round(next * this.enemyDamageMultiplier())
         return next
     }

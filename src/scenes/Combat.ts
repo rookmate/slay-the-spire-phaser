@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
 import { Engine, createPlayerFromDeck } from '../core/engine'
 import { RNG } from '../core/rng'
-import { createEnemyFromSpec } from '../core/enemies'
+import { createEnemyFromSpec, rollEngineIntentForEnemy } from '../core/enemies'
 import { generateEncounter } from '../core/encounters'
 import type { RunState } from '../core/run'
 import { saveRun } from '../core/run'
@@ -42,6 +42,10 @@ export class CombatScene extends Phaser.Scene {
         }
 
         this.engine = new Engine(seed, player, enemies, { asc: this.run.asc ?? 0, run: this.run })
+        for (let index = 0; index < this.engine.state.enemies.length; index++) {
+            const enemy = this.engine.state.enemies[index]
+            enemy.intent = rollEngineIntentForEnemy(new RNG(`${getEnemyActSeed(seed, act, combatIndex, index)}-intent`), enemy, this.engine.state)
+        }
         this.engine.configurePlayerCombatBonuses({
             baseEnergyPerTurn: 3 + getRelicEnergyBonus(this.run),
         })
