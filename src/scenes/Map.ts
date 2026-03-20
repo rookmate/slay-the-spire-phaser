@@ -30,9 +30,14 @@ export class MapScene extends Phaser.Scene {
             fontSize: '14px',
             color: '#cccccc',
         })
+        this.add.text(16, 60, `Act ${this.run.act}`, {
+            fontFamily: 'monospace',
+            fontSize: '14px',
+            color: '#cccccc',
+        })
 
         // Generate map for this act
-        this.gmap = generateMap(this.run.seed, this.run.mapProgress?.act ?? 1)
+        this.gmap = generateMap(this.run.seed, this.run.act)
         this.currentNodeId = this.run.mapProgress?.currentNodeId
         this.drawGraph()
 
@@ -68,13 +73,18 @@ export class MapScene extends Phaser.Scene {
         const rng = new RNG(`${this.run.seed}-unknown-${this.run.floor}`)
         // Update current node and persist
         this.currentNodeId = node.id
-        this.run.mapProgress = { act: this.run.mapProgress?.act ?? 1, currentNodeId: this.currentNodeId }
+        this.run.mapProgress = { currentNodeId: this.currentNodeId }
         saveRun(this.run)
         // Repaint to lock other nodes
         this.children.removeAll()
         const style = { fontFamily: 'monospace', fontSize: '18px', color: '#ffffff' }
         this.add.text(16, 16, `Floor ${this.run.floor}  HP ${this.run.player.hp}/${this.run.player.maxHp}  Gold ${this.run.gold}`, style)
         this.add.text(16, 40, `Relics: ${this.run.relics.map(id => RELIC_DEFS[id]?.name ?? id).join(', ') || 'None'}  Potions: ${this.run.potions.length}/${this.run.maxPotionSlots}`, {
+            fontFamily: 'monospace',
+            fontSize: '14px',
+            color: '#cccccc',
+        })
+        this.add.text(16, 60, `Act ${this.run.act}`, {
             fontFamily: 'monospace',
             fontSize: '14px',
             color: '#cccccc',

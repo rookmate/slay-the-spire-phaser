@@ -3,7 +3,7 @@ import type { RunState, RelicId } from '../core/run'
 import { saveRun } from '../core/run'
 import { RNG } from '../core/rng'
 import { CARD_DEFS, createCardInstance } from '../core/cards'
-import { MVP_RELIC_POOL, RELIC_DEFS, applyRelicAcquisition } from '../core/relics'
+import { MVP_RELIC_POOL, RELIC_DEFS, applyRelicAcquisition, blocksPotionGain } from '../core/relics'
 import { POTION_DEFS, type PotionId } from '../core/potions'
 import { Card } from '../ui/Card'
 import { DeckSelectionOverlay } from '../ui/DeckSelectionOverlay'
@@ -93,10 +93,14 @@ export class ShopScene extends Phaser.Scene {
             })
 
         this.inventory.potions.forEach((potion, index) => {
-            this.add.text(leftX, baseY + 40 + index * 32, `${POTION_DEFS[potion].name} (50)`, style)
+            const canBuyPotion = !blocksPotionGain(this.run.relics)
+            this.add.text(leftX, baseY + 40 + index * 32, `${POTION_DEFS[potion].name} (${canBuyPotion ? 50 : 'blocked'})`, {
+                ...style,
+                color: canBuyPotion ? style.color : '#777777',
+            })
                 .setInteractive({ useHandCursor: true })
                 .on('pointerdown', () => {
-                    if (this.run.gold < 50 || this.run.potions.length >= this.run.maxPotionSlots) return
+                    if (!canBuyPotion || this.run.gold < 50 || this.run.potions.length >= this.run.maxPotionSlots) return
                     this.run.gold -= 50
                     this.run.potions.push(potion)
                     this.inventory.potions.splice(index, 1)

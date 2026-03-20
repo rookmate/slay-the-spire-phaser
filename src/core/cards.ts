@@ -976,6 +976,15 @@ export const CARD_DEFS: Record<string, CardDef> = {
         poolEnabled: false,
         targeting: { type: 'none' },
     },
+    SLIMED: {
+        id: 'SLIMED',
+        name: 'Slimed',
+        type: 'status',
+        cost: 1,
+        exhaust: true,
+        poolEnabled: false,
+        targeting: { type: 'none' },
+    },
 }
 
 for (const def of Object.values(CARD_DEFS)) {

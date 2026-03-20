@@ -15,7 +15,10 @@ export class MainMenuScene extends Phaser.Scene {
             .setInteractive({ useHandCursor: true })
             .on('pointerdown', () => {
                 const run = loadRun()
-                if (run) this.scene.start('Map', { run })
+                if (!run) return
+                if (run.bossRelicChoicePending) this.scene.start('BossRelic', { run })
+                else if (!run.neowCompleted) this.scene.start('Neow', { run })
+                else this.scene.start('Map', { run })
             })
 
         this.add.text(16, 140, 'New Run (A0)', { ...style, backgroundColor: '#333', padding: { x: 8, y: 6 } })
@@ -23,7 +26,7 @@ export class MainMenuScene extends Phaser.Scene {
             .on('pointerdown', () => {
                 const run = createNewRun()
                 saveRun(run)
-                this.scene.start('Map', { run })
+                this.scene.start('Neow', { run })
             })
 
         // this.add.text(16, 180, 'Daily Run', { ...style, backgroundColor: '#333', padding: { x: 8, y: 6 } })
@@ -62,5 +65,4 @@ export class MainMenuScene extends Phaser.Scene {
             })
     }
 }
-
 

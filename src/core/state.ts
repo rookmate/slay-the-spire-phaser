@@ -71,6 +71,14 @@ export interface CardEngineApi {
     randomInt?: (min: number, max: number) => number
 }
 
+export interface EnemyEngineApi {
+    state: CombatState
+    enqueue: (a: any) => void
+    spawnEnemies: (enemies: EnemyState[]) => void
+    removeEnemy: (enemyId: EntityId) => void
+    createCardsInDestination: (defId: string, destination: Exclude<CardDestination, 'drawPileTop' | 'exhaustPile'>, count?: number, upgradeLevel?: number) => CardInstance[]
+}
+
 export interface CardDef {
     id: string
     name: string
@@ -145,9 +153,11 @@ export interface EnemyState {
     powers: PowerInstance[]
     intent?:
     | { kind: 'attack'; amount: number }
+    | { kind: 'multi_attack'; amount: number; hits: number }
     | { kind: 'block'; amount: number }
     | { kind: 'buff'; desc?: string }
     | { kind: 'debuff'; debuff: 'WEAK' | 'VULNERABLE'; stacks: number }
+    | { kind: 'status'; createdDefId: 'DAZED' | 'SLIMED'; destination: 'discardPile'; count: number }
     // Optional spec reference to drive intent generation
     specId?: string
     aiState?: Record<string, number | boolean | string>

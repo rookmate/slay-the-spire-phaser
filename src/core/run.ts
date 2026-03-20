@@ -5,6 +5,9 @@ import type { PotionId } from './potions'
 
 export type RelicId =
     | 'BURNING_BLOOD'
+    | 'BLACK_BLOOD'
+    | 'SOZU'
+    | 'BUSTED_CROWN'
     | 'ANCHOR'
     | 'LANTERN'
     | 'VAJRA'
@@ -15,6 +18,7 @@ export type RelicId =
 
 export interface RunState {
     seed: string
+    act: 1 | 2
     floor: number
     gold: number
     player: { maxHp: number; hp: number }
@@ -23,8 +27,13 @@ export interface RunState {
     maxPotionSlots: number
     merchantRemoveCost: number
     deck: CardInstance[]
+    neowCompleted: boolean
+    neowSeed: string
+    bossRelicChoicePending?: { sourceBossId: string; choices: RelicId[] }
+    cardsSeen?: number
+    actsCleared?: number[]
     asc?: number
-    mapProgress?: { act: number; currentNodeId?: string }
+    mapProgress?: { currentNodeId?: string }
     combatCount?: number
 }
 
@@ -35,6 +44,7 @@ export function createNewRun(seed?: string): RunState {
     rng.shuffleInPlace(deck)
     return {
         seed: s,
+        act: 1,
         floor: 1,
         gold: 99,
         player: { maxHp: 80, hp: 80 },
@@ -43,12 +53,16 @@ export function createNewRun(seed?: string): RunState {
         maxPotionSlots: 3,
         merchantRemoveCost: 75,
         deck,
-        mapProgress: { act: 1 },
+        neowCompleted: false,
+        neowSeed: `${s}-neow`,
+        mapProgress: {},
         combatCount: 0,
+        cardsSeen: 0,
+        actsCleared: [],
     }
 }
 
-const STORAGE_KEY = 'sts_run_v2'
+const STORAGE_KEY = 'sts_run_v3'
 
 export function saveRun(run: RunState): void {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(run))

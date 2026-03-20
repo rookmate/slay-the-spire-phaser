@@ -23,7 +23,13 @@ export type EnemyKey =
     | 'ACID_SLIME_L'
     | 'GREMLIN_NOB'
     | 'LAGAVULIN'
+    | 'SENTRY'
     | 'THE_GUARDIAN'
+    | 'SLIME_BOSS'
+    | 'SHELLED_PARASITE'
+    | 'SNECKO'
+    | 'BOOK_OF_STABBING'
+    | 'THE_CHAMP'
 
 export function pickWeighted<T>(rng: RNG, items: { item: T; weight: number }[]): T {
     const total = items.reduce((sum, item) => sum + item.weight, 0)
@@ -34,13 +40,30 @@ export function pickWeighted<T>(rng: RNG, items: { item: T; weight: number }[]):
     return items[items.length - 1].item
 }
 
-export function generateEncounter(rng: RNG, tier: EncounterTier, combatIndex: number): EnemyKey[] {
-    if (tier === 'elite') return [rng.random() < 0.5 ? 'GREMLIN_NOB' : 'LAGAVULIN']
-    if (tier === 'boss') return ['THE_GUARDIAN']
-    return generateHallwayEncounter(rng, combatIndex)
+export function generateEncounter(rng: RNG, act: 1 | 2, tier: EncounterTier, combatIndex: number): EnemyKey[] {
+    if (act === 2) return generateActTwoEncounter(rng, tier)
+    if (tier === 'elite') return generateActOneElite(rng)
+    if (tier === 'boss') return rng.random() < 0.5 ? ['THE_GUARDIAN'] : ['SLIME_BOSS']
+    return generateActOneHallwayEncounter(rng, combatIndex)
 }
 
-function generateHallwayEncounter(rng: RNG, combatIndex: number): EnemyKey[] {
+function generateActOneElite(rng: RNG): EnemyKey[] {
+    const pick = rng.int(0, 2)
+    if (pick === 0) return ['GREMLIN_NOB']
+    if (pick === 1) return ['LAGAVULIN']
+    return ['SENTRY', 'SENTRY', 'SENTRY']
+}
+
+function generateActTwoEncounter(rng: RNG, tier: EncounterTier): EnemyKey[] {
+    if (tier === 'elite') return ['BOOK_OF_STABBING']
+    if (tier === 'boss') return ['THE_CHAMP']
+    const pick = rng.int(0, 2)
+    if (pick === 0) return ['SHELLED_PARASITE']
+    if (pick === 1) return ['SNECKO']
+    return ['LOOTER', 'CULTIST']
+}
+
+function generateActOneHallwayEncounter(rng: RNG, combatIndex: number): EnemyKey[] {
     if (combatIndex < 3) return firstThree(rng)
     return remaining(rng)
 }

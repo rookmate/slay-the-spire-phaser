@@ -45,7 +45,11 @@ export class RewardsScene extends Phaser.Scene {
                 this.pendingPotionReward = item.potionId
             } else if (item.kind === 'cards') {
                 this.pendingCardReward = true
+                this.run.cardsSeen = (this.run.cardsSeen ?? 0) + item.choices.length
                 this.renderCardChoices(item)
+            } else if (item.kind === 'boss_relics') {
+                this.infoTexts.push(this.add.text(24, y, 'Boss relic reward is handled in the next scene.', style))
+                y += 28
             }
         }
 

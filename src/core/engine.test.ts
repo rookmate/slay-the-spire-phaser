@@ -4,9 +4,11 @@ import type { CardInstance, PlayerState } from './state'
 import { Engine, createDummyEnemy, createSimplePlayer } from './engine'
 import { RNG } from './rng'
 import { createEnemyFromSpec } from './enemies'
-import { getCombatRelicBonuses } from './relics'
+import { applyRelicAcquisition, blocksPotionGain, getCardRewardChoiceCount, getCombatRelicBonuses, getPostCombatHeal, getRelicEnergyBonus } from './relics'
 import { generateRewardBundle } from './rewards'
 import { createNewRun } from './run'
+import { applyNeowOption, getRandomNeowCommonCard, getRandomNeowRelic, rollNeowOptions } from './neow'
+import { generateEncounter } from './encounters'
 
 function createPlayerWithHand(handIds: string[]): PlayerState {
     const player = createSimplePlayer('test-player')
@@ -34,6 +36,26 @@ describe('deferred card systems', () => {
 
         expect(run.deck).toHaveLength(10)
         expect(run.deck.every(card => typeof card.instanceId === 'string' && card.upgradeLevel === 0)).toBe(true)
+        expect(run.neowCompleted).toBe(false)
+        expect(run.act).toBe(1)
+    })
+
+    it('rolls deterministic neow options and applies rewards', () => {
+        const run = createNewRun('neow-seed')
+        const options = rollNeowOptions(run.neowSeed)
+        const rerolled = rollNeowOptions(run.neowSeed)
+        const relicId = getRandomNeowRelic(`${run.neowSeed}-GAIN_COMMON_RELIC`, run)
+        const cardId = getRandomNeowCommonCard(`${run.neowSeed}-GAIN_COMMON_CARD`)
+
+        expect(options.map(option => option.id)).toEqual(rerolled.map(option => option.id))
+
+        applyNeowOption(run, 'GAIN_COMMON_RELIC', { rewardRelicId: relicId })
+        expect(run.relics).toContain(relicId)
+        expect(run.neowCompleted).toBe(true)
+
+        const secondRun = createNewRun('neow-seed-2')
+        applyNeowOption(secondRun, 'GAIN_COMMON_CARD', { rewardCardId: cardId })
+        expect(secondRun.deck.some(card => card.defId === cardId)).toBe(true)
     })
 
     it('resolves upgrade levels and searing blow scaling', () => {
@@ -156,6 +178,26 @@ describe('deferred card systems', () => {
         expect(engine.state.player.exhaustPile.map(card => card.defId)).toContain('GHOSTLY_ARMOR')
     })
 
+    it('dazed exhausts itself at end of turn', () => {
+        const player = createPlayerWithHand(['DAZED'])
+        const engine = new Engine('dazed-seed', player, [createDummyEnemy('e1')])
+
+        engine.enqueue({ kind: 'EndTurn' })
+        engine.runUntilIdle()
+
+        expect(engine.state.player.exhaustPile.map(card => card.defId)).toContain('DAZED')
+    })
+
+    it('slimed is playable for 1 energy and exhausts on use', () => {
+        const player = createPlayerWithHand(['SLIMED'])
+        const engine = new Engine('slimed-seed', player, [createDummyEnemy('e1')])
+
+        playAndResolve(engine, player.hand[0], [])
+
+        expect(engine.state.player.energy).toBe(2)
+        expect(engine.state.player.exhaustPile.map(card => card.defId)).toContain('SLIMED')
+    })
+
     it('whirlwind spends all remaining energy and is repeated by double tap', () => {
         const player = createPlayerWithHand(['DOUBLE_TAP', 'WHIRLWIND'])
         const engine = new Engine('whirlwind-seed', player, [createDummyEnemy('e1')])
@@ -249,6 +291,21 @@ describe('deferred card systems', () => {
         expect(engine.state.enemies[0].aiState?.asleep).toBe(false)
     })
 
+    it('sentries add dazed to discard pile on bolt turns', () => {
+        const player = createPlayerWithHand([])
+        const enemies = [
+            createEnemyFromSpec(new RNG('s1'), 'SENTRY', 'e1'),
+            createEnemyFromSpec(new RNG('s2'), 'SENTRY', 'e2'),
+            createEnemyFromSpec(new RNG('s3'), 'SENTRY', 'e3'),
+        ]
+        const engine = new Engine('sentries-seed', player, enemies)
+
+        engine.enqueue({ kind: 'EndTurn' })
+        engine.runUntilIdle()
+
+        expect(engine.state.player.hand.filter(card => card.defId === 'DAZED')).toHaveLength(4)
+    })
+
     it('the guardian enters defense mode after enough damage', () => {
         const player = createPlayerWithHand([])
         const enemy = createEnemyFromSpec(new RNG('guardian-seed'), 'THE_GUARDIAN', 'e1')
@@ -261,6 +318,23 @@ describe('deferred card systems', () => {
         expect(engine.state.enemies[0].block).toBeGreaterThanOrEqual(20)
     })
 
+    it('slime boss splits into two medium slimes exactly once', () => {
+        const player = createPlayerWithHand([])
+        const enemy = createEnemyFromSpec(new RNG('slime-boss'), 'SLIME_BOSS', 'e1')
+        const engine = new Engine('slime-boss-engine', player, [enemy])
+
+        engine.enqueue({ kind: 'DealDamage', source: player.id, target: enemy.id, amount: 80 })
+        engine.runUntilIdle()
+
+        expect(engine.state.enemies).toHaveLength(2)
+        expect(engine.state.enemies.map(entry => entry.specId).sort()).toEqual(['ACID_SLIME_M', 'SPIKE_SLIME_M'])
+
+        const enemyIds = engine.state.enemies.map(entry => entry.id)
+        engine.enqueue({ kind: 'DealDamage', source: player.id, target: enemyIds[0], amount: 1 })
+        engine.runUntilIdle()
+        expect(engine.state.enemies).toHaveLength(2)
+    })
+
     it('keeps status cards out of collectible pools and reward bundles', () => {
         const rewards = generateRewardBundle('reward-seed', 'elite', ['BURNING_BLOOD'])
         const rewardCards = rewards.items.find(item => item.kind === 'cards')
@@ -268,6 +342,7 @@ describe('deferred card systems', () => {
         expect(CARD_DEFS.WOUND.poolEnabled).toBe(false)
         expect(CARD_DEFS.DAZED.poolEnabled).toBe(false)
         expect(CARD_DEFS.BURN.poolEnabled).toBe(false)
+        expect(CARD_DEFS.SLIMED.poolEnabled).toBe(false)
         expect(rewardCards && rewardCards.kind === 'cards' && rewardCards.choices.every(id => CARD_DEFS[id].type !== 'status')).toBe(true)
     })
 
@@ -281,5 +356,34 @@ describe('deferred card systems', () => {
         expect(bonuses.eliteHpMultiplier).toBe(0.75)
         expect(rewards.items.some(item => item.kind === 'relic')).toBe(true)
         expect(rewards.items.some(item => item.kind === 'cards')).toBe(true)
+    })
+
+    it('applies boss relic hooks and boss reward generation', () => {
+        const run = createNewRun('boss-relic-seed')
+        applyRelicAcquisition(run, 'BLACK_BLOOD')
+
+        expect(run.relics).not.toContain('BURNING_BLOOD')
+        expect(getPostCombatHeal(run.relics)).toBe(12)
+        expect(blocksPotionGain(['SOZU'])).toBe(true)
+        expect(getCardRewardChoiceCount(['BUSTED_CROWN'])).toBe(1)
+        expect(getRelicEnergyBonus(['SOZU', 'BUSTED_CROWN'])).toBe(2)
+
+        const bossRewards = generateRewardBundle('boss-seed', 'boss', ['BLACK_BLOOD'])
+        expect(bossRewards.items.some(item => item.kind === 'boss_relics')).toBe(true)
+    })
+
+    it('omits potion rewards when sozu is owned', () => {
+        const rewards = Array.from({ length: 8 }, (_, index) => generateRewardBundle(`sozu-${index}`, 'elite', ['SOZU']))
+        expect(rewards.every(bundle => bundle.items.every(item => item.kind !== 'potion'))).toBe(true)
+    })
+
+    it('generates act two encounters from the act two pool only', () => {
+        const hallway = generateEncounter(new RNG('act2-hallway'), 2, 'hallway', 0)
+        const elite = generateEncounter(new RNG('act2-elite'), 2, 'elite', 0)
+        const boss = generateEncounter(new RNG('act2-boss'), 2, 'boss', 0)
+
+        expect(['SHELLED_PARASITE', 'SNECKO', 'LOOTER', 'CULTIST']).toContain(hallway[0])
+        expect(elite).toEqual(['BOOK_OF_STABBING'])
+        expect(boss).toEqual(['THE_CHAMP'])
     })
 })

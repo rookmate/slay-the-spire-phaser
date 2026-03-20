@@ -1,6 +1,6 @@
 import { RNG } from './rng'
 import { CARD_DEFS, canUpgradeCard, createCardInstance, createStarterDeck, resolveCard } from './cards'
-import { onEnemyDamaged, onPlayerCardPlayed, rollEngineIntentForEnemy } from './enemies'
+import { onEnemyDamaged, onEnemyIntentResolved, onPlayerCardPlayed, rollEngineIntentForEnemy } from './enemies'
 import { POTION_DEFS, type PotionId } from './potions'
 import type { Action, EmittedEvent, EntityId } from './actions'
 import type {
@@ -33,6 +33,7 @@ export class Engine {
     private queue: Action[] = []
     private ascension: number
     private doubleTapCharges = 0
+    private baseEnergyPerTurn = 3
     private basePlayerThorns = 0
     private temporaryThorns = 0
     private activeLimbo?: InternalLimboCardState
@@ -59,8 +60,10 @@ export class Engine {
         this.doubleTapCharges = charges
     }
 
-    configurePlayerCombatBonuses(opts: { baseThorns?: number } = {}): void {
+    configurePlayerCombatBonuses(opts: { baseThorns?: number; baseEnergyPerTurn?: number } = {}): void {
         this.basePlayerThorns = opts.baseThorns ?? this.basePlayerThorns
+        this.baseEnergyPerTurn = opts.baseEnergyPerTurn ?? this.baseEnergyPerTurn
+        this.state.player.energy = this.baseEnergyPerTurn
         if (this.basePlayerThorns > 0) this.setPowerStacks(this.state.player, 'THORNS', this.basePlayerThorns + this.temporaryThorns)
     }
 
@@ -147,6 +150,14 @@ export class Engine {
         return created
     }
 
+    spawnEnemies(enemies: EnemyState[]): void {
+        this.state.enemies.push(...enemies)
+    }
+
+    removeEnemy(enemyId: EntityId): void {
+        this.state.enemies = this.state.enemies.filter(enemy => enemy.id !== enemyId)
+    }
+
     randomInt(min: number, max: number): number {
         return this.rng.int(min, max)
     }
@@ -225,7 +236,7 @@ export class Engine {
                     this.enqueue({ kind: 'Heal', target: action.lifestealTo, amount: actualDamage })
                 }
 
-                if ('name' in target) onEnemyDamaged(target, actualDamage)
+                if ('name' in target) onEnemyDamaged(this, target, actualDamage)
 
                 if (source && action.damageType !== 'thorns') {
                     const thorns = target.powers.find(power => power.id === 'THORNS')?.stacks ?? 0
@@ -235,6 +246,12 @@ export class Engine {
                 }
 
                 this.checkWinLose(evts)
+                break
+            }
+            case 'DealMultiDamage': {
+                for (let i = 0; i < action.hits; i++) {
+                    this.enqueue({ kind: 'DealDamage', source: action.source, target: action.target, amount: action.amount, damageType: action.damageType })
+                }
                 break
             }
             case 'LoseHp': {
@@ -302,22 +319,28 @@ export class Engine {
                         if (enemy.intent?.kind === 'attack') {
                             const enemyStrength = enemy.powers.find(power => power.id === 'STRENGTH')?.stacks ?? 0
                             this.enqueue({ kind: 'DealDamage', source: enemy.id, target: this.state.player.id, amount: enemy.intent.amount + enemyStrength })
+                        } else if (enemy.intent?.kind === 'multi_attack') {
+                            const enemyStrength = enemy.powers.find(power => power.id === 'STRENGTH')?.stacks ?? 0
+                            this.enqueue({ kind: 'DealMultiDamage', source: enemy.id, target: this.state.player.id, amount: enemy.intent.amount + enemyStrength, hits: enemy.intent.hits })
                         } else if (enemy.intent?.kind === 'block') {
                             const scaled = Math.round(enemy.intent.amount * this.enemyBlockMultiplier())
                             this.enqueue({ kind: 'GainBlock', target: enemy.id, amount: scaled })
                         } else if (enemy.intent?.kind === 'debuff') {
                             this.enqueue({ kind: 'ApplyPower', target: this.state.player.id, powerId: enemy.intent.debuff, stacks: enemy.intent.stacks })
+                        } else if (enemy.intent?.kind === 'status') {
+                            this.createCardsInDestination(enemy.intent.createdDefId, enemy.intent.destination, enemy.intent.count)
                         } else if (enemy.intent?.kind === 'buff') {
                             const strengthGain = this.resolveEnemyBuffStrength(enemy.intent.desc)
                             if (strengthGain > 0) this.enqueue({ kind: 'ApplyPower', target: enemy.id, powerId: 'STRENGTH', stacks: strengthGain })
                         }
+                        onEnemyIntentResolved(this, enemy, enemy.intent)
                     }
 
                     this.enqueue({ kind: 'EndTurn' })
                 } else {
                     for (const enemy of this.state.enemies) this.tickTemporaryDebuffs(enemy)
                     this.state.turn = 'player'
-                    this.state.player.energy = 3
+                    this.state.player.energy = this.baseEnergyPerTurn
                     const hasBarricade = this.state.player.powers.find(power => power.id === 'BARRICADE')?.stacks ?? 0
                     if (hasBarricade === 0) this.state.player.block = 0
                     for (const enemy of this.state.enemies) enemy.block = 0
@@ -559,6 +582,7 @@ export class Engine {
             events.push({ kind: 'Defeat' })
             return
         }
+        if (this.state.enemies.length === 0) return
         if (this.state.enemies.every(enemy => enemy.hp <= 0)) {
             this.state.victory = true
             events.push({ kind: 'Victory' })

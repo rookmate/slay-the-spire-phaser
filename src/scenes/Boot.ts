@@ -41,8 +41,14 @@ export class BootScene extends Phaser.Scene {
         this.load.image('enemy:ACID_SLIME_M', acidSlimeWebp)
         this.load.image('enemy:ACID_SLIME_L', acidSlimeWebp)
         this.load.image('enemy:GREMLIN_NOB', gremlinWebp)
+        this.load.image('enemy:SENTRY', cultistWebp)
         this.load.image('enemy:LAGAVULIN', cultistWebp)
         this.load.image('enemy:THE_GUARDIAN', spikeSlimeWebp)
+        this.load.image('enemy:SLIME_BOSS', acidSlimeWebp)
+        this.load.image('enemy:SHELLED_PARASITE', fungiPng)
+        this.load.image('enemy:SNECKO', cultistWebp)
+        this.load.image('enemy:BOOK_OF_STABBING', slaverWebp)
+        this.load.image('enemy:THE_CHAMP', slaverWebp)
     }
 
     create(): void {
@@ -50,4 +56,3 @@ export class BootScene extends Phaser.Scene {
         this.scene.start('MainMenu')
     }
 }
-
