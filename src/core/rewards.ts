@@ -1,9 +1,10 @@
 import { RNG } from './rng'
 import { getAscensionHallwayGoldMultiplier } from './ascension'
-import { CARD_DEFS } from './cards'
+import { getUnlockedCollectibleCards } from './cards'
 import type { RoomKind } from './map'
+import type { MetaState } from './meta'
 import type { RelicId, RunState } from './run'
-import { BOSS_RELIC_POOL, MVP_RELIC_POOL, blocksPotionGain, getCardRewardChoiceCount } from './relics'
+import { BOSS_RELIC_POOL, blocksPotionGain, getCardRewardChoiceCount, getUnlockedRelicPool } from './relics'
 import type { PotionId } from './potions'
 
 export type EncounterTier = 'hallway' | 'elite' | 'boss' | 'chest'
@@ -27,6 +28,7 @@ export function generateRewardBundle(
     seed: string,
     tier: EncounterTier,
     run: Pick<RunState, 'relics' | 'potions' | 'maxPotionSlots'> | RelicId[],
+    meta: MetaState,
     opts?: { roomKind?: RoomKind; asc?: number },
 ): RewardBundle {
     const rng = new RNG(seed)
@@ -45,34 +47,35 @@ export function generateRewardBundle(
             ? Math.floor(baseGold * getAscensionHallwayGoldMultiplier(asc))
             : baseGold
         items.push({ kind: 'gold', amount })
-        items.push({ kind: 'cards', choices: drawCardChoices(rng, cardChoiceCount) })
+        items.push({ kind: 'cards', choices: drawCardChoices(rng, meta, cardChoiceCount) })
         if (canGainPotion && rng.random() < 0.4) items.push({ kind: 'potion', potionId: POTION_POOL[rng.int(0, POTION_POOL.length - 1)] })
     } else if (tier === 'elite') {
         items.push({ kind: 'gold', amount: rng.int(25, 35) })
-        items.push({ kind: 'cards', choices: drawCardChoices(rng, cardChoiceCount) })
-        items.push({ kind: 'relic', relicId: drawRelic(rng, runView.relics) })
+        items.push({ kind: 'cards', choices: drawCardChoices(rng, meta, cardChoiceCount) })
+        items.push({ kind: 'relic', relicId: drawRelic(rng, meta, runView.relics) })
         if (canGainPotion && rng.random() < 0.6) items.push({ kind: 'potion', potionId: POTION_POOL[rng.int(0, POTION_POOL.length - 1)] })
     } else if (tier === 'boss') {
         items.push({ kind: 'boss_relics', choices: drawBossRelics(rng, runView.relics) })
     } else if (tier === 'chest') {
-        items.push({ kind: 'relic', relicId: drawRelic(rng, runView.relics) })
+        items.push({ kind: 'relic', relicId: drawRelic(rng, meta, runView.relics) })
         items.push({ kind: 'gold', amount: rng.int(25, 35) })
     }
 
     return { tier, items }
 }
 
-function drawCardChoices(rng: RNG, count: number): string[] {
+function drawCardChoices(rng: RNG, meta: MetaState, count: number): string[] {
     const chosen = new Set<string>()
     const allByRarity = {
-        common: Object.values(CARD_DEFS).filter(card => card.poolEnabled && card.rarity === 'common').map(card => card.id),
-        uncommon: Object.values(CARD_DEFS).filter(card => card.poolEnabled && card.rarity === 'uncommon').map(card => card.id),
-        rare: Object.values(CARD_DEFS).filter(card => card.poolEnabled && card.rarity === 'rare').map(card => card.id),
+        common: getUnlockedCollectibleCards(meta, 'common'),
+        uncommon: getUnlockedCollectibleCards(meta, 'uncommon'),
+        rare: getUnlockedCollectibleCards(meta, 'rare'),
     }
+    const fallback = [...new Set([...allByRarity.common, ...allByRarity.uncommon, ...allByRarity.rare])]
 
     while (chosen.size < count) {
         const rarity = RARITY_ORDER[rng.int(0, RARITY_ORDER.length - 1)]
-        const pool = allByRarity[rarity]
+        const pool = allByRarity[rarity].length > 0 ? allByRarity[rarity] : fallback
         if (pool.length === 0) continue
         chosen.add(pool[rng.int(0, pool.length - 1)])
     }
@@ -80,9 +83,11 @@ function drawCardChoices(rng: RNG, count: number): string[] {
     return [...chosen]
 }
 
-function drawRelic(rng: RNG, ownedRelics: RelicId[]): RelicId {
-    const pool = MVP_RELIC_POOL.filter(id => !ownedRelics.includes(id))
-    if (pool.length === 0) return MVP_RELIC_POOL[rng.int(0, MVP_RELIC_POOL.length - 1)]
+function drawRelic(rng: RNG, meta: MetaState, ownedRelics: RelicId[]): RelicId {
+    const unlocked = getUnlockedRelicPool(meta).filter(id => !ownedRelics.includes(id))
+    const fallback = getUnlockedRelicPool(meta)
+    const pool = unlocked.length > 0 ? unlocked : fallback
+    if (pool.length === 0) return 'ANCHOR'
     return pool[rng.int(0, pool.length - 1)]
 }
 

@@ -1,3 +1,5 @@
+import type { MetaState } from './meta'
+import { getEffectiveUnlockedCardIds } from './meta'
 import type { CardDef, CardEngineApi, CardInstance, ChoiceZone } from './state'
 
 function playerStrength(engine: { state: { player: { powers: Array<{ id: string; stacks: number }> } } }): number {
@@ -1079,4 +1081,18 @@ export function resolveCard(card: CardInstance): ResolvedCardDef {
 
 export function isCurseCard(card: CardInstance | { defId: string }): boolean {
     return CARD_DEFS[card.defId]?.type === 'curse'
+}
+
+export function isCollectibleCard(id: string): boolean {
+    const card = CARD_DEFS[id]
+    return Boolean(card?.poolEnabled && card.type !== 'status' && card.type !== 'curse')
+}
+
+export function getUnlockedCollectibleCards(meta: MetaState, rarity?: 'basic' | 'common' | 'uncommon' | 'rare'): string[] {
+    const unlocked = getEffectiveUnlockedCardIds(meta)
+    return Object.values(CARD_DEFS)
+        .filter(card => isCollectibleCard(card.id))
+        .filter(card => unlocked.has(card.id))
+        .filter(card => !rarity || card.rarity === rarity)
+        .map(card => card.id)
 }

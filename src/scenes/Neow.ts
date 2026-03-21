@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
 import { canUpgradeCard, createCardInstance, resolveCard } from '../core/cards'
+import { loadMeta, type MetaState } from '../core/meta'
 import {
     applyNeowOption,
     getNeowOptionById,
@@ -15,6 +16,7 @@ import { DeckSelectionOverlay } from '../ui/DeckSelectionOverlay'
 
 export class NeowScene extends Phaser.Scene {
     private run!: RunState
+    private meta!: MetaState
     private selector!: DeckSelectionOverlay
     private options: NeowOption[] = []
     private rareChoiceOverlay?: Phaser.GameObjects.Container
@@ -25,6 +27,7 @@ export class NeowScene extends Phaser.Scene {
 
     create(data: { run: RunState }): void {
         this.run = data.run
+        this.meta = loadMeta()
         this.selector = new DeckSelectionOverlay(this)
         this.options = rollNeowOptions(this.run.neowSeed)
         this.render()
@@ -74,7 +77,7 @@ export class NeowScene extends Phaser.Scene {
 
     private renderOptionPreview(option: NeowOption, panel: Phaser.GameObjects.Container): void {
         if (option.id === 'GAIN_COMMON_RELIC_REGRET') {
-            const relicId = getRandomNeowRelic(`${this.run.neowSeed}-${option.id}`, this.run)
+            const relicId = getRandomNeowRelic(`${this.run.neowSeed}-${option.id}`, this.run, this.meta)
             const relicText = this.add.text(240, 18, RELIC_DEFS[relicId].name, {
                 fontFamily: 'monospace',
                 fontSize: '13px',
@@ -153,7 +156,7 @@ export class NeowScene extends Phaser.Scene {
         }
 
         if (option.id === 'GAIN_COMMON_RELIC_REGRET') {
-            const rewardRelicId = getRandomNeowRelic(`${this.run.neowSeed}-${option.id}`, this.run)
+            const rewardRelicId = getRandomNeowRelic(`${this.run.neowSeed}-${option.id}`, this.run, this.meta)
             applyNeowOption(this.run, option.id, { rewardRelicId })
             this.leave()
             return
@@ -176,7 +179,7 @@ export class NeowScene extends Phaser.Scene {
             color: '#ffffff',
         }))
 
-        const choices = getNeowRareCardChoices(`${this.run.neowSeed}-${option.id}`)
+        const choices = getNeowRareCardChoices(`${this.run.neowSeed}-${option.id}`, this.meta)
         const startX = this.scale.width / 2 - ((choices.length - 1) * 140) / 2
         choices.forEach((cardId, index) => {
             const view = new Card(this, createCardInstance(cardId), {

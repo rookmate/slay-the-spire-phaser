@@ -1,5 +1,6 @@
-import { CARD_DEFS, canUpgradeCard, createCardInstance } from './cards'
-import { MVP_RELIC_POOL, RELIC_DEFS, applyRelicAcquisition } from './relics'
+import { canUpgradeCard, createCardInstance, getUnlockedCollectibleCards } from './cards'
+import type { MetaState } from './meta'
+import { getUnlockedRelicPool, applyRelicAcquisition } from './relics'
 import { RNG } from './rng'
 import type { RelicId, RunState } from './run'
 import { obtainCurse, removeCardByInstanceId } from './run'
@@ -46,25 +47,23 @@ export function rollNeowOptions(seed: string): NeowOption[] {
     return [...benefits.slice(0, 2), ...tradeoffs.slice(0, 2)]
 }
 
-export function getRandomNeowRelic(seed: string, run: RunState): RelicId {
+export function getRandomNeowRelic(seed: string, run: RunState, meta: MetaState): RelicId {
     const rng = new RNG(`${seed}-relic`)
-    const commonRelics = MVP_RELIC_POOL.filter(id => RELIC_DEFS[id].rarity === 'common')
+    const commonRelics = getUnlockedRelicPool(meta, 'common')
     const pool = commonRelics.filter(id => !run.relics.includes(id))
     const source = pool.length > 0 ? pool : commonRelics
     return source[rng.int(0, source.length - 1)]
 }
 
-export function getRandomNeowCommonCard(seed: string): string {
+export function getRandomNeowCommonCard(seed: string, meta: MetaState): string {
     const rng = new RNG(`${seed}-card`)
-    const pool = Object.values(CARD_DEFS).filter(card => card.poolEnabled && card.rarity === 'common').map(card => card.id)
+    const pool = getUnlockedCollectibleCards(meta, 'common')
     return pool[rng.int(0, pool.length - 1)]
 }
 
-export function getNeowRareCardChoices(seed: string): string[] {
+export function getNeowRareCardChoices(seed: string, meta: MetaState): string[] {
     const rng = new RNG(`${seed}-rare`)
-    const pool = Object.values(CARD_DEFS)
-        .filter(card => card.poolEnabled && card.rarity === 'rare')
-        .map(card => card.id)
+    const pool = getUnlockedCollectibleCards(meta, 'rare')
     rng.shuffleInPlace(pool)
     return pool.slice(0, Math.min(3, pool.length))
 }

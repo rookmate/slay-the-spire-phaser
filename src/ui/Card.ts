@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { CARD_DEFS, resolveCard } from '../core/cards'
+import { resolveCard } from '../core/cards'
 import type { CardInstance } from '../core/state'
 
 export interface CardOptions {
@@ -7,6 +7,7 @@ export interface CardOptions {
     y: number
     scale?: number
     interactive?: boolean
+    locked?: boolean
 }
 
 export class Card extends Phaser.GameObjects.Container {
@@ -17,7 +18,7 @@ export class Card extends Phaser.GameObjects.Container {
     private cost: Phaser.GameObjects.Text
     private subtype: Phaser.GameObjects.Text
     private stats: Phaser.GameObjects.Text
-    private implementedBadge?: Phaser.GameObjects.Text
+    private stateBadge?: Phaser.GameObjects.Text
 
     // Card dimensions - optimized for fan layout
     public static readonly CARD_WIDTH = 120
@@ -33,12 +34,13 @@ export class Card extends Phaser.GameObjects.Container {
         const w = Card.CARD_WIDTH
         const h = Card.CARD_HEIGHT
         const scale = opts.scale ?? 1
+        const locked = opts.locked ?? false
 
         // Create card background with color based on card type
         const bgColor = this.getBackgroundColor(def.type)
         this.bg = scene.add.rectangle(0, 0, w, h, bgColor, 1)
         this.bg.setOrigin(0, 0)
-        if (!CARD_DEFS[card.defId].poolEnabled && !CARD_DEFS[card.defId].implemented) this.bg.setFillStyle(bgColor, 0.4)
+        if (locked) this.bg.setFillStyle(bgColor, 0.35)
 
         // Create transparent selection area rectangle
         this.selectionArea = scene.add.rectangle(0, 0, w, h, 0x000000, 0).setStrokeStyle(4, 0xffffff)
@@ -78,8 +80,8 @@ export class Card extends Phaser.GameObjects.Container {
             color: '#ddd'
         })
 
-        if (CARD_DEFS[card.defId].implemented === false) {
-            this.implementedBadge = scene.add.text(8, h - 44, 'COMING LATER', {
+        if (locked) {
+            this.stateBadge = scene.add.text(8, h - 44, 'LOCKED', {
                 fontFamily: 'monospace',
                 fontSize: '9px',
                 color: '#ffcc80',
@@ -89,7 +91,7 @@ export class Card extends Phaser.GameObjects.Container {
         // Add in correct z-order: background -> texts -> selectionArea
         this.add(this.bg)
         this.add([this.title, this.cost, this.subtype, this.stats, this.selectionArea])
-        if (this.implementedBadge) this.add(this.implementedBadge)
+        if (this.stateBadge) this.add(this.stateBadge)
 
         // Set Container bounds
         this.setSize(w, h)

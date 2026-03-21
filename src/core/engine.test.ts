@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { getAscensionEnemyDamageMultiplier, getAscensionEnemyHpMultiplier, pickMoreAggressiveIntent } from './ascension'
-import { CARD_DEFS, createCardInstance, resolveCard } from './cards'
+import { CARD_DEFS, createCardInstance, getUnlockedCollectibleCards, resolveCard } from './cards'
 import type { CardInstance, PlayerState } from './state'
 import { Engine, createDummyEnemy, createSimplePlayer } from './engine'
 import { RNG } from './rng'
 import { createEnemyFromSpec, rollEngineIntentForEnemy } from './enemies'
-import { applyRelicAcquisition, blocksPotionGain, getCardRewardChoiceCount, getCombatRelicBonuses, getMerchantRemoveBaseCost, getPostCombatHeal, getRelicEnergyBonus, getRelicState, getShopPriceMultiplier } from './relics'
+import { applyRelicAcquisition, blocksPotionGain, getCardRewardChoiceCount, getCombatRelicBonuses, getMerchantRemoveBaseCost, getPostCombatHeal, getRelicEnergyBonus, getRelicState, getShopPriceMultiplier, getUnlockedRelicPool } from './relics'
 import { generateRewardBundle } from './rewards'
-import { clampAscension, getSelectableAscensions, unlockNextAscension } from './meta'
+import { clampAscension, getEffectiveUnlockedCardIds, getEffectiveUnlockedRelicIds, getSelectableAscensions, grantNextIroncladUnlock, unlockNextAscension } from './meta'
 import { createNewRun, obtainCurse } from './run'
 import { applyNeowOption, getNeowRareCardChoices, getRandomNeowRelic, rollNeowOptions } from './neow'
 import { generateEncounter } from './encounters'
@@ -54,7 +54,7 @@ describe('deferred card systems', () => {
     })
 
     it('unlocks ascensions sequentially and clamps progression at a10', () => {
-        const meta = { bestAscensionUnlocked: 0, totalWins: 0, totalRuns: 0 }
+        const meta = { bestAscensionUnlocked: 0, totalWins: 0, totalRuns: 0, ironcladUnlockTier: 0, unlockedCardIds: [], unlockedRelicIds: [] }
 
         expect(getSelectableAscensions(meta)).toEqual([0])
         expect(unlockNextAscension(meta, 0)).toBe(true)
@@ -65,16 +65,46 @@ describe('deferred card systems', () => {
         expect(clampAscension(14)).toBe(10)
     })
 
+    it('starts with the base unlock pool and grants ironclad tiers sequentially', () => {
+        const meta = { bestAscensionUnlocked: 0, totalWins: 0, totalRuns: 0, ironcladUnlockTier: 0, unlockedCardIds: [], unlockedRelicIds: [] }
+
+        expect(getEffectiveUnlockedCardIds(meta).has('CLEAVE')).toBe(true)
+        expect(getEffectiveUnlockedCardIds(meta).has('ARMAMENTS')).toBe(false)
+        expect(getEffectiveUnlockedRelicIds(meta).has('ANCHOR')).toBe(true)
+        expect(getEffectiveUnlockedRelicIds(meta).has('STRAWBERRY')).toBe(false)
+
+        const bundle = grantNextIroncladUnlock(meta)
+        expect(bundle?.tier).toBe(1)
+        expect(meta.ironcladUnlockTier).toBe(1)
+        expect(getEffectiveUnlockedCardIds(meta).has('ARMAMENTS')).toBe(true)
+        expect(getEffectiveUnlockedRelicIds(meta).has('STRAWBERRY')).toBe(true)
+    })
+
     it('rolls deterministic neow options and applies rewards', () => {
         const run = createNewRun('neow-seed')
+        const meta = {
+            bestAscensionUnlocked: 0,
+            totalWins: 0,
+            totalRuns: 0,
+            ironcladUnlockTier: 0,
+            unlockedCardIds: [],
+            unlockedRelicIds: [],
+        }
+        grantNextIroncladUnlock(meta)
+        grantNextIroncladUnlock(meta)
+        grantNextIroncladUnlock(meta)
+        grantNextIroncladUnlock(meta)
+        grantNextIroncladUnlock(meta)
+        grantNextIroncladUnlock(meta)
         const options = rollNeowOptions(run.neowSeed)
         const rerolled = rollNeowOptions(run.neowSeed)
-        const relicId = getRandomNeowRelic(`${run.neowSeed}-GAIN_COMMON_RELIC_REGRET`, run)
-        const rareChoices = getNeowRareCardChoices(`${run.neowSeed}-GAIN_RARE_CARD_PAIN`)
+        const relicId = getRandomNeowRelic(`${run.neowSeed}-GAIN_COMMON_RELIC_REGRET`, run, meta)
+        const rareChoices = getNeowRareCardChoices(`${run.neowSeed}-GAIN_RARE_CARD_PAIN`, meta)
 
         expect(options.map(option => option.id)).toEqual(rerolled.map(option => option.id))
         expect(options.filter(option => option.category === 'benefit')).toHaveLength(2)
         expect(options.filter(option => option.category === 'tradeoff')).toHaveLength(2)
+        expect(rareChoices.every(cardId => getEffectiveUnlockedCardIds(meta).has(cardId))).toBe(true)
 
         applyNeowOption(run, 'GAIN_COMMON_RELIC_REGRET', { rewardRelicId: relicId })
         expect(run.relics).toContain(relicId)
@@ -514,7 +544,15 @@ describe('deferred card systems', () => {
     })
 
     it('keeps status cards out of collectible pools and reward bundles', () => {
-        const rewards = generateRewardBundle('reward-seed', 'elite', ['BURNING_BLOOD'])
+        const meta = {
+            bestAscensionUnlocked: 0,
+            totalWins: 0,
+            totalRuns: 0,
+            ironcladUnlockTier: 0,
+            unlockedCardIds: [],
+            unlockedRelicIds: [],
+        }
+        const rewards = generateRewardBundle('reward-seed', 'elite', ['BURNING_BLOOD'], meta)
         const rewardCards = rewards.items.find(item => item.kind === 'cards')
 
         expect(CARD_DEFS.WOUND.poolEnabled).toBe(false)
@@ -526,7 +564,15 @@ describe('deferred card systems', () => {
 
     it('computes combat relic bonuses and reward bundles', () => {
         const bonuses = getCombatRelicBonuses(['BURNING_BLOOD', 'ANCHOR', 'LANTERN', 'BRONZE_SCALES', 'PRESERVED_INSECT'], 'elite')
-        const rewards = generateRewardBundle('reward-seed-2', 'elite', ['BURNING_BLOOD'])
+        const meta = {
+            bestAscensionUnlocked: 0,
+            totalWins: 0,
+            totalRuns: 0,
+            ironcladUnlockTier: 0,
+            unlockedCardIds: [],
+            unlockedRelicIds: [],
+        }
+        const rewards = generateRewardBundle('reward-seed-2', 'elite', ['BURNING_BLOOD'], meta)
 
         expect(bonuses.startingBlock).toBe(10)
         expect(bonuses.energyBonus).toBe(1)
@@ -536,9 +582,36 @@ describe('deferred card systems', () => {
         expect(rewards.items.some(item => item.kind === 'cards')).toBe(true)
     })
 
+    it('keeps rewards and relic pools within the unlocked content', () => {
+        const meta = {
+            bestAscensionUnlocked: 0,
+            totalWins: 0,
+            totalRuns: 0,
+            ironcladUnlockTier: 0,
+            unlockedCardIds: [],
+            unlockedRelicIds: [],
+        }
+        const rewards = generateRewardBundle('unlock-reward', 'elite', ['BURNING_BLOOD'], meta)
+        const rewardCards = rewards.items.find(item => item.kind === 'cards')
+        const rewardRelic = rewards.items.find(item => item.kind === 'relic')
+
+        const unlockedCards = new Set(getUnlockedCollectibleCards(meta))
+        const unlockedRelics = new Set(getUnlockedRelicPool(meta))
+        expect(rewardCards && rewardCards.kind === 'cards' && rewardCards.choices.every(cardId => unlockedCards.has(cardId))).toBe(true)
+        expect(rewardRelic && rewardRelic.kind === 'relic' && unlockedRelics.has(rewardRelic.relicId)).toBe(true)
+    })
+
     it('applies ascension hallway gold, shop, and map modifiers', () => {
         const ascRun = createNewRun('asc-run', 8)
-        const hallwayRewards = generateRewardBundle('a4-reward', 'hallway', ascRun, { roomKind: 'monster' })
+        const meta = {
+            bestAscensionUnlocked: 0,
+            totalWins: 0,
+            totalRuns: 0,
+            ironcladUnlockTier: 0,
+            unlockedCardIds: [],
+            unlockedRelicIds: [],
+        }
+        const hallwayRewards = generateRewardBundle('a4-reward', 'hallway', ascRun, meta, { roomKind: 'monster' })
         const map = generateMap('a6-map', 1, 15, 7, 6)
         const eliteCount = map.nodes.filter(node => node.kind === 'elite').length
 
@@ -572,12 +645,28 @@ describe('deferred card systems', () => {
         expect(getCardRewardChoiceCount(['BUSTED_CROWN'])).toBe(1)
         expect(getRelicEnergyBonus(['SOZU', 'BUSTED_CROWN'])).toBe(2)
 
-        const bossRewards = generateRewardBundle('boss-seed', 'boss', ['BLACK_BLOOD'])
+        const meta = {
+            bestAscensionUnlocked: 0,
+            totalWins: 0,
+            totalRuns: 0,
+            ironcladUnlockTier: 0,
+            unlockedCardIds: [],
+            unlockedRelicIds: [],
+        }
+        const bossRewards = generateRewardBundle('boss-seed', 'boss', ['BLACK_BLOOD'], meta)
         expect(bossRewards.items.some(item => item.kind === 'boss_relics')).toBe(true)
     })
 
     it('omits potion rewards when sozu is owned', () => {
-        const rewards = Array.from({ length: 8 }, (_, index) => generateRewardBundle(`sozu-${index}`, 'elite', ['SOZU']))
+        const meta = {
+            bestAscensionUnlocked: 0,
+            totalWins: 0,
+            totalRuns: 0,
+            ironcladUnlockTier: 0,
+            unlockedCardIds: [],
+            unlockedRelicIds: [],
+        }
+        const rewards = Array.from({ length: 8 }, (_, index) => generateRewardBundle(`sozu-${index}`, 'elite', ['SOZU'], meta))
         expect(rewards.every(bundle => bundle.items.every(item => item.kind !== 'potion'))).toBe(true)
     })
 
@@ -611,26 +700,44 @@ describe('deferred card systems', () => {
 
         expect(getEventPool(1)).toContain(eventId)
 
-        resolveEventChoice(run, 'GOLDEN_IDOL', 'GOLDEN_IDOL_TAKE', 'idol-seed')
+        const meta = {
+            bestAscensionUnlocked: 0,
+            totalWins: 0,
+            totalRuns: 0,
+            ironcladUnlockTier: 0,
+            unlockedCardIds: [],
+            unlockedRelicIds: [],
+        }
+
+        resolveEventChoice(run, meta, 'GOLDEN_IDOL', 'GOLDEN_IDOL_TAKE', 'idol-seed')
         expect(run.gold).toBe(199)
         expect(run.deck.some(card => card.defId === 'INJURY')).toBe(true)
 
         const secondRun = createNewRun('event-seed-2')
-        resolveEventChoice(secondRun, 'BIG_FISH', 'BIG_FISH_BOX', 'fish-seed')
+        resolveEventChoice(secondRun, meta, 'BIG_FISH', 'BIG_FISH_BOX', 'fish-seed')
         expect(secondRun.relics.length).toBeGreaterThan(1)
         expect(secondRun.deck.some(card => card.defId === 'REGRET')).toBe(true)
     })
 
     it('supports transform events deterministically and act two event pools', () => {
         const run = createNewRun('transform-seed')
+        const meta = {
+            bestAscensionUnlocked: 0,
+            totalWins: 0,
+            totalRuns: 0,
+            ironcladUnlockTier: 0,
+            unlockedCardIds: [],
+            unlockedRelicIds: [],
+        }
         const original = run.deck[0]
-        const transformed = transformCard(run, original.instanceId, 'living-wall-seed')
+        const transformed = transformCard(run, meta, original.instanceId, 'living-wall-seed')
 
         expect(transformed).toBeDefined()
         expect(transformed?.defId).not.toBe(original.defId)
         expect(transformed?.upgradeLevel).toBe(0)
         expect(CARD_DEFS[transformed!.defId].type).not.toBe('status')
         expect(CARD_DEFS[transformed!.defId].type).not.toBe('curse')
+        expect(getEffectiveUnlockedCardIds(meta).has(transformed!.defId)).toBe(true)
         expect(getEventPool(2)).toEqual(['CLERIC', 'UPGRADE_SHRINE', 'FORGOTTEN_ALTAR', 'THE_MAUSOLEUM', 'BEGGAR'])
     })
 })

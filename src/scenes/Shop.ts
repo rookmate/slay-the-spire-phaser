@@ -1,9 +1,11 @@
 import Phaser from 'phaser'
+import { getUnlockedCollectibleCards } from '../core/cards'
+import { loadMeta, type MetaState } from '../core/meta'
 import type { RunState, RelicId } from '../core/run'
 import { removeCardByInstanceId, saveRun } from '../core/run'
 import { RNG } from '../core/rng'
 import { CARD_DEFS, createCardInstance, isCurseCard, resolveCard } from '../core/cards'
-import { MVP_RELIC_POOL, RELIC_DEFS, applyRelicAcquisition, canObtainPotion, getMerchantRemoveBaseCost, getShopPriceMultiplier } from '../core/relics'
+import { RELIC_DEFS, applyRelicAcquisition, canObtainPotion, getMerchantRemoveBaseCost, getShopPriceMultiplier, getUnlockedRelicPool } from '../core/relics'
 import { POTION_DEFS, type PotionId } from '../core/potions'
 import { Card } from '../ui/Card'
 import { DeckSelectionOverlay } from '../ui/DeckSelectionOverlay'
@@ -18,6 +20,7 @@ export class ShopScene extends Phaser.Scene {
     run!: RunState
     private inventory!: ShopInventory
     private selector!: DeckSelectionOverlay
+    private meta!: MetaState
 
     constructor() {
         super('Shop')
@@ -25,6 +28,7 @@ export class ShopScene extends Phaser.Scene {
 
     create(data: { run: RunState }): void {
         this.run = data.run
+        this.meta = loadMeta()
         this.selector = new DeckSelectionOverlay(this)
         this.inventory = this.generateInventory()
         this.render()
@@ -88,7 +92,7 @@ export class ShopScene extends Phaser.Scene {
                 if (this.run.gold < relicCost) return
                 this.run.gold -= relicCost
                 applyRelicAcquisition(this.run, this.inventory.relic)
-                this.inventory.relic = MVP_RELIC_POOL.find(id => !this.run.relics.includes(id)) ?? this.inventory.relic
+                this.inventory.relic = getUnlockedRelicPool(this.meta).find(id => !this.run.relics.includes(id)) ?? this.inventory.relic
                 saveRun(this.run)
                 this.render()
             })
@@ -158,14 +162,15 @@ export class ShopScene extends Phaser.Scene {
             ...this.pickCards(rng, 'uncommon', 1),
             ...this.pickCards(rng, 'rare', 1),
         ]
-        const relicPool = MVP_RELIC_POOL.filter(id => !this.run.relics.includes(id))
-        const relic = relicPool.length > 0 ? relicPool[rng.int(0, relicPool.length - 1)] : MVP_RELIC_POOL[rng.int(0, MVP_RELIC_POOL.length - 1)]
+        const relicPool = getUnlockedRelicPool(this.meta).filter(id => !this.run.relics.includes(id))
+        const relicSource = relicPool.length > 0 ? relicPool : getUnlockedRelicPool(this.meta)
+        const relic = relicSource[rng.int(0, relicSource.length - 1)]
         const potions = [this.pickPotion(rng), this.pickPotion(rng)]
         return { cards, relic, potions }
     }
 
     private pickCards(rng: RNG, rarity: 'common' | 'uncommon' | 'rare', count: number): string[] {
-        const pool = Object.values(CARD_DEFS).filter(card => card.poolEnabled && card.rarity === rarity).map(card => card.id)
+        const pool = getUnlockedCollectibleCards(this.meta, rarity)
         const picked = new Set<string>()
         while (picked.size < Math.min(count, pool.length)) {
             picked.add(pool[rng.int(0, pool.length - 1)])

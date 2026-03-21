@@ -1,12 +1,14 @@
 import Phaser from 'phaser'
 import { canUpgradeCard, resolveCard } from '../core/cards'
 import { EVENT_DEFS, generateEvent, resolveEventChoice, type EventChoiceDef, type EventId } from '../core/events'
+import { loadMeta, type MetaState } from '../core/meta'
 import { getRelicDisplayName } from '../core/relics'
 import { saveRun, type RunState } from '../core/run'
 import { DeckSelectionOverlay } from '../ui/DeckSelectionOverlay'
 
 export class EventScene extends Phaser.Scene {
     run!: RunState
+    private meta!: MetaState
     private selector!: DeckSelectionOverlay
     private eventId!: EventId
     private feedbackText?: Phaser.GameObjects.Text
@@ -17,6 +19,7 @@ export class EventScene extends Phaser.Scene {
 
     create(data: { run: RunState }): void {
         this.run = data.run
+        this.meta = loadMeta()
         this.selector = new DeckSelectionOverlay(this)
         this.eventId = generateEvent(this.run.act, `${this.run.seed}-event-${this.run.mapProgress?.currentNodeId ?? this.run.floor}`)
         this.render()
@@ -112,6 +115,7 @@ export class EventScene extends Phaser.Scene {
     private applyChoice(choiceId: EventChoiceDef['id'], selection?: { cardInstanceId?: string }): void {
         const result = resolveEventChoice(
             this.run,
+            this.meta,
             this.eventId,
             choiceId,
             `${this.run.seed}-event-resolution-${this.run.mapProgress?.currentNodeId ?? this.run.floor}-${choiceId}`,

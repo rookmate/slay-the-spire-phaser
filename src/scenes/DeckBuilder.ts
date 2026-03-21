@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
 import { CARD_DEFS, createCardInstance } from '../core/cards'
+import { getEffectiveUnlockedCardIds, loadMeta } from '../core/meta'
 import type { RunState } from '../core/run'
 // import { saveRun } from '../core/run'
 import { Card } from '../ui/Card'
@@ -13,6 +14,8 @@ export class DeckBuilderScene extends Phaser.Scene {
 
     create(data: { run: RunState }): void {
         this.run = data.run
+        const meta = loadMeta()
+        const unlockedCards = getEffectiveUnlockedCardIds(meta)
         const style = { fontFamily: 'monospace', fontSize: '16px', color: '#ffffff' }
         this.add.text(16, 16, 'Card Library', {
             fontFamily: 'monospace', fontSize: '18px', color: '#ffffff',
@@ -31,7 +34,12 @@ export class DeckBuilderScene extends Phaser.Scene {
             const col = i % cols
             const row = Math.floor(i / cols)
             const card = createCardInstance(id)
-            const view = new Card(this, card, { x: 16 + col * colW, y: row * rowHCard, scale: 1 })
+            const view = new Card(this, card, {
+                x: 16 + col * colW,
+                y: row * rowHCard,
+                scale: 1,
+                locked: !unlockedCards.has(id),
+            })
             this.list.add(view)
         })
         const totalRows = Math.ceil(keys.length / cols)
@@ -51,4 +59,3 @@ export class DeckBuilderScene extends Phaser.Scene {
 
     // No finish method; read-only library
 }
-

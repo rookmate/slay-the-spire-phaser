@@ -1,5 +1,6 @@
-import { CARD_DEFS, canUpgradeCard, createCardInstance } from './cards'
-import { MVP_RELIC_POOL, RELIC_DEFS, applyRelicAcquisition } from './relics'
+import { CARD_DEFS, canUpgradeCard, createCardInstance, getUnlockedCollectibleCards } from './cards'
+import type { MetaState } from './meta'
+import { getUnlockedRelicPool, applyRelicAcquisition } from './relics'
 import { RNG } from './rng'
 import type { CardInstance } from './state'
 import type { RelicId, RunState } from './run'
@@ -226,33 +227,34 @@ export function generateEvent(act: 1 | 2, seed: string): EventId {
     return pool[rng.int(0, pool.length - 1)]
 }
 
-function drawCommonRelic(run: RunState, seed: string): RelicId {
+function drawCommonRelic(run: RunState, meta: MetaState, seed: string): RelicId {
     const rng = new RNG(`${seed}-relic`)
-    const commonPool = MVP_RELIC_POOL.filter(id => RELIC_DEFS[id].rarity === 'common')
+    const commonPool = getUnlockedRelicPool(meta, 'common')
     const available = commonPool.filter(id => !run.relics.includes(id))
     const pool = available.length > 0 ? available : commonPool
     return pool[rng.int(0, pool.length - 1)]
 }
 
-export function transformCard(run: RunState, instanceId: string, seed: string): CardInstance | undefined {
+export function transformCard(run: RunState, meta: MetaState, instanceId: string, seed: string): CardInstance | undefined {
     const existing = run.deck.find(card => card.instanceId === instanceId)
     if (!existing) return undefined
     const rarity = CARD_DEFS[existing.defId]?.rarity
-    const collectible = Object.values(CARD_DEFS).filter(card => card.poolEnabled && card.type !== 'status' && card.type !== 'curse')
-    const sameRarity = collectible.filter(card => card.rarity === rarity && card.id !== existing.defId)
-    const pool = sameRarity.length > 0 ? sameRarity : collectible.filter(card => card.id !== existing.defId)
+    const collectible = getUnlockedCollectibleCards(meta)
+    const sameRarity = getUnlockedCollectibleCards(meta, rarity).filter(cardId => cardId !== existing.defId)
+    const pool = sameRarity.length > 0 ? sameRarity : collectible.filter(cardId => cardId !== existing.defId)
     if (pool.length === 0) return undefined
     const rng = new RNG(`${seed}-transform`)
     const replacement = pool[rng.int(0, pool.length - 1)]
     const index = run.deck.findIndex(card => card.instanceId === instanceId)
     if (index < 0) return undefined
-    const transformed = createCardInstance(replacement.id)
+    const transformed = createCardInstance(replacement)
     run.deck[index] = transformed
     return transformed
 }
 
 export function resolveEventChoice(
     run: RunState,
+    meta: MetaState,
     eventId: EventId,
     choiceId: EventChoiceId,
     seed: string,
@@ -313,7 +315,7 @@ export function resolveEventChoice(
         return { notes }
     }
     if (choiceId === 'BIG_FISH_BOX') {
-        const relicId = drawCommonRelic(run, seed)
+        const relicId = drawCommonRelic(run, meta, seed)
         applyRelicAcquisition(run, relicId)
         obtainCurse(run, 'REGRET')
         notes.push(`Obtained ${relicId}.`, 'Obtained Regret.')
@@ -333,7 +335,7 @@ export function resolveEventChoice(
     }
     if (choiceId === 'SCRAP_OOZE_SEARCH') {
         run.player.hp = Math.max(1, run.player.hp - 5)
-        const relicId = drawCommonRelic(run, seed)
+        const relicId = drawCommonRelic(run, meta, seed)
         applyRelicAcquisition(run, relicId)
         notes.push('Lost 5 HP.', `Obtained ${relicId}.`)
         return { grantedRelicId: relicId, notes }
@@ -344,7 +346,7 @@ export function resolveEventChoice(
         return { removedCardInstanceId: selection.cardInstanceId, notes }
     }
     if (choiceId === 'LIVING_WALL_CHANGE' && selection?.cardInstanceId) {
-        const transformed = transformCard(run, selection.cardInstanceId, seed)
+        const transformed = transformCard(run, meta, selection.cardInstanceId, seed)
         if (transformed) notes.push(`Transformed into ${transformed.defId}.`)
         return { transformedFromInstanceId: selection.cardInstanceId, transformedCard: transformed, notes }
     }
@@ -375,7 +377,7 @@ export function resolveEventChoice(
         return { notes }
     }
     if (choiceId === 'THE_MAUSOLEUM_OPEN') {
-        const relicId = drawCommonRelic(run, seed)
+        const relicId = drawCommonRelic(run, meta, seed)
         applyRelicAcquisition(run, relicId)
         notes.push(`Obtained ${relicId}.`)
         if (rng.random() < 0.5) {

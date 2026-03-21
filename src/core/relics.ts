@@ -1,5 +1,7 @@
 import type { RoomKind } from './map'
 import type { Engine } from './engine'
+import type { MetaState } from './meta'
+import { getEffectiveUnlockedRelicIds } from './meta'
 import type { CombatState } from './state'
 import { getAscensionMerchantRemoveBaseCost, getAscensionShopPriceMultiplier } from './ascension'
 import type { RelicId, RelicStateEntry, RunState } from './run'
@@ -347,4 +349,18 @@ export function getRelicDisplayName(run: Pick<RunState, 'relicState'>, relicId: 
     const charges = run.relicState?.[relicId]?.charges
     if (typeof charges === 'number') return `${def.name} (${charges})`
     return def.name
+}
+
+export function isRelicUnlocked(meta: MetaState, relicId: RelicId): boolean {
+    if (RELIC_DEFS[relicId].rarity === 'boss') return true
+    return getEffectiveUnlockedRelicIds(meta).has(relicId)
+}
+
+export function getUnlockedRelicPool(meta: MetaState, rarity?: RelicDef['rarity']): RelicId[] {
+    const unlocked = getEffectiveUnlockedRelicIds(meta)
+    return Object.keys(RELIC_DEFS)
+        .map(id => id as RelicId)
+        .filter(id => RELIC_DEFS[id].rarity !== 'starter')
+        .filter(id => rarity ? RELIC_DEFS[id].rarity === rarity : RELIC_DEFS[id].rarity !== 'boss')
+        .filter(id => RELIC_DEFS[id].rarity === 'boss' || unlocked.has(id))
 }

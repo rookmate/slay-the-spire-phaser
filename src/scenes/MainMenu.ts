@@ -1,6 +1,7 @@
 import Phaser from 'phaser'
 import { createNewRun, loadRun, saveRun, /*type RunState */ } from '../core/run'
 import { /*getDailySeed, */getSelectableAscensions, loadMeta } from '../core/meta'
+import { IRONCLAD_UNLOCK_TRACK } from '../core/unlocks'
 import { getAscensionLabel } from '../core/ascension'
 
 export class MainMenuScene extends Phaser.Scene {
@@ -13,6 +14,11 @@ export class MainMenuScene extends Phaser.Scene {
         let ascension = selectableAscensions[0] ?? 0
         this.add.text(16, 16, 'Slay the Spire (Phaser) - Main Menu', style)
         this.add.text(16, 50, `Ascension unlocked: ${meta.bestAscensionUnlocked}`, style)
+        this.add.text(16, 74, `Ironclad unlock tier: ${meta.ironcladUnlockTier}/${IRONCLAD_UNLOCK_TRACK.length}`, {
+            fontFamily: 'monospace',
+            fontSize: '18px',
+            color: '#cccccc',
+        })
 
         this.add.text(16, 100, 'Continue', { ...style, backgroundColor: '#333', padding: { x: 8, y: 6 } })
             .setInteractive({ useHandCursor: true })

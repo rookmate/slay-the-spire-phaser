@@ -4,6 +4,7 @@ import { Engine, createPlayerFromDeck } from '../core/engine'
 import { RNG } from '../core/rng'
 import { createEnemyFromSpec, rollEngineIntentForEnemy } from '../core/enemies'
 import { generateEncounter } from '../core/encounters'
+import { loadMeta } from '../core/meta'
 import type { RunState } from '../core/run'
 import { saveRun } from '../core/run'
 import { CombatUI } from '../ui/CombatUI'
@@ -17,6 +18,7 @@ export class CombatScene extends Phaser.Scene {
     private ui!: CombatUI
     private run!: RunState
     private roomKind: RoomKind = 'monster'
+    private meta = loadMeta()
 
     constructor() {
         super('Combat')
@@ -25,6 +27,7 @@ export class CombatScene extends Phaser.Scene {
     create(data: { run: RunState; roomKind?: RoomKind }): void {
         this.run = data.run
         this.roomKind = data.roomKind ?? 'monster'
+        this.meta = loadMeta()
         const seed = this.run.seed
         const act = this.run.act
         const player = createPlayerFromDeck(seed, this.run.deck, this.run.player.hp, this.run.player.maxHp)
@@ -133,7 +136,7 @@ export class CombatScene extends Phaser.Scene {
                 return
             }
             const sourceBossId = this.engine.state.enemies[0]?.specId ?? 'BOSS'
-            const bossRewards = generateRewardBundle(`${this.run.seed}-boss-relics-act-${this.run.act}-floor-${this.run.floor}`, 'boss', this.run, { roomKind: 'boss' })
+            const bossRewards = generateRewardBundle(`${this.run.seed}-boss-relics-act-${this.run.act}-floor-${this.run.floor}`, 'boss', this.run, this.meta, { roomKind: 'boss' })
             const bossRelicChoices = bossRewards.items.find(item => item.kind === 'boss_relics')
             this.run.bossRelicChoicePending = {
                 sourceBossId,
@@ -147,7 +150,7 @@ export class CombatScene extends Phaser.Scene {
 
         saveRun(this.run)
         const nodeId = this.run.mapProgress?.currentNodeId ?? `floor-${this.run.floor}`
-        const rewards = generateRewardBundle(`${this.run.seed}-reward-${nodeId}-${this.roomKind}`, this.getEncounterTier(), this.run, { roomKind: this.roomKind, asc: this.run.asc })
+        const rewards = generateRewardBundle(`${this.run.seed}-reward-${nodeId}-${this.roomKind}`, this.getEncounterTier(), this.run, this.meta, { roomKind: this.roomKind, asc: this.run.asc })
         this.scene.start('Rewards', { run: this.run, rewards })
     }
 

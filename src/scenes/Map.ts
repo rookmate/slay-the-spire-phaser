@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
 import { getAscensionLabel } from '../core/ascension'
+import { loadMeta } from '../core/meta'
 import type { RunState } from '../core/run'
 import { saveRun } from '../core/run'
 import { RNG } from '../core/rng'
@@ -11,6 +12,7 @@ export class MapScene extends Phaser.Scene {
     run!: RunState
     gmap!: GeneratedMap
     unknownWeights = defaultUnknownWeights()
+    private meta = loadMeta()
     private currentNodeId?: string
     private mapLayer!: Phaser.GameObjects.Container
     private contentHeight = 0
@@ -24,6 +26,7 @@ export class MapScene extends Phaser.Scene {
 
     create(data: { run: RunState }): void {
         this.run = data.run
+        this.meta = loadMeta()
         const style = { fontFamily: 'monospace', fontSize: '18px', color: '#ffffff' }
         this.add.text(16, 16, `Floor ${this.run.floor}  HP ${this.run.player.hp}/${this.run.player.maxHp}  Gold ${this.run.gold}`, style)
         this.add.text(16, 40, `Relics: ${this.run.relics.map(id => getRelicDisplayName(this.run, id)).join(', ') || 'None'}  Potions: ${this.run.potions.length}/${this.run.maxPotionSlots}`, {
@@ -99,7 +102,7 @@ export class MapScene extends Phaser.Scene {
             if (outcome === 'chest') {
                 this.scene.start('Rewards', {
                     run: this.run,
-                    rewards: generateRewardBundle(`${this.run.seed}-reward-${node.id}-unknown-chest`, 'chest', this.run, { roomKind: 'chest', asc: this.run.asc }),
+                    rewards: generateRewardBundle(`${this.run.seed}-reward-${node.id}-unknown-chest`, 'chest', this.run, this.meta, { roomKind: 'chest', asc: this.run.asc }),
                 })
                 return
             }
@@ -112,7 +115,7 @@ export class MapScene extends Phaser.Scene {
         if (kind === 'chest') {
             this.scene.start('Rewards', {
                 run: this.run,
-                rewards: generateRewardBundle(`${this.run.seed}-reward-${node.id}-chest`, 'chest', this.run, { roomKind: 'chest', asc: this.run.asc }),
+                rewards: generateRewardBundle(`${this.run.seed}-reward-${node.id}-chest`, 'chest', this.run, this.meta, { roomKind: 'chest', asc: this.run.asc }),
             })
             return
         }
