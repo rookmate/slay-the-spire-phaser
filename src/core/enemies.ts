@@ -664,6 +664,7 @@ export function createEnemyFromSpec(rng: RNG, key: keyof typeof ENEMIES, id: str
         victory: false,
         defeat: false,
         limbo: [],
+        cardRuntime: {},
     }))
     return enemy
 }

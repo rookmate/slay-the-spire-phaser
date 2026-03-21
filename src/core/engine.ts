@@ -7,6 +7,7 @@ import {
     createRelicCombatContext,
     modifyAttackDamageFromRelics,
     triggerRelicAttackPlayed,
+    triggerRelicCardExhausted,
     triggerRelicCombatStart,
     triggerRelicPlayerHpLost,
     triggerRelicPlayerTurnEnd,
@@ -52,6 +53,7 @@ export class Engine {
     private pendingChoice?: InternalPendingChoice
     private run?: RunState
     private relicRuntime: Partial<Record<RelicId, RelicCombatRuntimeEntry>> = {}
+    private resolvingCardInstanceId?: string
 
     constructor(seed: string, player: PlayerState, enemies: EnemyState[], opts?: { asc?: number; run?: RunState }) {
         this.rng = new RNG(seed)
@@ -62,12 +64,22 @@ export class Engine {
             victory: false,
             defeat: false,
             limbo: [],
+            cardRuntime: {},
         }
         this.ascension = opts?.asc ?? 0
         this.run = opts?.run
     }
 
     enqueue(a: Action): void {
+        if (
+            (a.kind === 'DealDamage' || a.kind === 'DealMultiDamage')
+            && a.source === this.state.player.id
+            && !a.sourceCardInstanceId
+            && this.resolvingCardInstanceId
+        ) {
+            this.queue.push({ ...a, sourceCardInstanceId: this.resolvingCardInstanceId })
+            return
+        }
         this.queue.push(a)
     }
 
@@ -179,6 +191,50 @@ export class Engine {
         return created
     }
 
+    copyCardToHand(instanceId: string, count = 1): CardInstance[] {
+        const source = [
+            ...this.state.player.hand,
+            ...this.state.player.discardPile,
+            ...this.state.player.exhaustPile,
+            ...(this.activeLimbo ? [this.activeLimbo.card] : []),
+        ].find(card => card.instanceId === instanceId)
+        if (!source) return []
+        const created: CardInstance[] = []
+        for (let i = 0; i < count; i++) {
+            const copy = createCardInstance(source.defId, source.upgradeLevel)
+            this.state.player.hand.push(copy)
+            created.push(copy)
+        }
+        return created
+    }
+
+    exhaustCardsInHand(predicate: (card: CardInstance) => boolean): CardInstance[] {
+        const exhausted: CardInstance[] = []
+        const kept: CardInstance[] = []
+        for (const card of this.state.player.hand) {
+            if (predicate(card)) exhausted.push(card)
+            else kept.push(card)
+        }
+        this.state.player.hand = kept
+        for (const card of exhausted) this.handleExhaust(card)
+        return exhausted
+    }
+
+    getCombatCardRuntime(instanceId: string): { bonusDamage?: number; triggered?: boolean } {
+        this.state.cardRuntime[instanceId] ??= {}
+        return this.state.cardRuntime[instanceId]
+    }
+
+    getCardCombatBonusDamage(instanceId: string): number {
+        return this.getCombatCardRuntime(instanceId).bonusDamage ?? 0
+    }
+
+    modifyCardCombatBonusDamage(instanceId: string, delta: number): number {
+        const runtime = this.getCombatCardRuntime(instanceId)
+        runtime.bonusDamage = (runtime.bonusDamage ?? 0) + delta
+        return runtime.bonusDamage
+    }
+
     spawnEnemies(enemies: EnemyState[]): void {
         const openSlots = Math.max(0, 5 - this.countLivingEnemies())
         if (openSlots <= 0) return
@@ -264,6 +320,7 @@ export class Engine {
                     if (weakStacks > 0) damage = Math.round(damage * 0.75)
                 }
                 damage = this.modifyIncomingDamage(target, damage, action.damageType ?? 'attack')
+                damage = Math.max(0, damage)
                 const blockUsed = Math.min(target.block, damage)
                 target.block -= blockUsed
                 const actualDamage = Math.max(0, damage - blockUsed)
@@ -290,6 +347,7 @@ export class Engine {
                 if ('name' in target) onEnemyDamaged(this, target, actualDamage)
                 if ('name' in target && source?.id === this.state.player.id && (action.damageType ?? 'attack') === 'attack') {
                     onEnemyHitByPlayerAttack(this, target, actualDamage)
+                    if (target.hp <= 0 && action.sourceCardInstanceId) this.onEnemyKilledByCard(action.sourceCardInstanceId, target.id)
                 }
 
                 if (source && action.damageType !== 'thorns') {
@@ -304,7 +362,14 @@ export class Engine {
             }
             case 'DealMultiDamage': {
                 for (let i = 0; i < action.hits; i++) {
-                    this.enqueue({ kind: 'DealDamage', source: action.source, target: action.target, amount: action.amount, damageType: action.damageType })
+                    this.enqueue({
+                        kind: 'DealDamage',
+                        source: action.source,
+                        target: action.target,
+                        amount: action.amount,
+                        damageType: action.damageType,
+                        sourceCardInstanceId: action.sourceCardInstanceId,
+                    })
                 }
                 break
             }
@@ -322,8 +387,12 @@ export class Engine {
             case 'GainBlock': {
                 const target = this.getEntity(action.target)
                 if (!target) break
-                target.block += action.amount
-                evts.push({ kind: 'BlockGained', target: action.target, amount: action.amount, resultingBlock: target.block })
+                const dexterity = target === this.state.player
+                    ? this.state.player.powers.find(power => power.id === 'DEXTERITY')?.stacks ?? 0
+                    : 0
+                const amount = Math.max(0, action.amount + dexterity)
+                target.block += amount
+                evts.push({ kind: 'BlockGained', target: action.target, amount, resultingBlock: target.block })
                 if (target === this.state.player) {
                     const juggernaut = this.state.player.powers.find(power => power.id === 'JUGGERNAUT')?.stacks ?? 0
                     if (juggernaut > 0) {
@@ -342,6 +411,7 @@ export class Engine {
                 const current = target.powers.find(power => power.id === action.powerId)
                 if (current) current.stacks += action.stacks
                 else target.powers.push({ id: action.powerId, stacks: action.stacks } as PowerInstance)
+                if (current && current.stacks === 0) target.powers = target.powers.filter(power => power !== current)
                 evts.push({ kind: 'PowerApplied', target: action.target, powerId: action.powerId, stacks: action.stacks })
                 break
             }
@@ -379,7 +449,7 @@ export class Engine {
                                 kind: 'DealDamage',
                                 source: enemy.id,
                                 target: this.state.player.id,
-                                amount: Math.round((enemy.intent.amount + enemyStrength) * this.getEnemyDamageMultiplier(enemy)),
+                                amount: Math.max(0, Math.round((enemy.intent.amount + enemyStrength) * this.getEnemyDamageMultiplier(enemy))),
                             })
                         } else if (enemy.intent?.kind === 'multi_attack') {
                             const enemyStrength = enemy.powers.find(power => power.id === 'STRENGTH')?.stacks ?? 0
@@ -387,7 +457,7 @@ export class Engine {
                                 kind: 'DealMultiDamage',
                                 source: enemy.id,
                                 target: this.state.player.id,
-                                amount: Math.round((enemy.intent.amount + enemyStrength) * this.getEnemyDamageMultiplier(enemy)),
+                                amount: Math.max(0, Math.round((enemy.intent.amount + enemyStrength) * this.getEnemyDamageMultiplier(enemy))),
                                 hits: enemy.intent.hits,
                             })
                         } else if (enemy.intent?.kind === 'block') {
@@ -501,6 +571,7 @@ export class Engine {
         if (resolved.type === 'attack' && this.run) {
             triggerRelicAttackPlayed(this.getRelicContext(), playedCard.instanceId)
         }
+        this.onPlayerCardPlayed(playedCard.instanceId, resolved.type)
 
         this.resolveActiveLimbo()
         for (const enemy of this.state.enemies) onPlayerCardPlayed(enemy, resolved.type)
@@ -520,6 +591,7 @@ export class Engine {
         if (feelNoPain > 0) this.enqueue({ kind: 'GainBlock', target: this.state.player.id, amount: feelNoPain * 3 })
         const darkEmbrace = this.state.player.powers.find(power => power.id === 'DARK_EMBRACE')?.stacks ?? 0
         if (darkEmbrace > 0) this.enqueue({ kind: 'DrawCards', count: darkEmbrace })
+        if (this.run) triggerRelicCardExhausted(this.getRelicContext(), card.instanceId)
     }
 
     computeDamage(target: EntityId, base: number): number {
@@ -533,12 +605,13 @@ export class Engine {
 
     modifyOutgoingAttackDamageFromPlayer(base: number, cardInstanceId?: string): number {
         let amount = base
+        if (cardInstanceId) amount += this.getCardCombatBonusDamage(cardInstanceId)
         const strength = this.state.player.powers.find(power => power.id === 'STRENGTH')?.stacks ?? 0
         amount += strength
         const weak = this.state.player.powers.find(power => power.id === 'WEAK')?.stacks ?? 0
         if (weak > 0) amount = Math.round(amount * 0.75)
         if (this.run && cardInstanceId) amount = modifyAttackDamageFromRelics(this.getRelicContext(), amount, cardInstanceId)
-        return amount
+        return Math.max(0, amount)
     }
 
     private resolveActiveLimbo(): void {
@@ -553,6 +626,7 @@ export class Engine {
             limbo.pendingChoiceStarter = undefined
             const def = CARD_DEFS[limbo.card.defId]
             const resolved = resolveCard(limbo.card)
+            this.resolvingCardInstanceId = limbo.card.instanceId
 
             if (def.onPlay) {
                 def.onPlay({
@@ -575,6 +649,7 @@ export class Engine {
                     this.enqueue({ kind: 'GainBlock', target: this.state.player.id, amount: resolved.baseBlock })
                 }
             }
+            this.resolvingCardInstanceId = undefined
 
             if (this.pendingChoice || limbo.pendingChoiceStarter) return
         }
@@ -631,6 +706,7 @@ export class Engine {
         const card = player.drawPile.shift()
         if (!card) return false
         player.hand.push(card)
+        this.onCardDrawn(card)
         return true
     }
 
@@ -676,7 +752,10 @@ export class Engine {
     private modifyIncomingDamage(target: PlayerState | EnemyState, amount: number, damageType: 'attack' | 'thorns'): number {
         const vulnerable = target.powers.find(power => power.id === 'VULNERABLE')?.stacks ?? 0
         let next = amount
-        if (vulnerable > 0) next = Math.round(next * 1.5)
+        if (vulnerable > 0) {
+            const vulnerableMultiplier = 'name' in target && this.run?.relics.includes('PAPER_FROG') && damageType === 'attack' ? 1.75 : 1.5
+            next = Math.round(next * vulnerableMultiplier)
+        }
         if ('name' in target && target.specId === 'BYRD' && damageType === 'attack' && target.aiState?.flying) {
             next = Math.min(next, 3)
         }
@@ -731,8 +810,58 @@ export class Engine {
 
     private onEndOfPlayerTurn(): void {
         if (this.run) triggerRelicPlayerTurnEnd(this.getRelicContext())
+        const strengthDown = this.state.player.powers.find(power => power.id === 'STRENGTH_DOWN_NEXT_TURN')?.stacks ?? 0
+        if (strengthDown > 0) {
+            this.enqueue({ kind: 'ApplyPower', target: this.state.player.id, powerId: 'STRENGTH', stacks: -strengthDown })
+            this.setPowerStacks(this.state.player, 'STRENGTH_DOWN_NEXT_TURN', 0)
+        }
+        this.setPowerStacks(this.state.player, 'RAGE', 0)
+        const combust = this.state.player.powers.find(power => power.id === 'COMBUST')?.stacks ?? 0
+        if (combust > 0) {
+            this.enqueue({ kind: 'LoseHp', target: this.state.player.id, amount: 1 })
+            for (const enemy of this.state.enemies) {
+                if (enemy.hp > 0) this.enqueue({ kind: 'DealDamage', source: this.state.player.id, target: enemy.id, amount: combust })
+            }
+        }
         const metallicize = this.state.player.powers.find(power => power.id === 'METALLICIZE')?.stacks ?? 0
         if (metallicize > 0) this.enqueue({ kind: 'GainBlock', target: this.state.player.id, amount: metallicize })
+    }
+
+    private onCardDrawn(card: CardInstance): void {
+        const resolved = resolveCard(card)
+        if (resolved.type !== 'status' && resolved.type !== 'curse') return
+        const evolve = this.state.player.powers.find(power => power.id === 'EVOLVE')?.stacks ?? 0
+        if (evolve > 0) this.enqueue({ kind: 'DrawCards', count: evolve })
+        const fireBreathing = this.state.player.powers.find(power => power.id === 'FIRE_BREATHING')?.stacks ?? 0
+        if (fireBreathing > 0) {
+            for (const enemy of this.state.enemies) {
+                if (enemy.hp > 0) this.enqueue({ kind: 'DealDamage', source: this.state.player.id, target: enemy.id, amount: fireBreathing })
+            }
+        }
+    }
+
+    private onPlayerCardPlayed(_cardInstanceId: string, type: string): void {
+        if (type !== 'attack') return
+        const rage = this.state.player.powers.find(power => power.id === 'RAGE')?.stacks ?? 0
+        if (rage > 0) this.enqueue({ kind: 'GainBlock', target: this.state.player.id, amount: rage })
+    }
+
+    private onEnemyKilledByCard(cardInstanceId: string, _enemyId: EntityId): void {
+        const runtime = this.getCombatCardRuntime(cardInstanceId)
+        if (runtime.triggered) return
+        const card = [
+            ...this.state.player.hand,
+            ...this.state.player.drawPile,
+            ...this.state.player.discardPile,
+            ...this.state.player.exhaustPile,
+            ...(this.activeLimbo ? [this.activeLimbo.card] : []),
+            ...this.state.player.deck,
+        ].find(entry => entry.instanceId === cardInstanceId)
+        if (!card || card.defId !== 'FEED') return
+        runtime.triggered = true
+        const gain = card.upgradeLevel > 0 ? 4 : 3
+        this.state.player.maxHp += gain
+        this.state.player.hp += gain
     }
 
     private getRelicContext() {

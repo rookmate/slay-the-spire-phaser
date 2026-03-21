@@ -60,6 +60,10 @@ export const IRONCLAD_UNLOCK_TRACK: UnlockBundle[] = [
     { tier: 4, label: 'Scaling Core', cards: ['PERFECTED_STRIKE', 'POWER_THROUGH', 'CORRUPTION'], relics: ['ORICHALCUM'] },
     { tier: 5, label: 'Exhaust Engine', cards: ['TRUE_GRIT', 'SENTINEL', 'JUGGERNAUT'], relics: ['CENTENNIAL_PUZZLE'] },
     { tier: 6, label: 'Late Burst', cards: ['WARCRY', 'WHIRLWIND', 'DARK_EMBRACE'], relics: ['BAG_OF_MARBLES'] },
+    { tier: 7, label: 'Tactical Pressure', cards: ['DISARM', 'FLEX', 'RECKLESS_CHARGE'], relics: ['HAPPY_FLOWER'] },
+    { tier: 8, label: 'Engine Pieces', cards: ['RAGE', 'EVOLVE', 'SECOND_WIND'], relics: ['PAPER_FROG'] },
+    { tier: 9, label: 'Status Fire', cards: ['COMBUST', 'FIRE_BREATHING', 'RAMPAGE'], relics: ['MERCURY_HOURGLASS'] },
+    { tier: 10, label: 'Finisher Tools', cards: ['IMMOLATE', 'FEED', 'DUAL_WIELD'], relics: ['CHARONS_ASHES'] },
 ]
 
 export function getBaseUnlockedCardIds(): string[] {

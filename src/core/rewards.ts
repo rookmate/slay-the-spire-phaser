@@ -22,7 +22,15 @@ export interface RewardBundle {
 }
 
 const RARITY_ORDER: Array<'common' | 'uncommon' | 'rare'> = ['common', 'common', 'common', 'common', 'common', 'common', 'uncommon', 'uncommon', 'uncommon', 'rare']
-const POTION_POOL: PotionId[] = ['FIRE_POTION', 'BLOCK_POTION', 'STRENGTH_POTION']
+const POTION_POOL: PotionId[] = [
+    'FIRE_POTION',
+    'BLOCK_POTION',
+    'STRENGTH_POTION',
+    'ENERGY_POTION',
+    'DEXTERITY_POTION',
+    'WEAK_POTION',
+    'EXPLOSIVE_POTION',
+]
 
 export function generateRewardBundle(
     seed: string,

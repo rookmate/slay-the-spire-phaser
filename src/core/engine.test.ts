@@ -5,7 +5,7 @@ import type { CardInstance, PlayerState } from './state'
 import { Engine, createDummyEnemy, createSimplePlayer } from './engine'
 import { RNG } from './rng'
 import { createEnemyFromSpec, rollEngineIntentForEnemy } from './enemies'
-import { applyRelicAcquisition, blocksPotionGain, getCardRewardChoiceCount, getCombatRelicBonuses, getMerchantRemoveBaseCost, getPostCombatHeal, getRelicEnergyBonus, getRelicState, getShopPriceMultiplier, getUnlockedRelicPool } from './relics'
+import { applyRelicAcquisition, BOSS_RELIC_POOL, blocksPotionGain, canRestAtCampfire, getCardRewardChoiceCount, getCombatRelicBonuses, getMerchantRemoveBaseCost, getPostCombatHeal, getRelicEnergyBonus, getRelicState, getShopPriceMultiplier, getUnlockedRelicPool } from './relics'
 import { generateRewardBundle } from './rewards'
 import { clampAscension, getEffectiveUnlockedCardIds, getEffectiveUnlockedRelicIds, getSelectableAscensions, grantNextIroncladUnlock, unlockNextAscension } from './meta'
 import { createNewRun, obtainCurse } from './run'
@@ -78,6 +78,18 @@ describe('deferred card systems', () => {
         expect(meta.ironcladUnlockTier).toBe(1)
         expect(getEffectiveUnlockedCardIds(meta).has('ARMAMENTS')).toBe(true)
         expect(getEffectiveUnlockedRelicIds(meta).has('STRAWBERRY')).toBe(true)
+    })
+
+    it('extends the ironclad unlock track to ten tiers and grants tier seven after six wins', () => {
+        const meta = { bestAscensionUnlocked: 0, totalWins: 0, totalRuns: 0, ironcladUnlockTier: 0, unlockedCardIds: [], unlockedRelicIds: [] }
+
+        for (let i = 0; i < 6; i++) grantNextIroncladUnlock(meta)
+        const bundle = grantNextIroncladUnlock(meta)
+
+        expect(bundle?.tier).toBe(7)
+        expect(meta.ironcladUnlockTier).toBe(7)
+        expect(getEffectiveUnlockedCardIds(meta).has('DISARM')).toBe(true)
+        expect(getEffectiveUnlockedRelicIds(meta).has('HAPPY_FLOWER')).toBe(true)
     })
 
     it('rolls deterministic neow options and applies rewards', () => {
@@ -226,6 +238,140 @@ describe('deferred card systems', () => {
 
         expect(engine.state.player.block).toBe(15)
         expect(engine.state.player.hand.map(card => card.defId)).toEqual(['WOUND', 'WOUND'])
+    })
+
+    it('flex grants temporary strength and removes it at end of turn', () => {
+        const player = createPlayerWithHand(['FLEX'])
+        const enemy = createDummyEnemy('e1')
+        enemy.intent = { kind: 'buff', desc: 'Idle' }
+        const engine = new Engine('flex-seed', player, [enemy])
+
+        playAndResolve(engine, player.hand[0], [])
+        expect(engine.state.player.powers.find(power => power.id === 'STRENGTH')?.stacks).toBe(2)
+
+        engine.enqueue({ kind: 'EndTurn' })
+        engine.runUntilIdle()
+
+        expect(engine.state.player.powers.find(power => power.id === 'STRENGTH')?.stacks ?? 0).toBe(0)
+        expect(engine.state.player.powers.find(power => power.id === 'STRENGTH_DOWN_NEXT_TURN')).toBeUndefined()
+    })
+
+    it('second wind exhausts all non-attacks in hand and gains block per exhausted card', () => {
+        const player = createPlayerWithHand(['SECOND_WIND', 'DEFEND', 'STRIKE', 'WOUND'])
+        const engine = new Engine('second-wind-seed', player, [createDummyEnemy('e1')])
+
+        playAndResolve(engine, player.hand[0], [])
+
+        expect(engine.state.player.block).toBe(10)
+        expect(engine.state.player.exhaustPile.map(card => card.defId).sort()).toEqual(['DEFEND', 'SECOND_WIND', 'WOUND'])
+        expect(engine.state.player.hand.map(card => card.defId)).toEqual(['STRIKE'])
+    })
+
+    it('evolve draws extra when a status is drawn and fire breathing damages all enemies on status draw', () => {
+        const player = createPlayerWithHand(['EVOLVE'])
+        player.drawPile = [createCardInstance('DAZED'), createCardInstance('STRIKE')]
+        const enemy = createDummyEnemy('e1')
+        const engine = new Engine('evolve-seed', player, [enemy])
+
+        playAndResolve(engine, player.hand[0], [])
+        engine.enqueue({ kind: 'ApplyPower', target: player.id, powerId: 'FIRE_BREATHING', stacks: 6 })
+        engine.enqueue({ kind: 'DrawCards', count: 1 })
+        engine.runUntilIdle()
+
+        expect(engine.state.player.hand.map(card => card.defId)).toContain('DAZED')
+        expect(engine.state.player.hand.map(card => card.defId)).toContain('STRIKE')
+        expect(engine.state.enemies[0].hp).toBe(34)
+    })
+
+    it('rampage scales only its own combat damage across repeated plays', () => {
+        const player = createPlayerWithHand(['RAMPAGE'])
+        const enemy = createDummyEnemy('e1')
+        const engine = new Engine('rampage-seed', player, [enemy])
+
+        const rampage = player.hand[0]
+        playAndResolve(engine, rampage, ['e1'])
+        const replay = engine.state.player.discardPile.shift()!
+        engine.state.player.hand.push(replay)
+        playAndResolve(engine, replay, ['e1'])
+
+        expect(engine.state.enemies[0].hp).toBe(19)
+    })
+
+    it('feed grants max hp only when it kills the target', () => {
+        const player = createPlayerWithHand(['FEED'])
+        const enemy = createDummyEnemy('e1')
+        enemy.hp = 10
+        const engine = new Engine('feed-seed', player, [enemy])
+
+        playAndResolve(engine, player.hand[0], ['e1'])
+
+        expect(engine.state.player.maxHp).toBe(203)
+        expect(engine.state.player.hp).toBe(203)
+    })
+
+    it('dual wield copies an attack or power card in hand and preserves upgrade level', () => {
+        const player = createPlayerWithHand(['DUAL_WIELD', 'STRIKE'])
+        player.hand[1].upgradeLevel = 1
+        const engine = new Engine('dual-wield-seed', player, [createDummyEnemy('e1')])
+
+        engine.playCard(player.hand[0], [])
+        engine.runUntilIdle()
+        engine.submitPendingChoice([player.hand[0].instanceId])
+        engine.runUntilIdle()
+
+        const strikes = engine.state.player.hand.filter(card => card.defId === 'STRIKE')
+        expect(strikes).toHaveLength(2)
+        expect(strikes.every(card => card.upgradeLevel === 1)).toBe(true)
+    })
+
+    it('new potions apply their combat effects', () => {
+        const player = createPlayerWithHand(['DEFEND'])
+        const enemy = createDummyEnemy('e1')
+        const engine = new Engine('potion-seed', player, [enemy])
+
+        engine.usePotion('ENERGY_POTION', [player.id])
+        engine.usePotion('DEXTERITY_POTION', [player.id])
+        playAndResolve(engine, player.hand[0], [])
+        engine.usePotion('WEAK_POTION', ['e1'])
+        engine.usePotion('EXPLOSIVE_POTION', [])
+
+        expect(engine.state.player.energy).toBe(4)
+        expect(engine.state.player.block).toBe(7)
+        expect(engine.state.enemies[0].powers.find(power => power.id === 'WEAK')?.stacks).toBe(3)
+        expect(engine.state.enemies[0].hp).toBe(30)
+    })
+
+    it('new relic hooks and boss relic rules work in combat and campfire helpers', () => {
+        const run = createNewRun('new-relics-seed')
+        run.relics = ['HAPPY_FLOWER', 'PAPER_FROG', 'MERCURY_HOURGLASS', 'CHARONS_ASHES', 'MARK_OF_PAIN', 'PHILOSOPHERS_STONE', 'COFFEE_DRIPPER']
+        run.relicState = {}
+        const player = createPlayerWithHand(['SECOND_WIND', 'DEFEND', 'STRIKE'])
+        player.drawPile = []
+        const enemy = createDummyEnemy('e1')
+        enemy.powers.push({ id: 'VULNERABLE', stacks: 1 })
+        enemy.intent = { kind: 'buff', desc: 'Idle' }
+        const engine = new Engine('new-relics-engine', player, [enemy], { run })
+        engine.configurePlayerCombatBonuses({ baseEnergyPerTurn: 3 })
+        engine.initializeCombat()
+        engine.runUntilIdle()
+
+        expect(canRestAtCampfire(run)).toBe(false)
+        expect(engine.state.enemies[0].powers.find(power => power.id === 'STRENGTH')?.stacks).toBe(1)
+        expect(engine.state.player.drawPile.filter(card => card.defId === 'WOUND')).toHaveLength(2)
+        expect(engine.state.enemies[0].hp).toBe(35)
+
+        playAndResolve(engine, player.hand[2], ['e1'])
+        expect(engine.state.enemies[0].hp).toBe(24)
+
+        playAndResolve(engine, player.hand[0], [])
+        expect(engine.state.enemies[0].hp).toBe(14)
+
+        engine.enqueue({ kind: 'EndTurn' })
+        engine.runUntilIdle()
+        engine.enqueue({ kind: 'EndTurn' })
+        engine.runUntilIdle()
+
+        expect(engine.state.player.energy).toBe(4)
     })
 
     it('ghostly armor exhausts itself when left in hand at end of turn', () => {
@@ -655,6 +801,7 @@ describe('deferred card systems', () => {
         }
         const bossRewards = generateRewardBundle('boss-seed', 'boss', ['BLACK_BLOOD'], meta)
         expect(bossRewards.items.some(item => item.kind === 'boss_relics')).toBe(true)
+        expect(BOSS_RELIC_POOL).toEqual(expect.arrayContaining(['COFFEE_DRIPPER', 'MARK_OF_PAIN', 'PHILOSOPHERS_STONE']))
     })
 
     it('omits potion rewards when sozu is owned', () => {

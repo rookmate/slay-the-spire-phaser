@@ -22,6 +22,7 @@ export interface RelicDef {
     onPlayerTurnEnd?: (ctx: RelicCombatContext) => void
     onPlayerHpLost?: (ctx: RelicCombatContext, amount: number) => void
     onAttackPlayed?: (ctx: RelicCombatContext, cardInstanceId: string) => void
+    onCardExhausted?: (ctx: RelicCombatContext, cardInstanceId: string) => void
     modifyOutgoingAttackDamage?: (ctx: RelicCombatContext, amount: number, cardInstanceId: string) => number
     preventCurseGain?: (run: RunState, curseId: string) => boolean
 }
@@ -61,6 +62,10 @@ const COMMON_RELICS: RelicId[] = [
     'ORICHALCUM',
     'CENTENNIAL_PUZZLE',
     'BAG_OF_MARBLES',
+    'HAPPY_FLOWER',
+    'PAPER_FROG',
+    'MERCURY_HOURGLASS',
+    'CHARONS_ASHES',
 ]
 
 const UNCOMMON_RELICS: RelicId[] = [
@@ -98,6 +103,35 @@ export const RELIC_DEFS: Record<RelicId, RelicDef> = {
         rarity: 'boss',
         energyPerTurn: 1,
         cardRewardChoiceDelta: -2,
+    },
+    COFFEE_DRIPPER: {
+        id: 'COFFEE_DRIPPER',
+        name: 'Coffee Dripper',
+        description: 'Gain 1 Energy at the start of each turn. You can no longer Rest at campfires.',
+        rarity: 'boss',
+        energyPerTurn: 1,
+    },
+    MARK_OF_PAIN: {
+        id: 'MARK_OF_PAIN',
+        name: 'Mark of Pain',
+        description: 'Gain 1 Energy at the start of each turn. At the start of combat, shuffle 2 Wounds into your draw pile.',
+        rarity: 'boss',
+        energyPerTurn: 1,
+        onCombatStart: ({ engine }) => {
+            engine.createCardsInDestination('WOUND', 'drawPile', 2)
+        },
+    },
+    PHILOSOPHERS_STONE: {
+        id: 'PHILOSOPHERS_STONE',
+        name: "Philosopher's Stone",
+        description: 'Gain 1 Energy at the start of each turn. All enemies start combat with 1 Strength.',
+        rarity: 'boss',
+        energyPerTurn: 1,
+        onCombatStart: ({ engine }) => {
+            for (const enemy of engine.state.enemies) {
+                if (enemy.hp > 0) engine.enqueue({ kind: 'ApplyPower', target: enemy.id, powerId: 'STRENGTH', stacks: 1 })
+            }
+        },
     },
     ANCHOR: {
         id: 'ANCHOR',
@@ -226,11 +260,50 @@ export const RELIC_DEFS: Record<RelicId, RelicDef> = {
             if (turn === 2) engine.enqueue({ kind: 'GainBlock', target: engine.state.player.id, amount: 14 })
         },
     },
+    HAPPY_FLOWER: {
+        id: 'HAPPY_FLOWER',
+        name: 'Happy Flower',
+        description: 'Every 3 turns, gain 1 Energy.',
+        rarity: 'common',
+        onPlayerTurnStart: ({ engine, runtime }) => {
+            const entry = runtime.HAPPY_FLOWER ?? (runtime.HAPPY_FLOWER = {})
+            entry.turnCounter = (entry.turnCounter ?? 0) + 1
+            if (entry.turnCounter % 3 === 0) engine.enqueue({ kind: 'GainEnergy', amount: 1 })
+        },
+    },
+    PAPER_FROG: {
+        id: 'PAPER_FROG',
+        name: 'Paper Frog',
+        description: 'Enemies with Vulnerable take 75% more attack damage rather than 50%.',
+        rarity: 'common',
+    },
+    MERCURY_HOURGLASS: {
+        id: 'MERCURY_HOURGLASS',
+        name: 'Mercury Hourglass',
+        description: 'At the start of each turn, deal 3 damage to all enemies.',
+        rarity: 'common',
+        onPlayerTurnStart: ({ engine }) => {
+            for (const enemy of engine.state.enemies) {
+                if (enemy.hp > 0) engine.enqueue({ kind: 'DealDamage', source: engine.state.player.id, target: enemy.id, amount: 3 })
+            }
+        },
+    },
+    CHARONS_ASHES: {
+        id: 'CHARONS_ASHES',
+        name: "Charon's Ashes",
+        description: 'Whenever you exhaust a card, deal 3 damage to all enemies.',
+        rarity: 'common',
+        onCardExhausted: ({ engine }) => {
+            for (const enemy of engine.state.enemies) {
+                if (enemy.hp > 0) engine.enqueue({ kind: 'DealDamage', source: engine.state.player.id, target: enemy.id, amount: 3 })
+            }
+        },
+    },
 }
 
 export const MVP_RELIC_POOL: RelicId[] = [...COMMON_RELICS, ...UNCOMMON_RELICS]
 
-export const BOSS_RELIC_POOL: RelicId[] = ['BLACK_BLOOD', 'SOZU', 'BUSTED_CROWN']
+export const BOSS_RELIC_POOL: RelicId[] = ['BLACK_BLOOD', 'SOZU', 'BUSTED_CROWN', 'COFFEE_DRIPPER', 'MARK_OF_PAIN', 'PHILOSOPHERS_STONE']
 
 export function getRelicState(run: RunState, relicId: RelicId): RelicStateEntry {
     run.relicState ??= {}
@@ -284,6 +357,10 @@ export function triggerRelicPlayerHpLost(ctx: RelicCombatContext, amount: number
 
 export function triggerRelicAttackPlayed(ctx: RelicCombatContext, cardInstanceId: string): void {
     for (const relicId of ctx.run.relics) RELIC_DEFS[relicId]?.onAttackPlayed?.(ctx, cardInstanceId)
+}
+
+export function triggerRelicCardExhausted(ctx: RelicCombatContext, cardInstanceId: string): void {
+    for (const relicId of ctx.run.relics) RELIC_DEFS[relicId]?.onCardExhausted?.(ctx, cardInstanceId)
 }
 
 export function modifyAttackDamageFromRelics(ctx: RelicCombatContext, amount: number, cardInstanceId: string): number {
@@ -342,6 +419,11 @@ export function getShopPriceMultiplier(run: Pick<RunState, 'asc'>): number {
 
 export function getMerchantRemoveBaseCost(run: Pick<RunState, 'asc'>): number {
     return getAscensionMerchantRemoveBaseCost(run.asc)
+}
+
+export function canRestAtCampfire(run: Pick<RunState, 'relics'> | RelicId[]): boolean {
+    const relics = Array.isArray(run) ? run : run.relics
+    return !relics.includes('COFFEE_DRIPPER')
 }
 
 export function getRelicDisplayName(run: Pick<RunState, 'relicState'>, relicId: RelicId): string {

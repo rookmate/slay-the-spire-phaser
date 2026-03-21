@@ -10,6 +10,9 @@ export type RelicId =
     | 'BLACK_BLOOD'
     | 'SOZU'
     | 'BUSTED_CROWN'
+    | 'COFFEE_DRIPPER'
+    | 'MARK_OF_PAIN'
+    | 'PHILOSOPHERS_STONE'
     | 'ANCHOR'
     | 'LANTERN'
     | 'VAJRA'
@@ -23,6 +26,10 @@ export type RelicId =
     | 'CENTENNIAL_PUZZLE'
     | 'BAG_OF_MARBLES'
     | 'HORN_CLEAT'
+    | 'HAPPY_FLOWER'
+    | 'PAPER_FROG'
+    | 'MERCURY_HOURGLASS'
+    | 'CHARONS_ASHES'
 
 export interface RelicStateEntry {
     charges?: number
@@ -90,7 +97,7 @@ export function createNewRun(seed?: string, asc = 0): RunState {
     }
 }
 
-const STORAGE_KEY = 'sts_run_v6'
+const STORAGE_KEY = 'sts_run_v7'
 
 export function obtainCard(run: RunState, defId: string, destination: 'deck' = 'deck', upgradeLevel = 0): CardInstance {
     const card = createCardInstance(defId, upgradeLevel)

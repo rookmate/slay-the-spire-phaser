@@ -31,6 +31,10 @@ export function createCardInstance(defId: string, upgradeLevel = 0): CardInstanc
     }
 }
 
+export function createCardCopy(card: CardInstance): CardInstance {
+    return createCardInstance(card.defId, card.upgradeLevel)
+}
+
 export function createStarterDeck(): CardInstance[] {
     const deck: CardInstance[] = []
     for (let i = 0; i < 5; i++) deck.push(createCardInstance('STRIKE'))
@@ -41,6 +45,14 @@ export function createStarterDeck(): CardInstance[] {
 
 export function canUpgradeCard(card: CardInstance): boolean {
     return card.defId === 'SEARING_BLOW' || card.upgradeLevel === 0
+}
+
+export function getCardCombatBonusDamage(engine: CardEngineApi, instanceId: string): number {
+    return engine.getCardCombatBonusDamage?.(instanceId) ?? 0
+}
+
+export function modifyCardCombatBonusDamage(engine: CardEngineApi, instanceId: string, delta: number): number {
+    return engine.modifyCardCombatBonusDamage?.(instanceId, delta) ?? 0
 }
 
 function chooseOneCard(engine: CardEngineApi, opts: {
@@ -855,6 +867,90 @@ export const CARD_DEFS: Record<string, CardDef> = {
             }
         },
     },
+    DISARM: {
+        id: 'DISARM',
+        name: 'Disarm',
+        type: 'skill',
+        cost: 1,
+        rarity: 'uncommon',
+        exhaust: true,
+        targeting: { type: 'single_enemy', required: true },
+        upgrade: { exhaust: false },
+        onPlay: ({ engine, targets, card }) => {
+            const target = targets[0]
+            engine.enqueue({ kind: 'ApplyPower', target, powerId: 'STRENGTH', stacks: isUpgraded(card) ? -3 : -2 })
+        },
+    },
+    FLEX: {
+        id: 'FLEX',
+        name: 'Flex',
+        type: 'skill',
+        cost: 0,
+        rarity: 'uncommon',
+        targeting: { type: 'none' },
+        upgrade: {},
+        onPlay: ({ engine, card }) => {
+            const amount = isUpgraded(card) ? 4 : 2
+            engine.enqueue({ kind: 'ApplyPower', target: 'player', powerId: 'STRENGTH', stacks: amount })
+            engine.enqueue({ kind: 'ApplyPower', target: 'player', powerId: 'STRENGTH_DOWN_NEXT_TURN', stacks: amount })
+        },
+    },
+    RECKLESS_CHARGE: {
+        id: 'RECKLESS_CHARGE',
+        name: 'Reckless Charge',
+        type: 'attack',
+        cost: 0,
+        rarity: 'common',
+        targeting: { type: 'single_enemy', required: true },
+        upgrade: { baseDamage: 10 },
+        baseDamage: 7,
+        onPlay: ({ engine, source, targets, card }) => {
+            const target = targets[0]
+            const resolved = resolveCard(card)
+            engine.enqueue({ kind: 'DealDamage', source, target, amount: attackAmount(engine, card, resolved.baseDamage ?? 0) })
+            engine.createCardsInDestination?.('DAZED', 'drawPile', 1)
+        },
+    },
+    RAGE: {
+        id: 'RAGE',
+        name: 'Rage',
+        type: 'skill',
+        cost: 0,
+        rarity: 'uncommon',
+        targeting: { type: 'none' },
+        upgrade: {},
+        onPlay: ({ engine, card }) => {
+            engine.enqueue({ kind: 'ApplyPower', target: 'player', powerId: 'RAGE', stacks: isUpgraded(card) ? 5 : 3 })
+        },
+    },
+    EVOLVE: {
+        id: 'EVOLVE',
+        name: 'Evolve',
+        type: 'power',
+        cost: 1,
+        rarity: 'uncommon',
+        targeting: { type: 'none' },
+        upgrade: {},
+        onPlay: ({ engine, card }) => {
+            engine.enqueue({ kind: 'ApplyPower', target: 'player', powerId: 'EVOLVE', stacks: isUpgraded(card) ? 2 : 1 })
+        },
+    },
+    SECOND_WIND: {
+        id: 'SECOND_WIND',
+        name: 'Second Wind',
+        type: 'skill',
+        cost: 1,
+        rarity: 'uncommon',
+        exhaust: true,
+        targeting: { type: 'none' },
+        upgrade: {},
+        onPlay: ({ engine, card }) => {
+            const exhausted = engine.exhaustCardsInHand?.((entry) => resolveCard(entry).type !== 'attack') ?? []
+            if (exhausted.length > 0) {
+                engine.enqueue({ kind: 'GainBlock', target: 'player', amount: exhausted.length * (isUpgraded(card) ? 7 : 5) })
+            }
+        },
+    },
     WHIRLWIND: {
         id: 'WHIRLWIND',
         name: 'Whirlwind',
@@ -952,6 +1048,111 @@ export const CARD_DEFS: Record<string, CardDef> = {
                     })
                 }
             }
+        },
+    },
+    COMBUST: {
+        id: 'COMBUST',
+        name: 'Combust',
+        type: 'power',
+        cost: 1,
+        rarity: 'uncommon',
+        targeting: { type: 'none' },
+        upgrade: {},
+        onPlay: ({ engine, card }) => {
+            engine.enqueue({ kind: 'ApplyPower', target: 'player', powerId: 'COMBUST', stacks: isUpgraded(card) ? 7 : 5 })
+        },
+    },
+    FIRE_BREATHING: {
+        id: 'FIRE_BREATHING',
+        name: 'Fire Breathing',
+        type: 'power',
+        cost: 1,
+        rarity: 'uncommon',
+        targeting: { type: 'none' },
+        upgrade: {},
+        onPlay: ({ engine, card }) => {
+            engine.enqueue({ kind: 'ApplyPower', target: 'player', powerId: 'FIRE_BREATHING', stacks: isUpgraded(card) ? 10 : 6 })
+        },
+    },
+    RAMPAGE: {
+        id: 'RAMPAGE',
+        name: 'Rampage',
+        type: 'attack',
+        cost: 1,
+        rarity: 'uncommon',
+        baseDamage: 8,
+        targeting: { type: 'single_enemy', required: true },
+        upgrade: { baseDamage: 11 },
+        onPlay: ({ engine, source, targets, card }) => {
+            const target = targets[0]
+            const resolved = resolveCard(card)
+            engine.enqueue({
+                kind: 'DealDamage',
+                source,
+                target,
+                amount: attackAmount(engine, card, resolved.baseDamage ?? 0),
+            })
+            modifyCardCombatBonusDamage(engine, card.instanceId, isUpgraded(card) ? 8 : 5)
+        },
+    },
+    IMMOLATE: {
+        id: 'IMMOLATE',
+        name: 'Immolate',
+        type: 'attack',
+        cost: 2,
+        rarity: 'rare',
+        baseDamage: 21,
+        targeting: { type: 'all_enemies', required: true },
+        upgrade: { baseDamage: 28 },
+        onPlay: ({ engine, source, card }) => {
+            const resolved = resolveCard(card)
+            for (const enemy of engine.state.enemies) {
+                if (enemy.hp > 0) {
+                    engine.enqueue({ kind: 'DealDamage', source, target: enemy.id, amount: attackAmount(engine, card, resolved.baseDamage ?? 0) })
+                }
+            }
+            engine.createCardsInDestination?.('BURN', 'discardPile', 1)
+        },
+    },
+    FEED: {
+        id: 'FEED',
+        name: 'Feed',
+        type: 'attack',
+        cost: 1,
+        rarity: 'rare',
+        baseDamage: 10,
+        targeting: { type: 'single_enemy', required: true },
+        upgrade: { baseDamage: 12 },
+        onPlay: ({ engine, source, targets, card }) => {
+            const target = targets[0]
+            const resolved = resolveCard(card)
+            engine.enqueue({ kind: 'DealDamage', source, target, amount: attackAmount(engine, card, resolved.baseDamage ?? 0) })
+        },
+    },
+    DUAL_WIELD: {
+        id: 'DUAL_WIELD',
+        name: 'Dual Wield',
+        type: 'skill',
+        cost: 1,
+        rarity: 'rare',
+        targeting: { type: 'none' },
+        upgrade: {},
+        onPlay: ({ engine, card }) => {
+            const eligible = (engine.getCardsInZone?.('hand') ?? [])
+                .filter(entry => {
+                    const type = resolveCard(entry).type
+                    return type === 'attack' || type === 'power'
+                })
+                .map(entry => entry.instanceId)
+            chooseOneCard(engine, {
+                card,
+                prompt: 'Choose an Attack or Power to copy',
+                zone: 'hand',
+                eligibleInstanceIds: eligible,
+                onSubmit: (instanceId) => {
+                    engine.copyCardToHand?.(instanceId, isUpgraded(card) ? 2 : 1)
+                },
+            })
         },
     },
     WOUND: {

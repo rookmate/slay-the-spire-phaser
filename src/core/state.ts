@@ -8,6 +8,7 @@ export type PowerId =
     | 'VULNERABLE'
     | 'WEAK'
     | 'STRENGTH'
+    | 'DEXTERITY'
     | 'THORNS'
     | 'BARRICADE'
     | 'METALLICIZE'
@@ -18,6 +19,11 @@ export type PowerId =
     | 'DARK_EMBRACE'
     | 'BRUTALITY'
     | 'BERSERK'
+    | 'RAGE'
+    | 'EVOLVE'
+    | 'FIRE_BREATHING'
+    | 'COMBUST'
+    | 'STRENGTH_DOWN_NEXT_TURN'
 
 export interface PowerInstance {
     id: PowerId
@@ -70,6 +76,10 @@ export interface CardEngineApi {
     upgradeCardInstance?: (instanceId: string, zones?: ChoiceZone[]) => CardInstance | undefined
     getLimboCard?: () => CardInstance | undefined
     randomInt?: (min: number, max: number) => number
+    copyCardToHand?: (instanceId: string, count?: number) => CardInstance[]
+    exhaustCardsInHand?: (predicate: (card: CardInstance) => boolean) => CardInstance[]
+    getCardCombatBonusDamage?: (instanceId: string) => number
+    modifyCardCombatBonusDamage?: (instanceId: string, delta: number) => number
 }
 
 export interface EnemyEngineApi {
@@ -177,4 +187,5 @@ export interface CombatState {
     victory: boolean
     defeat: boolean
     limbo: LimboCardState[]
+    cardRuntime: Record<string, { bonusDamage?: number; triggered?: boolean }>
 }

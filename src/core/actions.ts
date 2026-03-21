@@ -5,8 +5,8 @@ export type EntityId = string
 export type Action =
     | { kind: 'GainEnergy'; amount: number }
     | { kind: 'DrawCards'; count: number }
-    | { kind: 'DealDamage'; source: EntityId; target: EntityId; amount: number; damageType?: 'attack' | 'thorns'; lifestealTo?: EntityId }
-    | { kind: 'DealMultiDamage'; source: EntityId; target: EntityId; amount: number; hits: number; damageType?: 'attack' | 'thorns' }
+    | { kind: 'DealDamage'; source: EntityId; target: EntityId; amount: number; damageType?: 'attack' | 'thorns'; lifestealTo?: EntityId; sourceCardInstanceId?: string }
+    | { kind: 'DealMultiDamage'; source: EntityId; target: EntityId; amount: number; hits: number; damageType?: 'attack' | 'thorns'; sourceCardInstanceId?: string }
     | { kind: 'Heal'; target: EntityId; amount: number }
     | { kind: 'GainBlock'; target: EntityId; amount: number }
     | { kind: 'DiscardHand' }
