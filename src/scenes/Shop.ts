@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
 import { getUnlockedCollectibleCards } from '../core/cards'
 import { loadMeta, type MetaState } from '../core/meta'
-import type { RunState, RelicId } from '../core/run'
+import type { RunState } from '../core/run'
 import { removeCardByInstanceId, saveRun } from '../core/run'
 import { RNG } from '../core/rng'
 import { CARD_DEFS, createCardInstance, isCurseCard, resolveCard } from '../core/cards'
@@ -9,12 +9,7 @@ import { RELIC_DEFS, applyRelicAcquisition, canObtainPotion, getMerchantRemoveBa
 import { POTION_DEFS, type PotionId } from '../core/potions'
 import { Card } from '../ui/Card'
 import { DeckSelectionOverlay } from '../ui/DeckSelectionOverlay'
-
-interface ShopInventory {
-    cards: string[]
-    relic: RelicId
-    potions: PotionId[]
-}
+import { completeRoom, type ShopInventory } from '../core/progression'
 
 export class ShopScene extends Phaser.Scene {
     run!: RunState
@@ -30,7 +25,9 @@ export class ShopScene extends Phaser.Scene {
         this.run = data.run
         this.meta = loadMeta()
         this.selector = new DeckSelectionOverlay(this)
-        this.inventory = this.generateInventory()
+        this.inventory = (this.run.pendingRoom?.scene === 'Shop' && this.run.pendingRoom.inventory) || this.generateInventory()
+        this.run.pendingRoom = { scene: 'Shop', inventory: this.inventory }
+        saveRun(this.run)
         this.render()
     }
 
@@ -41,7 +38,7 @@ export class ShopScene extends Phaser.Scene {
         this.add.text(16, this.scale.height - 44, 'Leave', { ...style, backgroundColor: '#333', padding: { x: 6, y: 4 } })
             .setInteractive({ useHandCursor: true })
             .on('pointerdown', () => {
-                this.run.floor += 1
+                completeRoom(this.run)
                 saveRun(this.run)
                 this.scene.start('Map', { run: this.run })
             })

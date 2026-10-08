@@ -49,6 +49,7 @@ export class BossRelicScene extends Phaser.Scene {
         select.on('pointerdown', () => {
             applyRelicAcquisition(this.run, relicId)
             this.run.bossRelicChoicePending = undefined
+            this.run.pendingRoom = undefined
             this.run.act = 2
             this.run.floor = 1
             this.run.mapProgress = {}

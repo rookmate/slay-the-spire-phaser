@@ -5,6 +5,7 @@ import { loadMeta, type MetaState } from '../core/meta'
 import { getRelicDisplayName } from '../core/relics'
 import { saveRun, type RunState } from '../core/run'
 import { DeckSelectionOverlay } from '../ui/DeckSelectionOverlay'
+import { completeRoom } from '../core/progression'
 
 export class EventScene extends Phaser.Scene {
     run!: RunState
@@ -133,7 +134,7 @@ export class EventScene extends Phaser.Scene {
     }
 
     private leave(): void {
-        this.run.floor += 1
+        completeRoom(this.run)
         saveRun(this.run)
         this.scene.start('Map', { run: this.run })
     }

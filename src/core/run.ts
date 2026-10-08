@@ -4,6 +4,7 @@ import { clampAscension as clampAscensionLevel } from './ascension'
 import { tryPreventCurse } from './relics'
 import type { CardInstance } from './state'
 import type { PotionId } from './potions'
+import type { PendingRoom } from './progression'
 
 export type RelicId =
     | 'BURNING_BLOOD'
@@ -60,6 +61,7 @@ export interface RunState {
     runFlags?: Record<string, boolean>
     asc: number
     mapProgress?: { currentNodeId?: string }
+    pendingRoom?: PendingRoom
     combatCount?: number
 }
 

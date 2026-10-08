@@ -5,6 +5,7 @@ import { saveRun } from '../core/run'
 import { canUpgradeCard } from '../core/cards'
 import { canRestAtCampfire } from '../core/relics'
 import { DeckSelectionOverlay } from '../ui/DeckSelectionOverlay'
+import { completeRoom } from '../core/progression'
 
 export class CampfireScene extends Phaser.Scene {
     run!: RunState
@@ -58,7 +59,7 @@ export class CampfireScene extends Phaser.Scene {
     }
 
     private leave(): void {
-        this.run.floor += 1
+        completeRoom(this.run)
         saveRun(this.run)
         this.scene.start('Map', { run: this.run })
     }

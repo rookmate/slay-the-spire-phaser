@@ -1,4 +1,4 @@
-import Phaser from 'phaser'
+import type Phaser from 'phaser'
 import type { Engine } from '../core/engine'
 import type { EnemyState } from '../core/state'
 import { COMBAT_UI_CONFIG } from './CombatUIConfig'
@@ -11,6 +11,7 @@ export class EnemyDisplay {
     private enemyHpTexts: Phaser.GameObjects.Text[] = []
     private enemyNameTexts: Phaser.GameObjects.Text[] = []
     private enemyPowerTexts: Phaser.GameObjects.Text[] = []
+    private enemyIds: string[] = []
     private onEnemyClick?: (enemyIndex: number) => void
 
     constructor(scene: Phaser.Scene, engine: Engine) {
@@ -32,10 +33,13 @@ export class EnemyDisplay {
         }
 
         this.engine.state.enemies.forEach((enemy, index) => {
+            this.enemyIds.push(enemy.id)
             const position = this.calculateEnemyPosition(index)
             const texture = `enemy:${enemy.specId ?? enemy.name.toUpperCase().replace(/\s+/g, '_')}`
             const sprite = this.scene.add.image(position.x, position.y, texture).setScale(0.5).setInteractive()
-            sprite.on('pointerdown', () => this.onEnemyClick?.(index))
+            sprite.on('pointerdown', () => {
+                if (enemy.hp > 0) this.onEnemyClick?.(index)
+            })
             this.enemySprites.push(sprite)
 
             const intent = this.scene.add.text(position.x, position.y - 80, this.getEnemyText(enemy), style).setOrigin(0.5, 1)
@@ -64,6 +68,7 @@ export class EnemyDisplay {
         this.enemyHpTexts = []
         this.enemyNameTexts = []
         this.enemyPowerTexts = []
+        this.enemyIds = []
     }
 
     private getEnemyText(enemy: EnemyState): string {
@@ -100,6 +105,10 @@ export class EnemyDisplay {
     }
 
     update(): void {
+        const enemies = this.engine.state.enemies
+        if (enemies.length !== this.enemyIds.length || enemies.some((enemy, index) => enemy.id !== this.enemyIds[index])) {
+            this.build()
+        }
         this.engine.state.enemies.forEach((enemy, index) => {
             this.enemyTexts[index]?.setText(this.getEnemyText(enemy))
             this.enemyHpTexts[index]?.setText(this.getEnemyHpLabel(enemy))
@@ -112,7 +121,7 @@ export class EnemyDisplay {
         for (let i = 0; i < this.enemySprites.length; i++) {
             const sprite = this.enemySprites[i]
             const enemy = this.engine.state.enemies[i]
-            if (!sprite || enemy.hp <= 0) continue
+            if (!sprite || !enemy || enemy.hp <= 0) continue
             const bounds = sprite.getBounds()
             if (x >= bounds.x && x <= bounds.x + bounds.width && y >= bounds.y && y <= bounds.y + bounds.height) return i
         }

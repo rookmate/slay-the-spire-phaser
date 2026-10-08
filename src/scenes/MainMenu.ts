@@ -3,6 +3,7 @@ import { createNewRun, loadRun, saveRun, /*type RunState */ } from '../core/run'
 import { /*getDailySeed, */getSelectableAscensions, loadMeta } from '../core/meta'
 import { IRONCLAD_UNLOCK_TRACK } from '../core/unlocks'
 import { getAscensionLabel } from '../core/ascension'
+import { getRunDestination } from '../core/progression'
 
 export class MainMenuScene extends Phaser.Scene {
     constructor() { super('MainMenu') }
@@ -25,9 +26,8 @@ export class MainMenuScene extends Phaser.Scene {
             .on('pointerdown', () => {
                 const run = loadRun()
                 if (!run) return
-                if (run.bossRelicChoicePending) this.scene.start('BossRelic', { run })
-                else if (!run.neowCompleted) this.scene.start('Neow', { run })
-                else this.scene.start('Map', { run })
+                const destination = getRunDestination(run)
+                this.scene.start(destination.scene, destination.data)
             })
 
         this.add.text(16, 140, 'New Run', { ...style, backgroundColor: '#333', padding: { x: 8, y: 6 } })

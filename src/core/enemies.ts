@@ -309,8 +309,6 @@ export const ENEMIES: Record<string, EnemySpec> = {
             const spike: EnemyState = createEnemyFromSpec(new RNG(`${enemy.id}-split-spike`), 'SPIKE_SLIME_M', `${enemy.id}-spike`)
             acid.hp = Math.min(acid.maxHp, firstHp)
             spike.hp = Math.min(spike.maxHp, Math.max(1, secondHp))
-            acid.intent = rollEngineIntentForEnemy(new RNG(`${enemy.id}-split-acid-intent`), acid, engine.state)
-            spike.intent = rollEngineIntentForEnemy(new RNG(`${enemy.id}-split-spike-intent`), spike, engine.state)
             engine.spawnEnemies([acid, spike])
         },
     },
@@ -642,7 +640,7 @@ export const ENEMIES: Record<string, EnemySpec> = {
     },
 }
 
-export function createEnemyFromSpec(rng: RNG, key: keyof typeof ENEMIES, id: string): EnemyState {
+export function createEnemyState(key: keyof typeof ENEMIES, id: string): EnemyState {
     const spec = ENEMIES[key]
     const enemy: EnemyState = {
         id,
@@ -657,7 +655,12 @@ export function createEnemyFromSpec(rng: RNG, key: keyof typeof ENEMIES, id: str
         tags: [...(spec.tags ?? [])],
     }
     spec.initialize?.(enemy)
-    enemy.intent = toEngineIntent(spec.nextIntent(rng, enemy, {
+    return enemy
+}
+
+export function createEnemyFromSpec(rng: RNG, key: keyof typeof ENEMIES, id: string): EnemyState {
+    const enemy = createEnemyState(key, id)
+    enemy.intent = rollEngineIntentForEnemy(rng, enemy, {
         player: undefined as never,
         enemies: [enemy],
         turn: 'player',
@@ -665,7 +668,7 @@ export function createEnemyFromSpec(rng: RNG, key: keyof typeof ENEMIES, id: str
         defeat: false,
         limbo: [],
         cardRuntime: {},
-    }))
+    })
     return enemy
 }
 

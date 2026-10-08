@@ -6,6 +6,7 @@ import { createCardInstance } from '../core/cards'
 import { Card } from '../ui/Card'
 import { applyRelicAcquisition, getRelicDisplayName } from '../core/relics'
 import { POTION_DEFS } from '../core/potions'
+import { completeRoom } from '../core/progression'
 
 export class RewardsScene extends Phaser.Scene {
     run!: RunState
@@ -24,6 +25,8 @@ export class RewardsScene extends Phaser.Scene {
     create(data: { run: RunState; rewards: RewardBundle }): void {
         this.run = data.run
         this.rewards = data.rewards
+        this.pendingCardReward = false
+        this.pendingPotionReward = undefined
         this.infoTexts = []
         this.choiceCards = []
         this.potionTexts = []
@@ -62,7 +65,7 @@ export class RewardsScene extends Phaser.Scene {
         }).setOrigin(0.5, 0.5)
         this.continueButton.on('pointerdown', () => {
             if (!this.canContinue()) return
-            this.run.floor += 1
+            completeRoom(this.run)
             saveRun(this.run)
             this.scene.start('Map', { run: this.run })
         })
