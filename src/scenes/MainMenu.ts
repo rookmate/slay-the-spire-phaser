@@ -24,7 +24,6 @@ export class MainMenuScene extends Phaser.Scene {
         if (data.modifiers) { this.modifiers = data.modifiers; this.mode = 'custom' }
         const meta = loadMeta()
         if (this.mode === 'custom' && !meta.customUnlocked) { this.mode = 'standard'; this.modifiers = [] }
-        if (this.mode !== 'daily' && !getCharacterProgress(meta, this.character).unlocked) this.character = 'ironclad'
         this.replaceConfirmed = false
         this.render()
     }
@@ -39,26 +38,24 @@ export class MainMenuScene extends Phaser.Scene {
         this.add.rectangle(34, 100, 401, 1, palette.line).setOrigin(0)
 
         CHARACTER_IDS.forEach((id, i) => {
-            const unlocked = getCharacterProgress(meta, id).unlocked || this.mode === 'daily', selected = id === this.character
+            const selected = id === this.character
             const x = 34 + i * 104
             this.add.rectangle(x, 113, 94, 71, selected ? 0x443527 : 0x191a16, 0.92).setOrigin(0).setStrokeStyle(1, selected ? palette.copper : palette.line, selected ? 1 : 0.5)
-            this.add.image(x + 47, 136, `player:${id}`).setDisplaySize(37, 44).setAlpha(unlocked ? 1 : 0.28)
-            const button = this.add.text(x, 114, CHARACTERS[id].name, { ...menuText, fontSize: '13px', fontStyle: 'bold', align: 'center', fixedWidth: 94, fixedHeight: 69, padding: { top: 45 }, color: unlocked ? palette.text : '#958b76' }).setResolution(2)
+            this.add.image(x + 47, 136, `player:${id}`).setDisplaySize(37, 44)
+            const button = this.add.text(x, 114, CHARACTERS[id].name, { ...menuText, fontSize: '13px', fontStyle: 'bold', align: 'center', fixedWidth: 94, fixedHeight: 69, padding: { top: 45 }, color: palette.text }).setResolution(2)
             button.setData('character', id)
-            if (unlocked && this.mode !== 'daily') button.setInteractive({ useHandCursor: true }).on('pointerdown', () => {
+            if (this.mode !== 'daily') button.setInteractive({ useHandCursor: true }).on('pointerdown', () => {
                 this.character = id; this.ascension = 0; this.replaceConfirmed = false; this.render()
             }).on('pointerover', () => button.setColor(palette.gold)).on('pointerout', () => button.setColor(palette.text))
-            if (!unlocked) this.add.text(x + 76, 117, '×', { ...menuText, fontSize: '13px', color: '#9c917b' })
         })
         this.add.text(34, 196, character.name, { resolution: 2, fontFamily: DISPLAY_FONT, fontSize: '29px', color: palette.text }).setResolution(2)
-        this.add.text(434, 204, `${character.maxHp} HP  ·  Unlocks ${progress.unlockTier}/5`, { ...menuText, fontSize: '13px', color: palette.gold }).setOrigin(1, 0).setResolution(2)
+        this.add.text(434, 204, `${character.maxHp} HP  ·  XP tier ${progress.unlockTier}/5`, { ...menuText, fontSize: '13px', color: palette.gold }).setOrigin(1, 0).setResolution(2)
         this.add.text(34, 234, character.description, { ...menuText, fontSize: '14px', color: '#c7bca5', wordWrap: { width: 405 } }).setResolution(2)
         ;(['standard', 'seeded', 'daily', 'custom'] as const).forEach((mode, i) => {
             const x = 34 + i * 104, selected = this.mode === mode
             menuButton(this, x, 272, mode[0].toUpperCase() + mode.slice(1), () => {
                 this.mode = mode; this.replaceConfirmed = false
                 if (mode === 'daily') { this.character = dailyConfiguration().character; this.ascension = 0 }
-                else if (!getCharacterProgress(meta, this.character).unlocked) this.character = 'ironclad'
                 this.render()
             }, mode !== 'custom' || !!meta.customUnlocked, { width: 94, quiet: true }).setFontSize(14)
             if (selected) this.add.rectangle(x + 12, 306, 70, 2, palette.copper).setOrigin(0)
@@ -77,7 +74,7 @@ export class MainMenuScene extends Phaser.Scene {
                 input.setAttribute('aria-label', 'Run seed'); input.style.width = '202px'
                 input.addEventListener('input', () => { this.seed = input.value.trim() })
                 this.seedInput = this.add.dom(234, 315, input).setOrigin(0)
-            } else this.add.text(434, 324, UNLOCK_XP[progress.unlockTier] ? `${progress.xp} / ${UNLOCK_XP[progress.unlockTier]} XP` : 'All card unlocks earned', { ...menuText, fontSize: '13px', color: palette.muted }).setOrigin(1, 0).setResolution(2)
+            } else this.add.text(434, 324, UNLOCK_XP[progress.unlockTier] ? `${progress.xp} / ${UNLOCK_XP[progress.unlockTier]} XP` : 'Relic progression complete', { ...menuText, fontSize: '13px', color: palette.muted }).setOrigin(1, 0).setResolution(2)
         }
         const label = this.replaceConfirmed ? 'Abandon saved run and start' : 'New Run'
         menuButton(this, 34, 360, label, () => {

@@ -2,9 +2,14 @@ import { expect, test, type Page } from '@playwright/test'
 import { createNewRun } from '../../src/core/run'
 import { canUpgradeCard } from '../../src/core/cards'
 import { RELIC_DEFS } from '../../src/core/relics'
-import { boot, clickMapNode, clickCard, clickPoint, clickText, dragCard, expectScene, inspect, readSavedProgress, reloadRun } from './driver'
+import { boot, clickMapNode, clickCard, clickPoint, clickText, endTurnWithKeyboard, expectScene, inspect, inspectCombat, playCardWithKeyboard, readSavedProgress, reloadRun } from './driver'
 import { cardPriority, choosePlay, chooseRoute } from '../support/policy'
 import { bossRelicPick, eventPick, neowPick, rewardPick, shopPick } from '../support/strategy'
+
+// A retry of this entire campaign cannot fit the CI job budget. Keep the action
+// trace and failure screenshot without recording thousands of canvas screenshots.
+test.describe.configure({ retries: 0, timeout: 900_000 })
+test.use({ trace: { mode: 'retain-on-failure', screenshots: false, snapshots: false, sources: true } })
 
 async function selectFromPages(page: Page, id: string) {
     for (let attempt = 0; attempt < 20; attempt++) {
@@ -16,8 +21,7 @@ async function selectFromPages(page: Page, id: string) {
 }
 
 test('plays a seeded starter-deck run through all three acts and records victory', async ({ page }, testInfo) => {
-    test.setTimeout(process.env.CI ? 900_000 : 300_000)
-    const errors = await boot(page, createNewRun({ seed: process.env.PLAYTHROUGH_SEED ?? 'fidelity-ironclad-377' }))
+    const errors = await boot(page, createNewRun({ seed: process.env.PLAYTHROUGH_SEED ?? 'available-ironclad-177' }))
     await expectScene(page, 'Neow')
     const history: string[] = []
     let lastCombat = ''
@@ -27,6 +31,23 @@ test('plays a seeded starter-deck run through all three acts and records victory
     try {
         await clickText(page, neowPick((await inspect(page)).options!).label)
         for (let step = 0; step < 1500; step++) {
+            const combat = await inspectCombat(page)
+            if (combat) {
+                const combatKey = `${combat.act}:${combat.floor}`
+                if (lastCombat !== combatKey) {
+                    history.push(`Enemies: ${combat.state.enemies.map(enemy => enemy.name).join(', ')}`)
+                    lastCombat = combatKey
+                }
+                if (combat.choice) {
+                    await selectFromPages(page, combat.choice.eligibleInstanceIds[0])
+                    if (combat.choice.maxSelections > 1) await clickText(page, 'Confirm')
+                } else {
+                    const play = choosePlay(combat.state, combat.legalPlays)
+                    if (play) await playCardWithKeyboard(page, play.card.instanceId, play.enemyIndex)
+                    else await endTurnWithKeyboard(page, combat.state.turnNumber)
+                }
+                continue
+            }
             const ui = await inspect(page)
             if (ui.scene === 'RunSummary') break
             if (ui.scene === 'Map') {
@@ -38,26 +59,6 @@ test('plays a seeded starter-deck run through all three acts and records victory
                 history.push(`Act ${ui.run!.act} floor ${ui.run!.floor}: ${node.kind} ${node.id}, HP ${ui.run!.player.hp}, gold ${ui.run!.gold}`)
                 console.log(history.at(-1))
                 await clickMapNode(page, node.id)
-            } else if (ui.scene === 'Combat') {
-                const combatKey = `${ui.run!.act}:${ui.run!.floor}`
-                if (lastCombat !== combatKey) {
-                    history.push(`Enemies: ${ui.state!.enemies.map(enemy => enemy.name).join(', ')}`)
-                    lastCombat = combatKey
-                }
-                if (ui.choice) {
-                    await selectFromPages(page, ui.choice.eligibleInstanceIds[0])
-                    if (ui.choice.maxSelections > 1) await clickText(page, 'Confirm')
-                    continue
-                }
-                const state = ui.state!
-                const play = choosePlay(state, ui.legalPlays!)
-                if (play) {
-                    await dragCard(page, play.card.instanceId, play.enemyIndex)
-                    await expect.poll(async () => {
-                        const after = await inspect(page)
-                        return after.scene !== 'Combat' || !after.state!.player.hand.some(card => card.instanceId === play.card.instanceId)
-                    }, { message: `Play ${play.card.defId}` }).toBe(true)
-                } else await clickText(page, 'End Turn')
             } else if (ui.scene === 'Chest') {
                 await clickText(page, 'Open chest')
             } else if (ui.scene === 'RelicAcquisition') {

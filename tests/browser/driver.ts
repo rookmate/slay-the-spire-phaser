@@ -18,6 +18,44 @@ type SceneView = Phaser.Scene & {
     inventory?: ShopInventory
 }
 
+/** The campaign policy needs combat state, not a traversal of every rendered card. */
+export async function inspectCombat(page: Page) {
+    return page.evaluate(() => {
+        const scene = window.__testGame.scene.getScenes(true)[0] as SceneView
+        if (scene.scene.key !== 'Combat' || !scene.engine || !scene.run) return null
+        return { state: scene.engine.state, legalPlays: scene.engine.getPlayableCards(), choice: scene.engine.getPendingChoice(), act: scene.run.act, floor: scene.run.floor }
+    })
+}
+
+export async function playCardWithKeyboard(page: Page, id: string, enemyIndex?: number) {
+    const input = await page.evaluate(({ id, enemyIndex }) => {
+        const game = window.__testGame, scene = game.scene.getScenes(true)[0] as SceneView
+        const index = scene.engine!.state.player.hand.findIndex(card => card.instanceId === id)
+        const sprites = scene.children.list.filter(object => object.type === 'Image' && (object as Phaser.GameObjects.Image).texture.key.startsWith('enemy:')) as Phaser.GameObjects.Image[]
+        const enemy = enemyIndex === undefined ? undefined : sprites[enemyIndex], canvas = game.canvas.getBoundingClientRect()
+        return { index, target: enemy && { x: canvas.x + enemy.x * canvas.width / game.scale.width, y: canvas.y + enemy.y * canvas.height / game.scale.height } }
+    }, { id, enemyIndex })
+    expect(input.index).toBeGreaterThanOrEqual(0)
+    expect(input.index).toBeLessThan(10)
+    await page.keyboard.press(String((input.index + 1) % 10))
+    if (enemyIndex !== undefined) {
+        expect(input.target).toBeDefined()
+        await page.mouse.click(input.target!.x, input.target!.y)
+    }
+    await expect.poll(() => page.evaluate(id => {
+        const scene = window.__testGame.scene.getScenes(true)[0] as SceneView
+        return scene.scene.key !== 'Combat' || !scene.engine!.state.player.hand.some(card => card.instanceId === id)
+    }, id), { message: `Play card ${id} through keyboard controls` }).toBe(true)
+}
+
+export async function endTurnWithKeyboard(page: Page, turnNumber: number | undefined) {
+    await page.keyboard.press('e')
+    await expect.poll(() => page.evaluate(before => {
+        const scene = window.__testGame.scene.getScenes(true)[0] as SceneView
+        return scene.scene.key !== 'Combat' || scene.engine!.state.turnNumber !== before || !!scene.engine!.getPendingChoice()
+    }, turnNumber), { message: 'End turn through keyboard controls' }).toBe(true)
+}
+
 export async function inspect(page: Page) {
     return page.evaluate(() => {
         const game = window.__testGame

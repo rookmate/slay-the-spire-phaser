@@ -28,7 +28,9 @@ npm run build
   A20's second Act 3 boss, and the final rest/shop/elite/Heart sequence.
 - Merchant stock, discounts, removal, Courier restocking, Orrery, campfire relic
   actions, and a choice to leave chests closed.
-- Five XP unlock tiers and Ascension progression for each character, card library,
+- All four characters and their complete card collections are available immediately,
+  including in existing saves and imported profiles. Relic XP tiers and Ascension
+  progression remain per character, with a card library,
   score breakdowns, and the last 500 runs in local history.
 - Standard, seeded, local daily, and custom runs. Custom modifiers include
   Draft, Sealed Deck, mixed card pools, Endless, and Blight Chests.
@@ -48,7 +50,8 @@ counters. Active play time is saved separately so the timer cannot overwrite a
 combat checkpoint. Won fights and outstanding reward choices save without
 duplicating gold or relics. Shops save purchases and stock together.
 
-Content XP is earned across run modes. Standard runs advance Ascension and key
+XP is earned across run modes and continues relic progression. Cards do not
+require XP unlocks. Standard runs advance Ascension and key
 progression. Seeded runs reproduce this implementation's rules and RNG; a seed
 from the commercial game will produce a different run. Daily challenges use a
 UTC date and save scores on this device. Saves and profiles use browser local
@@ -74,9 +77,15 @@ npm run test:browser
 The suite starts Vite on port 5174 and drives the game through mouse clicks and
 drags. It covers combat, all characters, card-selection pages, crowded encounters,
 potion replacement, draft selections, events, the A20/Heart route, and reloads.
-A seeded starter-deck run earns its cards and relics and plays all three acts;
+A seeded starter-deck run uses keyboard card controls, earns its cards and relics,
+and plays all three acts;
 its route and result are attached to the Playwright report. Smaller tests use
 explicit saved-run fixtures to exercise edge cases quickly.
+
+The long campaign has a 15-minute limit and no automatic retry. Its trace keeps
+actions and source references without capturing a screenshot or DOM snapshot on
+every action; failure screenshots and the route log remain enabled. Dedicated
+drag, targeting, and animation tests retain full traces.
 
 `tests/browser/index.html` starts the production game factory and scenes with a
 read-only inspector. That entry is excluded from the production build. Tests

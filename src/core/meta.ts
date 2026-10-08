@@ -1,5 +1,5 @@
 import { clampAscension, MAX_ASCENSION } from './ascension'
-import { CHARACTER_IDS, type CharacterId } from './characters'
+import { CHARACTERS, CHARACTER_IDS, type CharacterId } from './characters'
 import type { CardInstance } from './state'
 import type { RelicId, RunState } from './run'
 import { getBaseUnlockedCardIds, getBaseUnlockedRelicIds, UNLOCK_TRACKS, UNLOCK_XP, type UnlockBundle } from './unlocks'
@@ -39,16 +39,17 @@ const META_KEY = 'sts_meta_v2'
 export function createDefaultMeta(): MetaState {
     return { version: 3, bestAscensionUnlocked: 0, totalWins: 0, totalRuns: 0, ironcladUnlockTier: 0, unlockedCardIds: [], unlockedRelicIds: [], history: [] }
 }
-function progressDefaults(character: CharacterId): CharacterProgress {
-    return { unlocked: character === 'ironclad', ascension: 0, unlockTier: 0, xp: 0, act3Cleared: false, previousRunReachedBoss: false }
+function progressDefaults(): CharacterProgress {
+    return { unlocked: true, ascension: 0, unlockTier: 0, xp: 0, act3Cleared: false, previousRunReachedBoss: false }
 }
 export function getCharacterProgress(meta: MetaState, character: CharacterId): CharacterProgress {
     if (!meta.characters) {
-        meta.characters = Object.fromEntries(CHARACTER_IDS.map(id => [id, progressDefaults(id)])) as Record<CharacterId, CharacterProgress>
+        meta.characters = Object.fromEntries(CHARACTER_IDS.map(id => [id, progressDefaults()])) as Record<CharacterId, CharacterProgress>
         Object.assign(meta.characters.ironclad, { ascension: clampAscension(meta.bestAscensionUnlocked), unlockTier: Math.min(5, meta.ironcladUnlockTier), previousRunReachedBoss: !!meta.previousRunReachedBoss, act3Cleared: meta.totalWins > 0 })
-        if (meta.totalRuns > 0) meta.characters.silent.unlocked = true
     }
-    return meta.characters[character]
+    const progress = meta.characters[character] ??= progressDefaults()
+    progress.unlocked = true
+    return progress
 }
 export function loadMeta(): MetaState {
     try {
@@ -57,8 +58,15 @@ export function loadMeta(): MetaState {
         const meta = { ...createDefaultMeta(), ...parsed, unlockedCardIds: parsed.unlockedCardIds ?? [], unlockedRelicIds: parsed.unlockedRelicIds ?? [] }
         for (const id of CHARACTER_IDS) {
             const progress = getCharacterProgress(meta, id)
-            meta.characters![id] = { ...progressDefaults(id), ...progress, ascension: clampAscension(progress?.ascension ?? 0), unlockTier: Math.max(0, Math.min(5, progress?.unlockTier ?? 0)), xp: Math.max(0, progress?.xp ?? 0) }
+            meta.characters![id] = { ...progressDefaults(), ...progress, ascension: clampAscension(progress?.ascension ?? 0), unlockTier: Math.max(0, Math.min(5, progress?.unlockTier ?? 0)), xp: Math.max(0, progress?.xp ?? 0) }
         }
+        meta.notifications = meta.notifications?.flatMap(notice => {
+            if (notice.id.startsWith('character:')) return []
+            const character = CHARACTER_IDS.find(id => notice.id.startsWith(`bundle:${id}:`))
+            const bundle = character && UNLOCK_TRACKS[character][Number(notice.id.split(':')[2]) - 1]
+            if (bundle && !bundle.relics.length) return []
+            return [bundle ? { ...notice, title: `${CHARACTERS[character!].name}: new relics` } : notice]
+        })
         meta.version = 3
         return meta
     } catch { return createDefaultMeta() }
@@ -79,7 +87,7 @@ function earnedBundles(meta: MetaState): UnlockBundle[] {
     return CHARACTER_IDS.flatMap(id => UNLOCK_TRACKS[id].slice(0, getCharacterProgress(meta, id).unlockTier))
 }
 export function getEffectiveUnlockedCardIds(meta: MetaState): Set<string> {
-    return new Set([...getBaseUnlockedCardIds(), ...meta.unlockedCardIds, ...earnedBundles(meta).flatMap(bundle => bundle.cards)])
+    return new Set([...getBaseUnlockedCardIds(), ...meta.unlockedCardIds])
 }
 export function getEffectiveUnlockedRelicIds(meta: MetaState): Set<RelicId> {
     return new Set([...getBaseUnlockedRelicIds(), ...meta.unlockedRelicIds, ...earnedBundles(meta).flatMap(bundle => bundle.relics)])
