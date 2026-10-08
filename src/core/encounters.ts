@@ -1,45 +1,8 @@
+import type { Act } from './acts'
 import { RNG } from './rng'
 import type { EncounterTier } from './rewards'
 
-export type EnemyKey =
-    | 'CULTIST'
-    | 'JAW_WORM'
-    | 'RED_LOUSE'
-    | 'GREEN_LOUSE'
-    | 'FUNGI_BEAST'
-    | 'SNEAKY_GREMLIN'
-    | 'MAD_GREMLIN'
-    | 'FAT_GREMLIN'
-    | 'SHIELD_GREMLIN'
-    | 'WIZARD_GREMLIN'
-    | 'SLAVER_RED'
-    | 'SLAVER_BLUE'
-    | 'LOOTER'
-    | 'SPIKE_SLIME_S'
-    | 'SPIKE_SLIME_M'
-    | 'SPIKE_SLIME_L'
-    | 'ACID_SLIME_S'
-    | 'ACID_SLIME_M'
-    | 'ACID_SLIME_L'
-    | 'GREMLIN_NOB'
-    | 'LAGAVULIN'
-    | 'SENTRY'
-    | 'THE_GUARDIAN'
-    | 'SLIME_BOSS'
-    | 'SHELLED_PARASITE'
-    | 'SNECKO'
-    | 'BOOK_OF_STABBING'
-    | 'THE_CHAMP'
-    | 'CHOSEN'
-    | 'BYRD'
-    | 'SPHERIC_GUARDIAN'
-    | 'GREMLIN_LEADER'
-    | 'RED_SLAVER'
-    | 'BLUE_SLAVER'
-    | 'TASKMASTER'
-    | 'THE_COLLECTOR'
-    | 'TORCH_HEAD'
-    | 'GREMLIN_MINION'
+export type EnemyKey = 'SLAVER_BLUE' | 'BLUE_SLAVER' | 'MUGGER' | 'GREEN_LOUSE' | 'SPIRE_SHIELD' | 'SPIRE_SPEAR' | 'CORRUPT_HEART' | 'SPIKER' | 'REPULSOR' | 'EXPLODER' | 'ORB_WALKER' | 'DARKLING' | 'SPIRE_GROWTH' | 'MAW' | 'TRANSIENT' | 'WRITHING_MASS' | 'DAGGER' | 'REPTOMANCER' | 'NEMESIS' | 'GIANT_HEAD' | 'DONU' | 'DECA' | 'TIME_EATER' | 'AWAKENED_ONE' | 'CULTIST' | 'JAW_WORM' | 'RED_LOUSE' | 'SPIKE_SLIME_S' | 'SPIKE_SLIME_M' | 'SPIKE_SLIME_L' | 'ACID_SLIME_S' | 'ACID_SLIME_M' | 'ACID_SLIME_L' | 'FUNGI_BEAST' | 'SNEAKY_GREMLIN' | 'MAD_GREMLIN' | 'FAT_GREMLIN' | 'SHIELD_GREMLIN' | 'WIZARD_GREMLIN' | 'GREMLIN_NOB' | 'LAGAVULIN' | 'SENTRY' | 'SLIME_BOSS' | 'HEXAGHOST' | 'THE_GUARDIAN' | 'LOOTER' | 'SLAVER_RED' | 'RED_SLAVER' | 'SNECKO' | 'CHOSEN' | 'BYRD' | 'SPHERIC_GUARDIAN' | 'SHELLED_PARASITE' | 'SNAKE_PLANT' | 'CENTURION' | 'MYSTIC' | 'BOOK_OF_STABBING' | 'GREMLIN_MINION' | 'GREMLIN_LEADER' | 'TASKMASTER' | 'TORCH_HEAD' | 'THE_COLLECTOR' | 'THE_CHAMP' | 'BRONZE_ORB' | 'BRONZE_AUTOMATON'
 
 export function pickWeighted<T>(rng: RNG, items: { item: T; weight: number }[]): T {
     const total = items.reduce((sum, item) => sum + item.weight, 0)
@@ -50,41 +13,35 @@ export function pickWeighted<T>(rng: RNG, items: { item: T; weight: number }[]):
     return items[items.length - 1].item
 }
 
-export function generateEncounter(rng: RNG, act: 1 | 2, tier: EncounterTier, combatIndex: number): EnemyKey[] {
-    if (act === 2) return generateActTwoEncounter(rng, tier)
-    if (tier === 'elite') return generateActOneElite(rng)
-    if (tier === 'boss') return rng.random() < 0.5 ? ['THE_GUARDIAN'] : ['SLIME_BOSS']
+export function generateEncounter(rng: RNG, act: Act, tier: EncounterTier, combatIndex: number): EnemyKey[] {
+    if (act === 4) return tier === 'boss' ? ['CORRUPT_HEART'] : ['SPIRE_SHIELD', 'SPIRE_SPEAR']
+    if (tier === 'boss') return bossEncounter(getActBoss(rng, act))
+    if (act === 3) {
+        if (tier === 'elite') return pick(rng, [['GIANT_HEAD'], ['NEMESIS'], ['REPTOMANCER', 'DAGGER', 'DAGGER']])
+        if (combatIndex < 2) return pick(rng, [['DARKLING', 'DARKLING', 'DARKLING'], ['ORB_WALKER'], ['SPIKER', 'REPULSOR', 'EXPLODER']])
+        return pick(rng, [['SPIKER', 'SPIKER', 'REPULSOR', 'EXPLODER'], ['DARKLING', 'DARKLING', 'DARKLING'], ['SPIRE_GROWTH'], ['MAW'], ['TRANSIENT'], ['WRITHING_MASS'], ['JAW_WORM', 'JAW_WORM', 'JAW_WORM']])
+    }
+    if (act === 2) {
+        if (tier === 'elite') return pick(rng, [['BOOK_OF_STABBING'], ['GREMLIN_LEADER', 'SNEAKY_GREMLIN', 'FAT_GREMLIN'], ['RED_SLAVER', 'TASKMASTER', 'BLUE_SLAVER']])
+        if (combatIndex < 2) return pick(rng, [['CHOSEN'], ['BYRD', 'BYRD', 'BYRD'], ['SPHERIC_GUARDIAN'], ['SHELLED_PARASITE'], ['LOOTER', 'MUGGER']])
+        return pick(rng, [['CHOSEN', 'BYRD'], ['CHOSEN', 'CULTIST'], ['SENTRY', 'SPHERIC_GUARDIAN'], ['SHELLED_PARASITE', 'FUNGI_BEAST'], ['SNAKE_PLANT'], ['SNECKO'], ['CENTURION', 'MYSTIC'], ['CULTIST', 'CULTIST', 'CULTIST']])
+    }
+    if (tier === 'elite') return pick(rng, [['GREMLIN_NOB'], ['LAGAVULIN'], ['SENTRY', 'SENTRY', 'SENTRY']])
     return generateActOneHallwayEncounter(rng, combatIndex)
 }
 
-function generateActOneElite(rng: RNG): EnemyKey[] {
-    const pick = rng.int(0, 2)
-    if (pick === 0) return ['GREMLIN_NOB']
-    if (pick === 1) return ['LAGAVULIN']
-    return ['SENTRY', 'SENTRY', 'SENTRY']
+function pick(rng: RNG, pool: EnemyKey[][]): EnemyKey[] { return pool[rng.int(0, pool.length - 1)] }
+export const ACT_BOSSES: Record<1 | 2 | 3 | 4, EnemyKey[]> = {
+    1: ['THE_GUARDIAN', 'SLIME_BOSS', 'HEXAGHOST'],
+    2: ['THE_CHAMP', 'THE_COLLECTOR', 'BRONZE_AUTOMATON'],
+    3: ['TIME_EATER', 'AWAKENED_ONE', 'DONU'],
+    4: ['CORRUPT_HEART'],
 }
-
-function generateActTwoEncounter(rng: RNG, tier: EncounterTier): EnemyKey[] {
-    if (tier === 'elite') {
-        const pick = rng.int(0, 2)
-        if (pick === 0) return ['BOOK_OF_STABBING']
-        if (pick === 1) return ['GREMLIN_LEADER']
-        return ['RED_SLAVER', 'BLUE_SLAVER', 'TASKMASTER']
-    }
-    if (tier === 'boss') {
-        return rng.random() < 0.5
-            ? ['THE_CHAMP']
-            : ['THE_COLLECTOR', 'TORCH_HEAD', 'TORCH_HEAD']
-    }
-    const pick = rng.int(0, 7)
-    if (pick === 0) return ['CHOSEN']
-    if (pick === 1) return ['BYRD']
-    if (pick === 2) return ['SPHERIC_GUARDIAN']
-    if (pick === 3) return ['CHOSEN', 'BYRD']
-    if (pick === 4) return ['SPHERIC_GUARDIAN', 'BYRD']
-    if (pick === 5) return ['SHELLED_PARASITE']
-    if (pick === 6) return ['SNECKO']
-    return ['LOOTER', 'CULTIST']
+export function getActBoss(rng: RNG, act: Act): EnemyKey { return ACT_BOSSES[act][rng.int(0, ACT_BOSSES[act].length - 1)] }
+export function bossEncounter(boss: EnemyKey): EnemyKey[] {
+    if (boss === 'DONU') return ['DONU', 'DECA']
+    if (boss === 'AWAKENED_ONE') return ['CULTIST', 'CULTIST', 'AWAKENED_ONE']
+    return [boss]
 }
 
 function generateActOneHallwayEncounter(rng: RNG, combatIndex: number): EnemyKey[] {
@@ -93,35 +50,35 @@ function generateActOneHallwayEncounter(rng: RNG, combatIndex: number): EnemyKey
 }
 
 function firstThree(rng: RNG): EnemyKey[] {
-    const choice = pickWeighted(rng, [
+    const choice = pickWeighted<string>(rng, [
         { item: 'CULTIST' as EnemyKey, weight: 2 },
         { item: 'JAW_WORM' as EnemyKey, weight: 2 },
-        { item: 'TWO_LOUSE' as unknown as EnemyKey, weight: 2 },
-        { item: 'SMALL_SLIMES' as unknown as EnemyKey, weight: 2 },
+        { item: 'TWO_LOUSE' as const, weight: 2 },
+        { item: 'SMALL_SLIMES' as const, weight: 2 },
     ])
 
-    if (choice === ('TWO_LOUSE' as unknown as EnemyKey)) return [pickLouse(rng), pickLouse(rng)]
-    if (choice === ('SMALL_SLIMES' as unknown as EnemyKey)) {
+    if (choice === ('TWO_LOUSE' as const)) return [pickLouse(rng), pickLouse(rng)]
+    if (choice === ('SMALL_SLIMES' as const)) {
         return rng.random() < 0.5 ? ['SPIKE_SLIME_M', 'ACID_SLIME_S'] : ['ACID_SLIME_M', 'SPIKE_SLIME_S']
     }
-    return [choice]
+    return [choice as EnemyKey]
 }
 
 function remaining(rng: RNG): EnemyKey[] {
-    const choice = pickWeighted(rng, [
-        { item: 'GANG_GREMLINS' as unknown as EnemyKey, weight: 1 },
-        { item: 'LARGE_SLIME' as unknown as EnemyKey, weight: 2 },
-        { item: 'SWARM_SLIMES' as unknown as EnemyKey, weight: 1 },
+    const choice = pickWeighted<string>(rng, [
+        { item: 'GANG_GREMLINS' as const, weight: 1 },
+        { item: 'LARGE_SLIME' as const, weight: 2 },
+        { item: 'SWARM_SLIMES' as const, weight: 1 },
         { item: 'SLAVER_BLUE' as EnemyKey, weight: 2 },
         { item: 'SLAVER_RED' as EnemyKey, weight: 1 },
-        { item: 'THREE_LOUSE' as unknown as EnemyKey, weight: 2 },
-        { item: 'FUNGI_PAIR' as unknown as EnemyKey, weight: 2 },
-        { item: 'EXOR_THUGS' as unknown as EnemyKey, weight: 1.5 },
-        { item: 'EXOR_WILDLIFE' as unknown as EnemyKey, weight: 1.5 },
+        { item: 'THREE_LOUSE' as const, weight: 2 },
+        { item: 'FUNGI_PAIR' as const, weight: 2 },
+        { item: 'EXOR_THUGS' as const, weight: 1.5 },
+        { item: 'EXOR_WILDLIFE' as const, weight: 1.5 },
         { item: 'LOOTER' as EnemyKey, weight: 2 },
     ])
 
-    if (choice === ('GANG_GREMLINS' as unknown as EnemyKey)) {
+    if (choice === ('GANG_GREMLINS' as const)) {
         const pool: EnemyKey[] = ['FAT_GREMLIN', 'FAT_GREMLIN', 'SNEAKY_GREMLIN', 'SNEAKY_GREMLIN', 'MAD_GREMLIN', 'MAD_GREMLIN', 'SHIELD_GREMLIN', 'WIZARD_GREMLIN']
         const picks: EnemyKey[] = []
         for (let i = 0; i < 4 && pool.length > 0; i++) {
@@ -131,23 +88,23 @@ function remaining(rng: RNG): EnemyKey[] {
         }
         return picks
     }
-    if (choice === ('LARGE_SLIME' as unknown as EnemyKey)) return [rng.random() < 0.5 ? 'SPIKE_SLIME_L' : 'ACID_SLIME_L']
-    if (choice === ('SWARM_SLIMES' as unknown as EnemyKey)) return ['SPIKE_SLIME_S', 'SPIKE_SLIME_S', 'SPIKE_SLIME_S', 'ACID_SLIME_S', 'ACID_SLIME_S']
-    if (choice === ('THREE_LOUSE' as unknown as EnemyKey)) return [pickLouse(rng), pickLouse(rng), pickLouse(rng)]
-    if (choice === ('FUNGI_PAIR' as unknown as EnemyKey)) return ['FUNGI_BEAST', 'FUNGI_BEAST']
-    if (choice === ('EXOR_THUGS' as unknown as EnemyKey)) {
+    if (choice === ('LARGE_SLIME' as const)) return [rng.random() < 0.5 ? 'SPIKE_SLIME_L' : 'ACID_SLIME_L']
+    if (choice === ('SWARM_SLIMES' as const)) return ['SPIKE_SLIME_S', 'SPIKE_SLIME_S', 'SPIKE_SLIME_S', 'ACID_SLIME_S', 'ACID_SLIME_S']
+    if (choice === ('THREE_LOUSE' as const)) return [pickLouse(rng), pickLouse(rng), pickLouse(rng)]
+    if (choice === ('FUNGI_PAIR' as const)) return ['FUNGI_BEAST', 'FUNGI_BEAST']
+    if (choice === ('EXOR_THUGS' as const)) {
         const first = rng.random() < 0.5 ? pickLouse(rng) : pickMediumSlime(rng)
-        const second = pickWeighted(rng, [
+        const second = pickWeighted<string>(rng, [
             { item: (rng.random() < 0.5 ? 'SLAVER_RED' : 'SLAVER_BLUE') as EnemyKey, weight: 1 },
             { item: 'CULTIST' as EnemyKey, weight: 1 },
             { item: 'LOOTER' as EnemyKey, weight: 1 },
         ])
-        return [first, second]
+        return [first, second as EnemyKey]
     }
-    if (choice === ('EXOR_WILDLIFE' as unknown as EnemyKey)) {
+    if (choice === ('EXOR_WILDLIFE' as const)) {
         return [rng.random() < 0.5 ? 'FUNGI_BEAST' : 'JAW_WORM', rng.random() < 0.5 ? pickLouse(rng) : pickMediumSlime(rng)]
     }
-    return [choice]
+    return [choice as EnemyKey]
 }
 
 function pickLouse(rng: RNG): EnemyKey {

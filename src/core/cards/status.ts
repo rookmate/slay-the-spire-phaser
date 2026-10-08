@@ -1,6 +1,13 @@
 import type { CardDef } from '../state'
 
 export const STATUS_CARDS: Record<string, CardDef> = {
+    DOUBT: { id: 'DOUBT', name: 'Doubt', type: 'curse', cost: 0, unplayable: true, poolEnabled: false, description: () => 'At turn end, gain 1 Weak.' },
+    SHAME: { id: 'SHAME', name: 'Shame', type: 'curse', cost: 0, unplayable: true, poolEnabled: false, description: () => 'At turn end, gain 1 Frail.' },
+    DECAY: { id: 'DECAY', name: 'Decay', type: 'curse', cost: 0, unplayable: true, poolEnabled: false, description: () => 'At turn end, take 2 damage.' },
+    WRITHE: { id: 'WRITHE', name: 'Writhe', type: 'curse', cost: 0, unplayable: true, innate: true, poolEnabled: false },
+    NORMALITY: { id: 'NORMALITY', name: 'Normality', type: 'curse', cost: 0, unplayable: true, poolEnabled: false, description: () => 'While in hand, you cannot play more than 3 cards per turn.' },
+    VOID: { id: 'VOID', name: 'Void', type: 'status', cost: 0, unplayable: true, ethereal: true, poolEnabled: false },
+    ASCENDERS_BANE: { id: 'ASCENDERS_BANE', name: "Ascender's Bane", type: 'curse', cost: 0, unplayable: true, ethereal: true, poolEnabled: false },
     WOUND: {
         id: 'WOUND',
         name: 'Wound',

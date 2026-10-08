@@ -34,14 +34,14 @@ export class MapScene extends Phaser.Scene {
             fontSize: '14px',
             color: '#cccccc',
         })
-        this.add.text(16, 60, `Act ${this.run.act}  Ascension ${getAscensionLabel(this.run.asc)}`, {
+        this.add.text(16, 60, `Act ${this.run.act}  ${getAscensionLabel(this.run.asc)}  Keys: ${Object.entries(this.run.keys).filter(([, held]) => held).map(([key]) => key).join(", ") || "none"}`, {
             fontFamily: 'monospace',
             fontSize: '14px',
             color: '#cccccc',
         })
 
         // Generate map for this act
-        this.gmap = generateMap(this.run.seed, this.run.act, 15, 7, this.run.asc)
+        this.gmap = generateMap(this.run.seed, this.run.act, this.run.mapRows ?? 16, 7, this.run.asc)
         this.currentNodeId = this.run.mapProgress?.currentNodeId
         this.drawGraph()
 
@@ -77,6 +77,7 @@ export class MapScene extends Phaser.Scene {
         const rng = new RNG(`${this.run.seed}-unknown-${this.run.floor}`)
         this.currentNodeId = node.id
         this.run.mapProgress = { currentNodeId: node.id }
+        this.run.burningEliteActive = Boolean(node.burning && !this.run.keys.emerald)
         let kind: RoomKind | UnknownOutcome = node.kind
         if (node.kind === 'unknown') {
             const weights = this.run.unknownWeights ?? defaultUnknownWeights()
@@ -141,7 +142,7 @@ export class MapScene extends Phaser.Scene {
                 // Add pulsating animation for available paths
                 this.addPulsateAnimation(t)
             }
-            const label = this.add.text(x + 14, y - 10, n.kind, { fontFamily: 'monospace', fontSize: '12px', color: '#aaa' })
+            const label = this.add.text(x + 14, y - 10, n.burning && !this.run.keys.emerald ? 'burning elite' : n.kind, { fontFamily: 'monospace', fontSize: '12px', color: '#aaa' })
             this.mapLayer.add(t)
             this.mapLayer.add(label)
         }
@@ -151,7 +152,7 @@ export class MapScene extends Phaser.Scene {
 
     private isSelectable(n: MapNode): boolean {
         // If no current node yet, only bottom row starts are valid
-        if (!this.currentNodeId) return n.row === this.gmap.rows - 1 && n.kind === 'start'
+        if (!this.currentNodeId) return this.gmap.startIds.includes(n.id)
         // Otherwise must be a forward edge of current node
         const cur = this.gmap.byId[this.currentNodeId]
         if (!cur) return false

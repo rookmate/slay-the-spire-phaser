@@ -1,3 +1,4 @@
+import { CAMPAIGN_RELICS } from './relics/campaign'
 import type { RoomKind } from './map'
 import type { Engine } from './engine'
 import type { MetaState } from './meta'
@@ -10,7 +11,7 @@ export interface RelicDef {
     id: RelicId
     name: string
     description: string
-    rarity: 'starter' | 'common' | 'uncommon' | 'boss'
+    rarity: 'starter' | 'common' | 'uncommon' | 'rare' | 'shop' | 'event' | 'boss'
     energyPerTurn?: number
     postCombatHeal?: number
     blocksPotionGain?: boolean
@@ -74,6 +75,7 @@ const UNCOMMON_RELICS: RelicId[] = [
 ]
 
 export const RELIC_DEFS: Record<RelicId, RelicDef> = {
+    ...CAMPAIGN_RELICS,
     BURNING_BLOOD: {
         id: 'BURNING_BLOOD',
         name: 'Burning Blood',
@@ -182,7 +184,7 @@ export const RELIC_DEFS: Record<RelicId, RelicDef> = {
         id: 'PRESERVED_INSECT',
         name: 'Preserved Insect',
         description: 'Elites have 25% less HP.',
-        rarity: 'uncommon',
+        rarity: 'common',
         eliteHpMultiplier: 0.75,
     },
     OMAMORI: {
@@ -275,13 +277,13 @@ export const RELIC_DEFS: Record<RelicId, RelicDef> = {
         id: 'PAPER_FROG',
         name: 'Paper Frog',
         description: 'Enemies with Vulnerable take 75% more attack damage rather than 50%.',
-        rarity: 'common',
+        rarity: 'uncommon',
     },
     MERCURY_HOURGLASS: {
         id: 'MERCURY_HOURGLASS',
         name: 'Mercury Hourglass',
         description: 'At the start of each turn, deal 3 damage to all enemies.',
-        rarity: 'common',
+        rarity: 'uncommon',
         onPlayerTurnStart: ({ engine }) => {
             for (const enemy of engine.state.enemies) {
                 if (enemy.hp > 0) engine.enqueue({ kind: 'DealDamage', source: engine.state.player.id, target: enemy.id, amount: 3, damageType: 'effect' })
@@ -292,7 +294,7 @@ export const RELIC_DEFS: Record<RelicId, RelicDef> = {
         id: 'CHARONS_ASHES',
         name: "Charon's Ashes",
         description: 'Whenever you exhaust a card, deal 3 damage to all enemies.',
-        rarity: 'common',
+        rarity: 'rare',
         onCardExhausted: ({ engine }) => {
             for (const enemy of engine.state.enemies) {
                 if (enemy.hp > 0) engine.enqueue({ kind: 'DealDamage', source: engine.state.player.id, target: enemy.id, amount: 3, damageType: 'effect' })
@@ -318,6 +320,7 @@ export function setRelicCharges(run: RunState, relicId: RelicId, charges: number
 
 export function applyRelicAcquisition(run: RunState, relicId: RelicId): void {
     if (relicId === 'BLACK_BLOOD') run.relics = run.relics.filter(id => id !== 'BURNING_BLOOD')
+    if (relicId === 'CIRCLET' && run.relics.includes(relicId)) { getRelicState(run, relicId).counter = (getRelicState(run, relicId).counter ?? 1) + 1; return }
     if (run.relics.includes(relicId)) return
     run.relics.push(relicId)
     RELIC_DEFS[relicId].onAcquire?.(run)
@@ -390,6 +393,7 @@ export function getCombatRelicBonuses(relics: RelicId[], roomKind: RoomKind): Co
 
 export function getPostCombatHeal(run: Pick<RunState, 'relics'> | RelicId[]): number {
     const relics = Array.isArray(run) ? run : run.relics
+    if (relics.includes('MARK_OF_THE_BLOOM')) return 0
     return relics.reduce((highest, relicId) => Math.max(highest, RELIC_DEFS[relicId]?.postCombatHeal ?? 0), 0)
 }
 
@@ -413,8 +417,8 @@ export function getCardRewardChoiceCount(run: Pick<RunState, 'relics'> | RelicId
     return Math.max(1, baseChoices + delta)
 }
 
-export function getShopPriceMultiplier(run: Pick<RunState, 'asc'>): number {
-    return getAscensionShopPriceMultiplier(run.asc)
+export function getShopPriceMultiplier(run: Pick<RunState, 'asc'> & Partial<Pick<RunState, 'relics'>>): number {
+    return getAscensionShopPriceMultiplier(run.asc) * (run.relics?.includes('MEMBERSHIP_CARD') ? 0.5 : 1) * (run.relics?.includes('COURIER') ? 0.8 : 1)
 }
 
 export function getMerchantRemoveBaseCost(run: Pick<RunState, 'asc'>): number {
@@ -443,6 +447,6 @@ export function getUnlockedRelicPool(meta: MetaState, rarity?: RelicDef['rarity'
     return Object.keys(RELIC_DEFS)
         .map(id => id as RelicId)
         .filter(id => RELIC_DEFS[id].rarity !== 'starter')
-        .filter(id => rarity ? RELIC_DEFS[id].rarity === rarity : RELIC_DEFS[id].rarity !== 'boss')
-        .filter(id => RELIC_DEFS[id].rarity === 'boss' || unlocked.has(id))
+        .filter(id => rarity ? RELIC_DEFS[id].rarity === rarity : ['common', 'uncommon', 'rare'].includes(RELIC_DEFS[id].rarity))
+        .filter(id => ['boss', 'shop'].includes(RELIC_DEFS[id].rarity) || ['SMILING_MASK', 'COURIER', 'MANGO', 'OLD_COIN', 'THREAD_AND_NEEDLE'].includes(id) || unlocked.has(id))
 }

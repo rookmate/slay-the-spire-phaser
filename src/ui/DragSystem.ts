@@ -50,7 +50,7 @@ export class DragSystem {
         if (!cardDef || cardDef.unplayable) return
 
         // Mirror engine cost modifiers so drag availability matches actual playability.
-        const effectiveCost = this.getEffectiveCost(cardDef)
+        const effectiveCost = this.engine.getCardCost(cardInstance)
         if (this.engine.state.player.energy < effectiveCost) {
             return // Can't afford, don't start drag
         }
@@ -263,13 +263,6 @@ export class DragSystem {
     private clearTargetHighlights(): void {
         this.validTargets.forEach(target => target.destroy())
         this.validTargets = []
-    }
-
-    private getEffectiveCost(cardDef: CardDef): number {
-        const hasCorruption = this.engine.state.player.powers.find(p => p.id === 'CORRUPTION')?.stacks ?? 0
-        if (hasCorruption > 0 && cardDef.type === 'skill') return 0
-        if (cardDef.xCost) return this.engine.state.player.energy
-        return cardDef.cost ?? 0
     }
 
     private cleanupDrag(): void {

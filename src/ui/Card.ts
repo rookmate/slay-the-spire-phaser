@@ -55,7 +55,7 @@ export class Card extends Phaser.GameObjects.Container {
             wordWrap: { width: w - 44 }
         })
 
-        this.cost = scene.add.text(w - 28, 8, def.xCost ? 'X' : String(def.cost ?? 0), {
+        this.cost = scene.add.text(w - 28, 8, def.xCost ? 'X' : String(opts.engine?.getCardCost(card) ?? def.cost ?? 0), {
             fontFamily: 'monospace',
             fontSize: '12px',
             color: '#ffeb3b',

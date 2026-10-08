@@ -2,6 +2,8 @@ import type { RelicId } from './run'
 import { getBaseUnlockedCardIds as getBaseUnlockedCardIdsFromTrack, getBaseUnlockedRelicIds as getBaseUnlockedRelicIdsFromTrack, IRONCLAD_UNLOCK_TRACK, type UnlockBundle } from './unlocks'
 
 export interface MetaState {
+    previousRunReachedBoss?: boolean
+    lastRecordedRunId?: string
     bestAscensionUnlocked: number
     totalWins: number
     totalRuns: number
@@ -10,7 +12,7 @@ export interface MetaState {
     unlockedRelicIds: RelicId[]
 }
 
-const MAX_ASCENSION = 10
+import { MAX_ASCENSION } from './ascension'
 
 const META_KEY = 'sts_meta_v2'
 

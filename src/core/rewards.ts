@@ -1,110 +1,79 @@
 import { RNG } from './rng'
-import { getAscensionHallwayGoldMultiplier } from './ascension'
-import { getUnlockedCollectibleCards } from './cards'
+import { cardChoices, drawRelic, drawBossRelics, drawPotion } from './rewardPools'
 import type { RoomKind } from './map'
 import type { MetaState } from './meta'
 import type { RelicId, RunState } from './run'
-import { BOSS_RELIC_POOL, blocksPotionGain, getCardRewardChoiceCount, getUnlockedRelicPool } from './relics'
+import { blocksPotionGain, getCardRewardChoiceCount } from './relics'
 import type { PotionId } from './potions'
 
 export type EncounterTier = 'hallway' | 'elite' | 'boss' | 'chest'
 
 export type RewardItem =
     | { kind: 'gold'; amount: number }
-    | { kind: 'cards'; choices: string[] }
+    | { kind: 'cards'; choices: string[]; upgrades?: number[] }
     | { kind: 'relic'; relicId: RelicId }
     | { kind: 'potion'; potionId: PotionId }
     | { kind: 'boss_relics'; choices: RelicId[] }
 
 export interface RewardBundle {
+    advanceFloor?: boolean
+    claimed?: number[]
     tier: EncounterTier
     items: RewardItem[]
 }
 
-const RARITY_ORDER: Array<'common' | 'uncommon' | 'rare'> = ['common', 'common', 'common', 'common', 'common', 'common', 'uncommon', 'uncommon', 'uncommon', 'rare']
-const POTION_POOL: PotionId[] = [
-    'FIRE_POTION',
-    'BLOCK_POTION',
-    'STRENGTH_POTION',
-    'ENERGY_POTION',
-    'DEXTERITY_POTION',
-    'WEAK_POTION',
-    'EXPLOSIVE_POTION',
-]
-
 export function generateRewardBundle(
     seed: string,
     tier: EncounterTier,
-    run: Pick<RunState, 'relics' | 'potions' | 'maxPotionSlots'> | RelicId[],
+    run: Pick<RunState, 'relics' | 'potions' | 'maxPotionSlots'> & Partial<RunState> | RelicId[],
     meta: MetaState,
     opts?: { roomKind?: RoomKind; asc?: number },
 ): RewardBundle {
     const rng = new RNG(seed)
     const items: RewardItem[] = []
     const runView = Array.isArray(run)
-        ? { relics: run, potions: [], maxPotionSlots: 3 }
+        ? { relics: run, potions: [], maxPotionSlots: 3 } as Partial<RunState> & Pick<RunState, 'relics' | 'potions' | 'maxPotionSlots'>
         : run
     const cardChoiceCount = getCardRewardChoiceCount(runView)
     const canGainPotion = !blocksPotionGain(runView)
 
     if (tier === 'hallway') {
         const baseGold = rng.int(10, 20)
-        const asc = Array.isArray(run) ? (opts?.asc ?? 0) : (run as RunState).asc
-        const roomKind = opts?.roomKind ?? 'monster'
-        const amount = roomKind === 'monster'
-            ? Math.floor(baseGold * getAscensionHallwayGoldMultiplier(asc))
-            : baseGold
+        const amount = baseGold
         items.push({ kind: 'gold', amount })
-        items.push({ kind: 'cards', choices: drawCardChoices(rng, meta, cardChoiceCount) })
-        if (canGainPotion && rng.random() < 0.4) items.push({ kind: 'potion', potionId: POTION_POOL[rng.int(0, POTION_POOL.length - 1)] })
+        items.push({ kind: 'cards', choices: cardChoices(rng, meta, cardChoiceCount, runView, 'hallway') })
     } else if (tier === 'elite') {
         items.push({ kind: 'gold', amount: rng.int(25, 35) })
-        items.push({ kind: 'cards', choices: drawCardChoices(rng, meta, cardChoiceCount) })
+        items.push({ kind: 'cards', choices: cardChoices(rng, meta, cardChoiceCount, runView, tier === 'elite' ? 'elite' : 'hallway') })
         items.push({ kind: 'relic', relicId: drawRelic(rng, meta, runView.relics) })
-        if (canGainPotion && rng.random() < 0.6) items.push({ kind: 'potion', potionId: POTION_POOL[rng.int(0, POTION_POOL.length - 1)] })
     } else if (tier === 'boss') {
+        const asc = opts?.asc ?? (Array.isArray(run) ? 0 : (run as RunState).asc)
+        items.push({ kind: 'gold', amount: Math.round(rng.int(95, 105) * (asc >= 13 ? 0.75 : 1)) })
+        items.push({ kind: 'cards', choices: cardChoices(rng, meta, cardChoiceCount, runView, 'boss') })
         items.push({ kind: 'boss_relics', choices: drawBossRelics(rng, runView.relics) })
     } else if (tier === 'chest') {
-        items.push({ kind: 'relic', relicId: drawRelic(rng, meta, runView.relics) })
-        items.push({ kind: 'gold', amount: rng.int(25, 35) })
+        const sizeRoll = rng.random()
+        const size = sizeRoll < 0.5 ? 'small' : sizeRoll < 0.83 ? 'medium' : 'large'
+        const table = {
+            small: { common: 0.75, uncommon: 1, goldChance: 0.5, goldMin: 23, goldMax: 27 },
+            medium: { common: 0.35, uncommon: 0.85, goldChance: 0.35, goldMin: 45, goldMax: 55 },
+            large: { common: 0, uncommon: 0.75, goldChance: 0.5, goldMin: 68, goldMax: 82 },
+        }[size]
+        const rarityRoll = rng.random()
+        const rarity = rarityRoll < table.common ? 'common' : rarityRoll < table.uncommon ? 'uncommon' : 'rare'
+        items.push({ kind: 'relic', relicId: drawRelic(rng, meta, runView.relics, rarity) })
+        if (rng.random() < table.goldChance) items.push({ kind: 'gold', amount: rng.int(table.goldMin, table.goldMax) })
     }
 
+    if (tier !== 'chest') {
+        const chance = runView.potionChance ?? 0.4
+        const dropped = rng.random() < chance
+        runView.potionChance = Math.max(0, Math.min(1, chance + (dropped ? -0.1 : 0.1)))
+        if (canGainPotion && dropped) items.push({ kind: 'potion', potionId: drawPotion(rng) })
+        if (runView.relics.includes('GOLDEN_IDOL')) for (const item of items) if (item.kind === 'gold') item.amount = Math.floor(item.amount * 1.25)
+    }
+    const act = Array.isArray(run) ? 1 : ((run as RunState).act ?? 1)
+    const asc = opts?.asc ?? (Array.isArray(run) ? 0 : (run as RunState).asc)
+    for (const item of items) if (item.kind === 'cards') item.upgrades = item.choices.map(() => tier === 'boss' ? 0 : Number(rng.random() < Math.max(0, act - 1) * (asc >= 12 ? 0.125 : 0.25)))
     return { tier, items }
-}
-
-function drawCardChoices(rng: RNG, meta: MetaState, count: number): string[] {
-    const chosen = new Set<string>()
-    const allByRarity = {
-        common: getUnlockedCollectibleCards(meta, 'common'),
-        uncommon: getUnlockedCollectibleCards(meta, 'uncommon'),
-        rare: getUnlockedCollectibleCards(meta, 'rare'),
-    }
-    const fallback = [...new Set([...allByRarity.common, ...allByRarity.uncommon, ...allByRarity.rare])]
-
-    while (chosen.size < count) {
-        const rarity = RARITY_ORDER[rng.int(0, RARITY_ORDER.length - 1)]
-        const pool = allByRarity[rarity].length > 0 ? allByRarity[rarity] : fallback
-        if (pool.length === 0) continue
-        chosen.add(pool[rng.int(0, pool.length - 1)])
-    }
-
-    return [...chosen]
-}
-
-function drawRelic(rng: RNG, meta: MetaState, ownedRelics: RelicId[]): RelicId {
-    const unlocked = getUnlockedRelicPool(meta).filter(id => !ownedRelics.includes(id))
-    const fallback = getUnlockedRelicPool(meta)
-    const pool = unlocked.length > 0 ? unlocked : fallback
-    if (pool.length === 0) return 'ANCHOR'
-    return pool[rng.int(0, pool.length - 1)]
-}
-
-function drawBossRelics(rng: RNG, ownedRelics: RelicId[]): RelicId[] {
-    const pool = BOSS_RELIC_POOL.filter(id => !ownedRelics.includes(id))
-    const source = pool.length > 0 ? pool : BOSS_RELIC_POOL
-    const chosen = new Set<RelicId>()
-    while (chosen.size < Math.min(3, source.length)) {
-        chosen.add(source[rng.int(0, source.length - 1)])
-    }
-    return [...chosen]
 }

@@ -1,3 +1,5 @@
+import { finishBossCombat } from '../core/campaign'
+import { getRunDestination } from '../core/progression'
 import Phaser from 'phaser'
 import { affectsRoomTier } from '../core/ascension'
 import { applyCombatVictory, createCombatEngine } from '../core/combat'
@@ -23,6 +25,11 @@ export class CombatScene extends Phaser.Scene {
     create(data: { run: RunState; roomKind?: RoomKind }): void {
         this.run = data.run
         this.roomKind = data.roomKind ?? 'monster'
+        if (this.run.act === 1 && this.roomKind === 'boss') {
+            this.run.runFlags ??= {}
+            this.run.runFlags.reachedFirstBoss = true
+            saveRun(this.run)
+        }
         this.meta = loadMeta()
         this.engine = createCombatEngine(this.run, this.roomKind)
 
@@ -82,22 +89,21 @@ export class CombatScene extends Phaser.Scene {
     private handleVictory(): void {
         applyCombatVictory(this.run, this.engine.state.player)
         this.run.pendingRoom = undefined
+        if (this.run.eventCombat) {
+            const rewards = this.run.eventCombat.rewards
+            this.run.eventCombat = undefined; this.run.eventState = undefined
+            this.run.pendingRoom = { scene: 'Rewards', rewards }; saveRun(this.run)
+            this.scene.start('Rewards', { run: this.run, rewards }); return
+        }
 
+        if (this.roomKind === 'elite' && this.run.burningEliteActive) this.run.keys.emerald = true
+        this.run.burningEliteActive = false
+        if (this.roomKind === 'monster') this.run.hallwayCount = (this.run.hallwayCount ?? 0) + 1
         if (this.roomKind === 'boss') {
-            this.run.actsCleared = [...(this.run.actsCleared ?? []), this.run.act]
-            if (this.run.act === 2) {
-                this.scene.start('RunSummary', { run: this.run, result: 'victory' as const })
-                return
-            }
-            const sourceBossId = this.engine.state.enemies[0]?.specId ?? 'BOSS'
-            const bossRewards = generateRewardBundle(`${this.run.seed}-boss-relics-act-${this.run.act}-floor-${this.run.floor}`, 'boss', this.run, this.meta, { roomKind: 'boss' })
-            const bossRelicChoices = bossRewards.items.find(item => item.kind === 'boss_relics')
-            this.run.bossRelicChoicePending = {
-                sourceBossId,
-                choices: bossRelicChoices && bossRelicChoices.kind === 'boss_relics' ? bossRelicChoices.choices : [],
-            }
+            const scene = finishBossCombat(this.run, this.meta)
             saveRun(this.run)
-            this.scene.start('BossRelic', { run: this.run })
+            if (scene === 'RunSummary') this.scene.start(scene, { run: this.run, result: 'victory' })
+            else { const next = getRunDestination(this.run); this.scene.start(next.scene, next.data) }
             return
         }
 

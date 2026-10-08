@@ -1,141 +1,61 @@
 import Phaser from 'phaser'
-import { canUpgradeCard, resolveCard } from '../core/cards'
-import { EVENT_DEFS, generateEvent, resolveEventChoice, type EventChoiceDef, type EventId } from '../core/events'
+import { canUpgradeCard, createCardInstance } from '../core/cards'
+import { EVENT_DEFS, eventSeed, getEventChoices, initializeEvent, resolveEventChoice, type EventChoiceDef, type EventId } from '../core/events'
 import { loadMeta, type MetaState } from '../core/meta'
-import { getRelicDisplayName } from '../core/relics'
+import { completeRoom } from '../core/progression'
 import { saveRun, type RunState } from '../core/run'
 import { DeckSelectionOverlay } from '../ui/DeckSelectionOverlay'
-import { completeRoom } from '../core/progression'
 
 export class EventScene extends Phaser.Scene {
     run!: RunState
     private meta!: MetaState
     private selector!: DeckSelectionOverlay
     private eventId!: EventId
-    private feedbackText?: Phaser.GameObjects.Text
-
-    constructor() {
-        super('Event')
-    }
-
+    constructor() { super('Event') }
     create(data: { run: RunState }): void {
-        this.run = data.run
-        this.meta = loadMeta()
-        this.selector = new DeckSelectionOverlay(this)
-        this.eventId = generateEvent(this.run.act, `${this.run.seed}-event-${this.run.mapProgress?.currentNodeId ?? this.run.floor}`)
-        this.render()
-    }
-
-    private render(): void {
-        this.children.removeAll()
-        const event = EVENT_DEFS[this.eventId]
-        const titleStyle = { fontFamily: 'monospace', fontSize: '24px', color: '#ffffff' }
-        const bodyStyle = { fontFamily: 'monospace', fontSize: '17px', color: '#d0d0d0', wordWrap: { width: 760 } }
-        const noteStyle = { fontFamily: 'monospace', fontSize: '14px', color: '#d9bdd9', wordWrap: { width: 760 } }
-
-        this.add.rectangle(0, 0, this.scale.width, this.scale.height, 0x171717, 1).setOrigin(0, 0)
-        this.add.text(20, 18, event.title, titleStyle)
-        this.add.text(20, 60, event.body, bodyStyle)
-        if (event.note) {
-            this.add.text(20, 104, event.note, {
-                fontFamily: 'monospace',
-                fontSize: '14px',
-                color: '#d9bdd9',
-                wordWrap: { width: 760 },
-            })
-        }
-
-        let y = 178
-        for (const choice of event.choices) {
-            this.renderChoice(choice, y)
-            y += 60
-        }
-
-        this.feedbackText = this.add.text(20, this.scale.height - 88, '', noteStyle)
-        this.add.text(20, this.scale.height - 42, 'Leave', {
-            fontFamily: 'monospace',
-            fontSize: '17px',
-            color: '#ffffff',
-            backgroundColor: '#313131',
-            padding: { x: 10, y: 7 },
-        }).setInteractive({ useHandCursor: true }).on('pointerdown', () => this.leave())
-    }
-
-    private renderChoice(choice: EventChoiceDef, y: number): void {
-        const disabled = choice.disabled?.(this.run) ?? false
-        const container = this.add.container(20, y)
-        const bg = this.add.rectangle(0, 0, 560, 46, disabled ? 0x2a2a2a : 0x232323, 1).setOrigin(0, 0)
-        const label = this.add.text(12, 7, choice.label, {
-            fontFamily: 'monospace',
-            fontSize: '17px',
-            color: disabled ? '#777777' : '#ffffff',
-        })
-        const description = this.add.text(180, 9, choice.description ?? '', {
-            fontFamily: 'monospace',
-            fontSize: '13px',
-            color: disabled ? '#6a6a6a' : '#bfbfbf',
-        })
-        container.add([bg, label, description])
-
-        if (disabled) return
-
-        bg.setInteractive({ useHandCursor: true }).on('pointerdown', () => this.handleChoice(choice))
-        label.setInteractive({ useHandCursor: true }).on('pointerdown', () => this.handleChoice(choice))
-        description.setInteractive({ useHandCursor: true }).on('pointerdown', () => this.handleChoice(choice))
-    }
-
-    private handleChoice(choice: EventChoiceDef): void {
-        if (choice.requiresSelection === 'remove') {
-            this.selector.open({
-                title: 'Choose a card to remove',
-                cards: this.run.deck,
-                onSelect: (card) => this.applyChoice(choice.id, { cardInstanceId: card.instanceId }),
-            })
-            return
-        }
-        if (choice.requiresSelection === 'upgrade') {
-            this.selector.open({
-                title: 'Choose a card to upgrade',
-                cards: this.run.deck,
-                filter: (card) => canUpgradeCard(card),
-                onSelect: (card) => this.applyChoice(choice.id, { cardInstanceId: card.instanceId }),
-            })
-            return
-        }
-        if (choice.requiresSelection === 'transform') {
-            this.selector.open({
-                title: 'Choose a card to transform',
-                cards: this.run.deck,
-                onSelect: (card) => this.applyChoice(choice.id, { cardInstanceId: card.instanceId }),
-            })
-            return
-        }
-        this.applyChoice(choice.id)
-    }
-
-    private applyChoice(choiceId: EventChoiceDef['id'], selection?: { cardInstanceId?: string }): void {
-        const result = resolveEventChoice(
-            this.run,
-            this.meta,
-            this.eventId,
-            choiceId,
-            `${this.run.seed}-event-resolution-${this.run.mapProgress?.currentNodeId ?? this.run.floor}-${choiceId}`,
-            selection,
-        )
-        const notes = [...(result.notes ?? [])]
-        if (result.grantedRelicId) notes.push(`Relic: ${getRelicDisplayName(this.run, result.grantedRelicId)}`)
-        if (result.transformedCard) notes.push(`New card: ${resolveCard(result.transformedCard).name}`)
-        if (selection?.cardInstanceId) {
-            const card = this.run.deck.find(entry => entry.instanceId === selection.cardInstanceId)
-            if (card) notes.push(`Card: ${resolveCard(card).name}`)
-        }
-        if (this.feedbackText) this.feedbackText.setText(notes.join(' '))
-        this.leave()
-    }
-
-    private leave(): void {
-        completeRoom(this.run)
+        this.run = data.run; this.meta = loadMeta(); this.selector = new DeckSelectionOverlay(this)
+        initializeEvent(this.run, this.meta)
+        this.eventId = this.run.eventState!.id
         saveRun(this.run)
-        this.scene.start('Map', { run: this.run })
+        this.render()
+        this.events.once('shutdown', () => this.selector.destroy())
+    }
+    private render(): void {
+        this.children.removeAll(true)
+        const event = EVENT_DEFS[this.eventId]
+        this.add.rectangle(0, 0, this.scale.width, this.scale.height, 0x171717).setOrigin(0)
+        this.add.text(24, 18, event.title, { fontFamily: 'monospace', fontSize: '26px', color: '#fff' })
+        this.add.text(24, 57, event.body, { fontFamily: 'monospace', fontSize: '17px', color: '#ccc', wordWrap: { width: 750 } })
+        this.add.text(24, 92, `${this.run.player.hp}/${this.run.player.maxHp} HP    ${this.run.gold} Gold`, { fontFamily: 'monospace', fontSize: '16px', color: '#aaa' })
+        getEventChoices(this.run).forEach((choice, i) => {
+            const disabled = choice.disabled?.(this.run) ?? false
+            const y = 132 + i * 65
+            const text = this.add.text(24, y, choice.label, { fontFamily: 'monospace', fontSize: '19px', color: disabled ? '#777' : '#fff', backgroundColor: '#2d2d2d', padding: { x: 10, y: 8 } })
+            if (!disabled) text.setInteractive({ useHandCursor: true }).on('pointerdown', () => this.handleChoice(choice))
+            this.add.text(24, y + 40, choice.description ?? '', { fontFamily: 'monospace', fontSize: '14px', color: '#bbb', wordWrap: { width: 744 } })
+        })
+        this.add.text(24, 345, this.run.eventState?.notes?.join(' ') ?? '', { fontFamily: 'monospace', fontSize: '15px', color: '#dbc5a3', wordWrap: { width: 750 } })
+        if (this.run.eventState?.resolved) this.add.text(24, 399, 'Continue', { fontFamily: 'monospace', fontSize: '18px', color: '#fff', backgroundColor: '#333', padding: { x: 12, y: 8 } })
+            .setInteractive({ useHandCursor: true }).on('pointerdown', () => this.leave())
+    }
+    private handleChoice(choice: EventChoiceDef): void {
+        if (choice.disabled?.(this.run)) return
+        if (choice.requiresSelection === 'reward') {
+            this.selector.open({ title: 'Choose a card', cards: (this.run.eventState?.cards ?? []).map(id => createCardInstance(id)), onSelect: card => this.applyChoice(choice.id, { cardId: card.defId }) })
+        } else if (choice.requiresSelection) {
+            this.selector.open({ title: choice.label, cards: this.run.deck, filter: card => choice.requiresSelection === 'upgrade' ? canUpgradeCard(card) : choice.requiresSelection === 'copy' || card.defId !== 'ASCENDERS_BANE', onSelect: card => this.applyChoice(choice.id, { cardInstanceId: card.instanceId }) })
+        } else this.applyChoice(choice.id)
+    }
+    private applyChoice(choiceId: string, selection?: { cardInstanceId?: string; cardId?: string }): void {
+        const result = resolveEventChoice(this.run, this.meta, this.eventId, choiceId, eventSeed(this.run), selection)
+        saveRun(this.run)
+        if (result.nextScene === 'RunSummary') this.scene.start('RunSummary', { run: this.run, result: 'defeat' })
+        else if (result.nextScene === 'Combat' && this.run.pendingRoom?.scene === 'Combat') this.scene.start('Combat', { run: this.run, roomKind: this.run.pendingRoom.roomKind })
+        else if (result.nextScene === 'Rewards' && this.run.pendingRoom?.scene === 'Rewards') this.scene.start('Rewards', { run: this.run, rewards: this.run.pendingRoom.rewards })
+        else this.render()
+    }
+    private leave(): void {
+        if (!this.run.eventState?.resolved) return
+        completeRoom(this.run); saveRun(this.run); this.scene.start('Map', { run: this.run })
     }
 }

@@ -50,7 +50,7 @@ test('can leave a campfire when Coffee Dripper and an upgraded deck block both s
     run.deck = run.deck.map(card => ({ ...card, upgradeLevel: 1 }))
     const errors = await boot(page, run)
     const ui = await inspect(page)
-    expect(ui.texts.filter(t => t.enabled).map(t => t.text)).toEqual(['Skip'])
+    expect(ui.texts.filter(t => t.enabled).map(t => t.text)).toEqual(['Recall (obtain Ruby Key)', 'Skip'])
     await clickText(page, 'Skip')
     await expectScene(page, 'Map')
     expect((await inspect(page)).run!.floor).toBe(2)
@@ -100,6 +100,7 @@ test('five enemies and multiple effects stay above the hand; hover shows every e
     const run = createNewRun('crowd-21')
     run.neowCompleted = true
     run.combatCount = 4
+    run.hallwayCount = 4
     run.pendingRoom = { scene: 'Combat', roomKind: 'monster' }
     run.relics.push('BAG_OF_MARBLES', 'PHILOSOPHERS_STONE', 'VAJRA')
     run.deck = ['DEMON_FORM', 'METALLICIZE', 'DEFEND', 'STRIKE', 'STRIKE'].map(id => createCardInstance(id))
@@ -170,6 +171,7 @@ test('card and potion rewards have separate controls and survive reload without 
 
 test('unknown-room probabilities survive reload as part of the run', async ({ page }) => {
     const run = createNewRun('weights-5')
+    run.mapRows = 15
     run.neowCompleted = true
     run.floor = 5
     run.mapProgress = { currentNodeId: '12:1' }
@@ -180,6 +182,6 @@ test('unknown-room probabilities survive reload as part of the run', async ({ pa
     // monster; resetting weights at reload incorrectly produces an event.
     await clickText(page, '?')
     await expectScene(page, 'Combat')
-    expect((await inspect(page)).run!.unknownWeights).toEqual({ event: 0.1, monster: 0.85, shop: 0.1, chest: 0.1 })
+    expect((await inspect(page)).run!.unknownWeights).toEqual({ event: 0.75, monster: 0.1, shop: 0.08, chest: 0.07 })
     expect(errors).toEqual([])
 })

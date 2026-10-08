@@ -5,7 +5,7 @@ import type { GeneratedMap, MapNode } from '../../src/core/map'
 // A deterministic, deliberately small player for the end-to-end run. It only
 // chooses legal actions from visible information; the browser executes them.
 const priorities: Record<string, number> = {
-    DEMON_FORM: 100, REAPER: 95, SPOT_WEAKNESS: 90, SHRUG_IT_OFF: 80,
+    INFLAME: 90, CARNAGE: 65, SEVER_SOUL: 55, APOTHEOSIS: 99, MASTER_OF_STRATEGY: 75, DEMON_FORM: 100, REAPER: 95, SPOT_WEAKNESS: 90, SHRUG_IT_OFF: 80,
     FLAME_BARRIER: 80, METALLICIZE: 75, TWIN_STRIKE: 70, CLEAVE: 70,
     IRON_WAVE: 65, POMMEL_STRIKE: 65, UPPERCUT: 60, SWORD_BOOMERANG: 60,
     IMPERVIOUS: 65, GHOSTLY_ARMOR: 60, BATTLE_TRANCE: 60, ANGER: 55,
@@ -30,7 +30,9 @@ export function choosePlay(state: CombatState): { card: CardInstance; enemyIndex
     const choices: Array<{ card: CardInstance; enemyIndex?: number; score: number }> = []
     for (const card of player.hand) {
         const def = resolveCard(card)
-        if (def.unplayable || def.cost > player.energy) continue
+        const cost = card.costForTurn ?? card.costForCombat ?? card.confusedCost ?? def.cost
+        if (def.unplayable || cost > player.energy || (def.type === 'attack' && stacks(player, 'ENTANGLED') > 0)) continue
+        if ((state.cardsPlayed ?? 0) >= 3 && player.hand.some(c => c.defId === 'NORMALITY')) continue
         if (card.defId === 'CLASH' && player.hand.some(entry => CARD_DEFS[entry.defId].type !== 'attack')) continue
         const targets = def.targeting?.type === 'single_enemy' ? living : [undefined]
         for (const enemy of targets) {
@@ -45,6 +47,9 @@ export function choosePlay(state: CombatState): { card: CardInstance; enemyIndex
                 if (card.defId === 'REAPER') score += Math.min(damage, target.hp, player.maxHp - player.hp) * 2
             }
             score += Math.min(blockNeeded, (def.baseBlock ?? 0) + (def.baseBlock ? stacks(player, 'DEXTERITY') : 0)) * 1.8
+            if (card.defId === 'INFLAME') score += 45
+            if (card.defId === 'APOTHEOSIS') score += 90
+            if (card.defId === 'MASTER_OF_STRATEGY' && player.hand.length < 8) score += 15
             if (card.defId === 'DEMON_FORM') score += living.some(e => e.hp > 35) ? 90 : 0
             if (card.defId === 'SPOT_WEAKNESS' && living.some(e => incomingDamage(e) > 0)) score += 40
             if (card.defId === 'METALLICIZE') score += 24
@@ -54,7 +59,7 @@ export function choosePlay(state: CombatState): { card: CardInstance; enemyIndex
             if (card.defId === 'BASH' && enemy && !stacks(enemy, 'VULNERABLE')) score += 7
             if (card.defId === 'UPPERCUT' && enemy && !stacks(enemy, 'WEAK')) score += incomingDamage(enemy) * 0.5 + 5
             if (card.defId === 'FLAME_BARRIER') score += living.filter(e => incomingDamage(e) > 0).length * 4
-            choices.push({ card, enemyIndex: enemy ? state.enemies.indexOf(enemy) : undefined, score: score / Math.max(0.75, def.cost) })
+            choices.push({ card, enemyIndex: enemy ? state.enemies.indexOf(enemy) : undefined, score: score / Math.max(0.75, cost) })
         }
     }
     return choices.filter(choice => choice.score > 0).sort((a, b) => b.score - a.score)[0]

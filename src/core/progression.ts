@@ -5,7 +5,15 @@ import type { RelicId, RunState } from './run'
 
 export interface ShopInventory {
     cards: string[]
-    relic: RelicId
+    version?: 2
+    relic?: RelicId
+    relics?: RelicId[]
+    cardPrices?: number[]
+    relicPrices?: number[]
+    potionPrices?: number[]
+    saleIndex?: number
+    removalUsed?: boolean
+    restockCount?: number
     potions: PotionId[]
 }
 
@@ -23,13 +31,14 @@ export function getRunDestination(run: RunState) {
     // Old saves had no room checkpoint. A boss node has no outgoing path, so it
     // can only resume at the boss fight unless the relic choice is already saved.
     const nodeId = run.mapProgress?.currentNodeId
-    if (nodeId && generateMap(run.seed, run.act, 15, 7, run.asc).byId[nodeId]?.kind === 'boss') {
+    if (nodeId && generateMap(run.seed, run.act, run.mapRows ?? 16, 7, run.asc).byId[nodeId]?.kind === 'boss') {
         return { scene: 'Combat', data: { run, roomKind: 'boss' as const } }
     }
     return { scene: 'Map', data: { run } }
 }
 
 export function completeRoom(run: RunState): void {
+    run.eventState = undefined
     run.pendingRoom = undefined
     run.floor += 1
 }

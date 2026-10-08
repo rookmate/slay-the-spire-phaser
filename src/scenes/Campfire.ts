@@ -1,3 +1,4 @@
+import { healRun } from '../core/health'
 import Phaser from 'phaser'
 import { getAscensionRestHealFraction } from '../core/ascension'
 import type { RunState } from '../core/run'
@@ -35,7 +36,7 @@ export class CampfireScene extends Phaser.Scene {
             restButton.setInteractive({ useHandCursor: true })
                 .on('pointerdown', () => {
                     const heal = Math.max(1, Math.floor(this.run.player.maxHp * healFraction))
-                    this.run.player.hp = Math.min(this.run.player.maxHp, this.run.player.hp + heal)
+                    healRun(this.run, heal)
                     this.leave()
                 })
         }
@@ -59,7 +60,9 @@ export class CampfireScene extends Phaser.Scene {
                     },
                 })
             })
-        this.add.text(16, 160, 'Skip', { ...style, backgroundColor: '#333', padding: { x: 8, y: 6 } })
+        if (!this.run.keys.ruby) this.add.text(16, 160, 'Recall (obtain Ruby Key)', { ...style, backgroundColor: '#333', padding: { x: 8, y: 6 } })
+            .setInteractive({ useHandCursor: true }).on('pointerdown', () => { this.run.keys.ruby = true; this.leave() })
+        this.add.text(16, 210, 'Skip', { ...style, backgroundColor: '#333', padding: { x: 8, y: 6 } })
             .setInteractive({ useHandCursor: true })
             .on('pointerdown', () => this.leave())
         this.events.once('shutdown', () => this.selector.destroy())

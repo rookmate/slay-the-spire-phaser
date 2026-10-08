@@ -1,186 +1,67 @@
 import Phaser from 'phaser'
-import { getUnlockedCollectibleCards } from '../core/cards'
+import { createCardInstance } from '../core/cards'
 import { loadMeta, type MetaState } from '../core/meta'
-import type { RunState } from '../core/run'
-import { removeCardByInstanceId, saveRun } from '../core/run'
-import { RNG } from '../core/rng'
-import { CARD_DEFS, createCardInstance, isCurseCard, resolveCard } from '../core/cards'
-import { RELIC_DEFS, applyRelicAcquisition, canObtainPotion, getMerchantRemoveBaseCost, getShopPriceMultiplier, getUnlockedRelicPool } from '../core/relics'
-import { POTION_DEFS, type PotionId } from '../core/potions'
+import { POTION_DEFS } from '../core/potions'
+import { completeRoom, type ShopInventory } from '../core/progression'
+import { canObtainPotion, RELIC_DEFS } from '../core/relics'
+import { saveRun, type RunState } from '../core/run'
+import { generateShop, normalizeShop, purchaseRemoval, purchaseShopItem, removalPrice, shopPrice } from '../core/shop'
 import { Card } from '../ui/Card'
 import { DeckSelectionOverlay } from '../ui/DeckSelectionOverlay'
-import { completeRoom, type ShopInventory } from '../core/progression'
 
 export class ShopScene extends Phaser.Scene {
     run!: RunState
     private inventory!: ShopInventory
     private selector!: DeckSelectionOverlay
     private meta!: MetaState
-
-    constructor() {
-        super('Shop')
-    }
-
+    constructor() { super('Shop') }
     create(data: { run: RunState }): void {
         this.run = data.run
         this.meta = loadMeta()
         this.selector = new DeckSelectionOverlay(this)
-        this.inventory = (this.run.pendingRoom?.scene === 'Shop' && this.run.pendingRoom.inventory) || this.generateInventory()
+        this.inventory = normalizeShop(this.run, (this.run.pendingRoom?.scene === 'Shop' && this.run.pendingRoom.inventory) || generateShop(this.run, this.meta))
         this.run.pendingRoom = { scene: 'Shop', inventory: this.inventory }
         saveRun(this.run)
         this.render()
+        this.events.once('shutdown', () => this.selector.destroy())
     }
-
+    private button(x: number, y: number, label: string, enabled: boolean, action: () => void): void {
+        const text = this.add.text(x, y, label, { fontFamily: 'monospace', fontSize: '14px', color: enabled ? '#fff' : '#888', backgroundColor: '#292929', padding: { x: 6, y: 6 } })
+        if (enabled) text.setInteractive({ useHandCursor: true }).on('pointerdown', action)
+    }
+    private buy(kind: 'cards' | 'relics' | 'potions', index: number): void {
+        if (!purchaseShopItem(this.run, this.meta, this.inventory, kind, index)) return
+        saveRun(this.run)
+        if (this.run.pendingRoom?.scene === 'Rewards') this.scene.start('Rewards', { run: this.run, rewards: this.run.pendingRoom.rewards })
+        else this.render()
+    }
     private render(): void {
-        this.children.removeAll()
-        const style = { fontFamily: 'monospace', fontSize: '18px', color: '#ffffff' }
-        this.add.text(16, 16, `Shop (gold ${this.run.gold})  Ascension A${this.run.asc}`, style)
-        this.add.text(16, this.scale.height - 44, 'Leave', { ...style, backgroundColor: '#333', padding: { x: 6, y: 4 } })
-            .setInteractive({ useHandCursor: true })
-            .on('pointerdown', () => {
-                completeRoom(this.run)
-                saveRun(this.run)
-                this.scene.start('Map', { run: this.run })
-            })
-
-        this.renderCards()
-        this.renderConsumables(style)
-        this.renderRemove(style)
-    }
-
-    private renderCards(): void {
-        const startX = 20
-        const y = 70
-        const spacing = 130
-        this.inventory.cards.forEach((cardId, index) => {
-            const rarity = CARD_DEFS[cardId].rarity
-            const cost = this.priceFor(rarity === 'common' ? 50 : rarity === 'uncommon' ? 75 : 150)
-            const view = new Card(this, createCardInstance(cardId), {
-                x: startX + index * spacing,
-                y,
-                interactive: false,
-            })
-            this.add.existing(view)
-            const buy = this.add.text(startX + index * spacing, y + 188, `Buy (${cost})`, {
-                fontFamily: 'monospace',
-                fontSize: '14px',
-                color: '#ffffff',
-                backgroundColor: this.run.gold >= cost ? '#333' : '#666',
-                padding: { x: 6, y: 4 },
-            }).setInteractive({ useHandCursor: true })
-            buy.on('pointerdown', () => {
-                if (this.run.gold < cost) return
-                this.run.gold -= cost
-                this.run.deck.push(createCardInstance(cardId))
-                this.inventory.cards.splice(index, 1)
-                saveRun(this.run)
-                this.render()
-            })
+        this.children.removeAll(true)
+        this.add.text(18, 16, `Merchant    ${this.run.gold} Gold    A${this.run.asc}`, { fontFamily: 'monospace', fontSize: '22px', color: '#fff' })
+        this.inventory.cards.forEach((id, i) => {
+            const x = 18 + i * 109
+            this.add.existing(new Card(this, createCardInstance(id), { x, y: 56, scale: 0.70 }))
+            const price = shopPrice(this.run, this.inventory.cardPrices![i])
+            this.button(x, 190, `${i === this.inventory.saleIndex ? 'Sale ' : ''}${price} G`, this.run.gold >= price, () => this.buy('cards', i))
         })
-    }
-
-    private renderConsumables(style: Phaser.Types.GameObjects.Text.TextStyle): void {
-        const leftX = 20
-        const baseY = 300
-        const relicCost = this.priceFor(150)
-        this.add.text(leftX, baseY, `Relic: ${RELIC_DEFS[this.inventory.relic].name} (${relicCost})`, style)
-            .setInteractive({ useHandCursor: true })
-            .on('pointerdown', () => {
-                if (this.run.gold < relicCost) return
-                this.run.gold -= relicCost
-                applyRelicAcquisition(this.run, this.inventory.relic)
-                this.inventory.relic = getUnlockedRelicPool(this.meta).find(id => !this.run.relics.includes(id)) ?? this.inventory.relic
-                saveRun(this.run)
-                this.render()
-            })
-
-        this.inventory.potions.forEach((potion, index) => {
-            const canBuyPotion = canObtainPotion(this.run)
-            const potionCost = this.priceFor(50)
-            this.add.text(leftX, baseY + 40 + index * 32, `${POTION_DEFS[potion].name} (${canBuyPotion ? potionCost : 'blocked'})`, {
-                ...style,
-                color: canBuyPotion ? style.color : '#777777',
-            })
-                .setInteractive({ useHandCursor: true })
-                .on('pointerdown', () => {
-                    if (!canBuyPotion || this.run.gold < potionCost || this.run.potions.length >= this.run.maxPotionSlots) return
-                    this.run.gold -= potionCost
-                    this.run.potions.push(potion)
-                    this.inventory.potions.splice(index, 1)
-                    saveRun(this.run)
-                    this.render()
-                })
+        this.inventory.relics!.forEach((id, i) => {
+            const x = 18 + i * 256
+            const def = RELIC_DEFS[id]
+            const price = shopPrice(this.run, this.inventory.relicPrices![i])
+            this.button(x, 235, `${def.name} · ${price} G`, this.run.gold >= price, () => this.buy('relics', i))
+            this.add.text(x, 270, def.description, { fontFamily: 'monospace', fontSize: '12px', color: '#bbb', wordWrap: { width: 236 } })
         })
-    }
-
-    private renderRemove(style: Phaser.Types.GameObjects.Text.TextStyle): void {
-        if (this.run.merchantRemoveCost < getMerchantRemoveBaseCost(this.run)) {
-            this.run.merchantRemoveCost = getMerchantRemoveBaseCost(this.run)
-        }
-        const canPurge = this.run.gold >= this.run.merchantRemoveCost && this.run.deck.length > 0
-        this.add.text(420, 268, `Purge cost: ${this.run.merchantRemoveCost}`, {
-            ...style,
-            fontSize: '15px',
-            color: canPurge ? '#d8d8d8' : '#777777',
+        this.inventory.potions.forEach((id, i) => {
+            const price = shopPrice(this.run, this.inventory.potionPrices![i])
+            this.button(18 + i * 256, 325, `${POTION_DEFS[id].name} · ${price} G`, this.run.gold >= price && canObtainPotion(this.run), () => this.buy('potions', i))
+            this.add.text(18 + i * 256, 359, POTION_DEFS[id].description, { fontFamily: 'monospace', fontSize: '12px', color: '#bbb', wordWrap: { width: 236 } })
         })
-        this.add.text(420, 300, `Remove a card (${this.run.merchantRemoveCost})`, {
-            ...style,
-            backgroundColor: canPurge ? '#333' : '#555',
-            padding: { x: 8, y: 6 },
-        }).setInteractive({ useHandCursor: true })
-            .on('pointerdown', () => {
-                if (this.run.gold < this.run.merchantRemoveCost || this.run.deck.length === 0) return
-                this.selector.open({
-                    title: 'Choose a card to remove',
-                    cards: this.run.deck,
-                    onSelect: (card) => {
-                        this.run.gold -= this.run.merchantRemoveCost
-                        this.run.merchantRemoveCost += 25
-                        removeCardByInstanceId(this.run, card.instanceId)
-                        saveRun(this.run)
-                        this.render()
-                    },
-                })
-            })
-        const curses = this.run.deck.filter(card => isCurseCard(card)).map(card => resolveCard(card).name)
-        this.add.text(420, 340, `Curses in deck: ${curses.length > 0 ? curses.join(', ') : 'None'}`, {
-            fontFamily: 'monospace',
-            fontSize: '13px',
-            color: curses.length > 0 ? '#d9bdd9' : '#bcbcbc',
-            wordWrap: { width: 260 },
-        })
-    }
-
-    private generateInventory(): ShopInventory {
-        const nodeId = this.run.mapProgress?.currentNodeId ?? `floor-${this.run.floor}`
-        const rng = new RNG(`${this.run.seed}-shop-${nodeId}`)
-        const cards = [
-            ...this.pickCards(rng, 'common', 3),
-            ...this.pickCards(rng, 'uncommon', 1),
-            ...this.pickCards(rng, 'rare', 1),
-        ]
-        const relicPool = getUnlockedRelicPool(this.meta).filter(id => !this.run.relics.includes(id))
-        const relicSource = relicPool.length > 0 ? relicPool : getUnlockedRelicPool(this.meta)
-        const relic = relicSource[rng.int(0, relicSource.length - 1)]
-        const potions = [this.pickPotion(rng), this.pickPotion(rng)]
-        return { cards, relic, potions }
-    }
-
-    private pickCards(rng: RNG, rarity: 'common' | 'uncommon' | 'rare', count: number): string[] {
-        const pool = getUnlockedCollectibleCards(this.meta, rarity)
-        const picked = new Set<string>()
-        while (picked.size < Math.min(count, pool.length)) {
-            picked.add(pool[rng.int(0, pool.length - 1)])
-        }
-        return [...picked]
-    }
-
-    private pickPotion(rng: RNG): PotionId {
-        const ids = Object.keys(POTION_DEFS) as PotionId[]
-        return ids[rng.int(0, ids.length - 1)]
-    }
-
-    private priceFor(basePrice: number): number {
-        return Math.ceil(basePrice * getShopPriceMultiplier(this.run))
+        const cost = removalPrice(this.run)
+        this.button(18, 401, this.inventory.removalUsed ? 'Card removal used' : `Remove a card · ${cost} G`, !this.inventory.removalUsed && this.run.gold >= cost && this.run.deck.some(card => card.defId !== 'ASCENDERS_BANE'), () => this.selector.open({
+            title: 'Choose a card to remove', cards: this.run.deck, filter: card => card.defId !== 'ASCENDERS_BANE', onSelect: card => {
+                if (purchaseRemoval(this.run, this.inventory, card.instanceId)) { saveRun(this.run); this.render() }
+            },
+        }))
+        this.button(680, 401, 'Leave', true, () => { completeRoom(this.run); saveRun(this.run); this.scene.start('Map', { run: this.run }) })
     }
 }

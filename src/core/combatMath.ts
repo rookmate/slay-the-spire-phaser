@@ -9,13 +9,16 @@ export function powerAmount(entity: Combatant, id: PowerId): number {
 
 /** Amount already contains Strength and card/relic bonuses. Round only after multipliers. */
 export function damageAmount(base: number, source: Combatant | undefined, target: Combatant | undefined,
-    type: DamageType = 'attack', vulnerableMultiplier = 1.5): number {
+    type: DamageType = 'attack', vulnerableMultiplier = 1.5, attackMultiplier = 1): number {
     let amount = base
     if (type === 'attack') {
+        amount *= attackMultiplier
         if (source && powerAmount(source, 'WEAK') > 0) amount *= 0.75
         if (target && powerAmount(target, 'VULNERABLE') > 0) amount *= vulnerableMultiplier
+        if (target && 'specId' in target && target.specId === 'GIANT_HEAD') amount *= 1 + Number(target.aiState?.slow ?? 0) * 0.1
         if (target && 'specId' in target && target.specId === 'BYRD' && target.aiState?.flying) amount *= 0.5
     }
+    if (target && powerAmount(target, 'INTANGIBLE') > 0) amount = Math.min(1, amount)
     return Math.max(0, Math.floor(amount))
 }
 
@@ -29,5 +32,5 @@ export function blockAmount(base: number, target: Combatant, source: BlockSource
 }
 
 export function isDebuff(id: PowerId, stacks: number): boolean {
-    return stacks < 0 || ['WEAK', 'VULNERABLE', 'FRAIL', 'NO_DRAW', 'STRENGTH_DOWN_NEXT_TURN'].includes(id)
+    return stacks < 0 || ['WEAK', 'VULNERABLE', 'FRAIL', 'NO_DRAW', 'STRENGTH_DOWN_NEXT_TURN', 'CONFUSION', 'HEX', 'ENTANGLED', 'DRAW_REDUCTION', 'CONSTRICTED'].includes(id)
 }

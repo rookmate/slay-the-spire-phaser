@@ -11,6 +11,7 @@ export type PotionId =
     | 'EXPLOSIVE_POTION'
 
 export interface PotionDef {
+    rarity?: 'common' | 'uncommon' | 'rare'
     id: PotionId
     name: string
     target: 'none' | 'player' | 'single_enemy'
@@ -20,6 +21,7 @@ export interface PotionDef {
 
 export const POTION_DEFS: Record<PotionId, PotionDef> = {
     FIRE_POTION: {
+        rarity: 'common',
         id: 'FIRE_POTION',
         name: 'Fire Potion',
         target: 'single_enemy',
@@ -31,6 +33,7 @@ export const POTION_DEFS: Record<PotionId, PotionDef> = {
         },
     },
     BLOCK_POTION: {
+        rarity: 'common',
         id: 'BLOCK_POTION',
         name: 'Block Potion',
         target: 'player',
@@ -40,6 +43,7 @@ export const POTION_DEFS: Record<PotionId, PotionDef> = {
         },
     },
     STRENGTH_POTION: {
+        rarity: 'common',
         id: 'STRENGTH_POTION',
         name: 'Strength Potion',
         target: 'player',
@@ -49,6 +53,7 @@ export const POTION_DEFS: Record<PotionId, PotionDef> = {
         },
     },
     ENERGY_POTION: {
+        rarity: 'common',
         id: 'ENERGY_POTION',
         name: 'Energy Potion',
         target: 'player',
@@ -58,6 +63,7 @@ export const POTION_DEFS: Record<PotionId, PotionDef> = {
         },
     },
     DEXTERITY_POTION: {
+        rarity: 'common',
         id: 'DEXTERITY_POTION',
         name: 'Dexterity Potion',
         target: 'player',
@@ -67,6 +73,7 @@ export const POTION_DEFS: Record<PotionId, PotionDef> = {
         },
     },
     WEAK_POTION: {
+        rarity: 'common',
         id: 'WEAK_POTION',
         name: 'Weak Potion',
         target: 'single_enemy',
@@ -78,6 +85,7 @@ export const POTION_DEFS: Record<PotionId, PotionDef> = {
         },
     },
     EXPLOSIVE_POTION: {
+        rarity: 'common',
         id: 'EXPLOSIVE_POTION',
         name: 'Explosive Potion',
         target: 'none',
