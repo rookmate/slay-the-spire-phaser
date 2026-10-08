@@ -82,17 +82,31 @@ export class CombatUI {
     apply(events: EmittedEvent[]): void {
         for (const event of events) {
             if (event.kind === 'CardPlayed') playCue('card')
+            if (event.kind === 'CardExhausted') playCue('exhaust')
             if (event.kind === 'TurnChanged' && event.turn === 'player') playCue('turn')
             if (event.kind === 'Healed' && event.amount > 0 && event.target === this.engine.state.player.id) this.visualEffects.showDamageNumber(event.amount, 110, 95, true)
-            if (event.kind === 'DamageApplied') {
-                const enemyIndex = this.engine.state.enemies.findIndex(enemy => enemy.id === event.target)
-                if (enemyIndex >= 0) {
-                    this.enemyDisplay.flashEnemyText(enemyIndex)
-                    const sprite = this.enemyDisplay.getEnemySprites()[enemyIndex]
-                    if (sprite && event.amount > 0) this.visualEffects.showDamageNumber(event.amount, sprite.x, sprite.y - 25)
-                }
-                if (event.target === this.engine.state.player.id && event.amount > 0) { this.visualEffects.screenShake(); this.visualEffects.showDamageNumber(event.amount, 110, 95) }
+            if (event.kind === 'OrbChanneled') {
+                playCue('power')
+                this.visualEffects.showImpact(110, 115, 'orb', { lightning: 0xe6ca77, frost: 0xa2d8d7, dark: 0xaf96c5, plasma: 0xefb989 }[event.orbType])
             }
+            if (event.kind === 'StanceChanged') {
+                playCue('power')
+                this.visualEffects.showImpact(110, 115, 'stance', { neutral: 0xc6bea9, calm: 0x9cc7d1, wrath: 0xe28d7b, divinity: 0xf6d67f }[event.stance])
+            }
+            if (!('target' in event)) continue
+            const enemyIndex = this.engine.state.enemies.findIndex(enemy => enemy.id === event.target)
+            const sprite = enemyIndex >= 0 ? this.enemyDisplay.getEnemySprites()[enemyIndex] : undefined
+            const x = sprite?.x ?? 110, y = sprite?.y ?? 115
+            if (event.kind === 'BlockGained' && event.amount > 0) { playCue('block'); this.visualEffects.showImpact(x, y, 'block', 0xa9ccd6) }
+            if (event.kind === 'PowerApplied') this.visualEffects.showImpact(x, y, 'power', event.powerId === 'POISON' ? 0xadd07b : 0xccb28d)
+            if (event.kind === 'DamageApplied' && event.amount > 0) {
+                if (enemyIndex >= 0) this.enemyDisplay.flashEnemyText(enemyIndex)
+                this.visualEffects.showImpact(x, y, event.actualDamage > 0 ? 'hit' : 'block', event.actualDamage > 0 ? 0xe3c698 : 0xa9ccd6)
+                if (event.actualDamage > 0) this.visualEffects.showDamageNumber(event.actualDamage, x, y - 25)
+                else playCue('block')
+                if (event.target === this.engine.state.player.id && event.actualDamage > 0) this.visualEffects.screenShake()
+            }
+            if (event.kind === 'HpLost' && event.amount > 0) this.visualEffects.showDamageNumber(event.amount, x, y - 25)
         }
         this.update()
     }
@@ -131,6 +145,7 @@ export class CombatUI {
         this.keyHandler = (event: KeyboardEvent) => {
             if (event.repeat) return
             if (event.key === 'Escape') {
+                this.handManager.inspectCard(-1)
                 this.clearTargeting()
                 this.dragSystem.cancelDrag(); this.playerDisplay.closePotionMenu(); this.overlayManager.close(); return
             }
@@ -139,6 +154,7 @@ export class CombatUI {
             if (!/^[0-9]$/.test(event.key)) return
             const index = event.key === '0' ? 9 : Number(event.key) - 1, card = this.engine.state.player.hand[index]
             if (!card) return
+            if (event.altKey) { this.handManager.inspectCard(index); return }
             this.clearTargeting()
             const def = resolveCard(card)
             if (def.targeting?.type === 'single_enemy' || def.targeting?.type === 'any') {

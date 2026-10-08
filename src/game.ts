@@ -1,3 +1,4 @@
+import { attachSound } from './ui/sound'
 import { ChestScene } from './scenes/Chest'
 import { InventoryScene } from './scenes/Inventory'
 import { SettingsScene } from './scenes/Settings'
@@ -27,6 +28,7 @@ const config: Phaser.Types.Core.GameConfig = {
   width: 800,
   height: 450,
   dom: { createContainer: true },
+  audio: { noAudio: true },
   parent: 'app',
   backgroundColor: '#1a1a1a',
   scale: {
@@ -46,6 +48,7 @@ const config: Phaser.Types.Core.GameConfig = {
 
 export function createGame(): Phaser.Game {
   const game = new Phaser.Game(config)
+  attachSound(game)
   let sinceSave = 0
   game.events.on(Phaser.Core.Events.POST_STEP, (_time: number, delta: number) => {
     const scene = game.scene.getScenes(true)[0] as Phaser.Scene & { run?: RunState }

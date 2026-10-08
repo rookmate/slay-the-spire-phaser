@@ -31,7 +31,8 @@ export class HandManager {
         this.handInputArea.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
             const card = this.cardAtPoint(pointer.worldX, pointer.worldY)
             if (!card) return
-            this.handCards.forEach(view => scene.tweens.killTweensOf(view))
+            if (card.inspectAtPoint(pointer.worldX, pointer.worldY)) return
+            this.handCards.forEach(view => { scene.tweens.killTweensOf(view); view.showDetails(false) })
             this.onCardDrag?.(card, this.handCards.indexOf(card), pointer)
         })
     }
@@ -64,6 +65,7 @@ export class HandManager {
         const positions = handPositions(this.scene.scale.width, this.scene.scale.height, this.handCards.length, hovered)
         this.handCards.forEach((card, index) => {
             this.scene.tweens.killTweensOf(card)
+            card.showDetails(index === hovered)
             this.handContainer.bringToTop(card)
             card.setDepth(index === hovered ? COMBAT_UI_CONFIG.depths.handHover : index)
             if (animate && !loadSettings().reducedMotion) this.scene.tweens.add({ targets: card, ...positions[index], duration: 100 })
@@ -74,6 +76,10 @@ export class HandManager {
 
     getHandCards(): Card[] {
         return this.handCards
+    }
+
+    inspectCard(index: number): void {
+        this.handCards.forEach((card, i) => card.showDetails(i === index))
     }
 
     destroy(): void {

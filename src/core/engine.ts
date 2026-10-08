@@ -314,11 +314,15 @@ export class Engine {
             case 'StartPlayerTurn': this.startPlayerTurn(evts, action.extra); break
             case 'CardEffect': action.resolve(); break
             case 'OrbPassives': triggerOrbPassives(this, action.phase); break
-            case 'ChannelOrb': channelOrb(this, action.orbType, action.storedDamage); break
+            case 'ChannelOrb':
+                if (this.state.player.orbSlots > 0) { channelOrb(this, action.orbType, action.storedDamage); evts.push({ kind: 'OrbChanneled', orbType: action.orbType }) }
+                break
             case 'EvokeOrb': evokeOrb(this, action.repeats, action.remove); break
             case 'ChangeOrbSlots': changeOrbSlots(this, action.amount); break
             case 'TriggerOrb': triggerOrb(this, action.orb, action.mode); break
-            case 'ChangeStance': changeStance(this, action.stance); break
+            case 'ChangeStance':
+                if (this.state.player.stance !== action.stance) { changeStance(this, action.stance); evts.push({ kind: 'StanceChanged', stance: action.stance }) }
+                break
             case 'PlayTopCard':
             case 'AutoPlayCard': {
                 if (this.endTurnRequested && !(action.kind === 'AutoPlayCard' && action.allowPendingTurnEnd)) break

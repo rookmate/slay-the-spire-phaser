@@ -35,6 +35,8 @@ export type Action =
     | { kind: 'ExhaustCard'; owner: EntityId; cardInstanceId?: string }
 
 export type EmittedEvent =
+    | { kind: 'OrbChanneled'; orbType: OrbType }
+    | { kind: 'StanceChanged'; stance: StanceId }
     | { kind: 'EnergyChanged'; energy: number }
     | { kind: 'CardDrawn' }
     | { kind: 'DamageApplied'; source: EntityId; target: EntityId; amount: number; actualDamage: number; resultingHp: number; resultingBlock: number }
