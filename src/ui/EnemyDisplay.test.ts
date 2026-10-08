@@ -8,6 +8,8 @@ import { EnemyDisplay } from './EnemyDisplay'
 class View {
     events = new Map<string, () => void>()
     destroyed = false
+    width = 160
+    height = 160
     readonly x: number
     readonly y: number
     readonly texture: string
@@ -20,6 +22,7 @@ class View {
     setInteractive() { return this }
     setOrigin() { return this }
     setAlpha() { return this }
+    setDepth() { return this }
     setText() { return this }
     on(event: string, callback: () => void) { this.events.set(event, callback); return this }
     destroy() { this.destroyed = true }

@@ -4,6 +4,8 @@ import type { RunState } from '../core/run'
 import { POTION_DEFS } from '../core/potions'
 import { getRelicDisplayName } from '../core/relics'
 import { COMBAT_UI_CONFIG } from './CombatUIConfig'
+import { combatLayout } from './layout'
+import { summarizeEffects } from './effectLabels'
 
 export class PlayerDisplay {
     private scene: Phaser.Scene
@@ -63,12 +65,12 @@ export class PlayerDisplay {
     }
 
     private createPlayerSprite(): void {
-        this.playerSprite = this.scene.add.image(120, 180, 'player:ironclad').setScale(0.35)
+        this.playerSprite = this.scene.add.image(110, 116, 'player:ironclad').setScale(0.23)
     }
 
     private createPlayerHpText(): void {
         if (!this.playerSprite) return
-        this.playerHpText = this.scene.add.text(this.playerSprite.x, this.playerSprite.y + 80, this.getPlayerHpLabel(), {
+        this.playerHpText = this.scene.add.text(this.playerSprite.x, this.playerSprite.y + 38, this.getPlayerHpLabel(), {
             fontFamily: COMBAT_UI_CONFIG.styles.fontFamily,
             fontSize: COMBAT_UI_CONFIG.styles.hpFontSize,
             color: COMBAT_UI_CONFIG.styles.color,
@@ -77,11 +79,12 @@ export class PlayerDisplay {
 
     private createPlayerNameText(): void {
         if (!this.playerSprite) return
-        this.playerNameText = this.scene.add.text(this.playerSprite.x, this.playerSprite.y - 70, 'Ironclad', {
+        this.playerNameText = this.scene.add.text(this.playerSprite.x, 48, this.getPlayerDetails(), {
             fontFamily: COMBAT_UI_CONFIG.styles.fontFamily,
-            fontSize: COMBAT_UI_CONFIG.styles.fontSize,
+            fontSize: '11px',
             color: COMBAT_UI_CONFIG.styles.color,
-        }).setOrigin(0.5, 1).setAlpha(0)
+            backgroundColor: '#111111', padding: { x: 6, y: 4 }, wordWrap: { width: 190 },
+        }).setOrigin(0.5, 0).setAlpha(0).setDepth(6000)
         this.playerSprite.setInteractive()
         this.playerSprite.on('pointerover', () => this.playerNameText?.setAlpha(1))
         this.playerSprite.on('pointerout', () => this.playerNameText?.setAlpha(0))
@@ -89,7 +92,7 @@ export class PlayerDisplay {
 
     private createEnergyDisplay(): void {
         const { height } = this.scene.scale
-        this.energyText = this.scene.add.text(72, height - 56, this.getPlayerStatsText(), {
+        this.energyText = this.scene.add.text(78, height - 12, this.getPlayerStatsText(), {
             fontFamily: COMBAT_UI_CONFIG.styles.fontFamily,
             fontSize: COMBAT_UI_CONFIG.styles.fontSize,
             color: COMBAT_UI_CONFIG.styles.color,
@@ -100,7 +103,7 @@ export class PlayerDisplay {
 
     private createDrawIcon(): void {
         const { height } = this.scene.scale
-        this.drawIcon = this.scene.add.text(16, height - 16, '🃏', {
+        this.drawIcon = this.scene.add.text(16, height - 12, '🃏', {
             fontFamily: COMBAT_UI_CONFIG.styles.fontFamily,
             fontSize: COMBAT_UI_CONFIG.styles.iconFontSize,
             color: COMBAT_UI_CONFIG.styles.color,
@@ -111,29 +114,20 @@ export class PlayerDisplay {
 
     private createEndTurnButton(): void {
         const { width, height } = this.scene.scale
-        this.endTurnButton = this.scene.add.text(width - 66, height - 46, 'End\nTurn', {
+        this.endTurnButton = this.scene.add.text(width - 16, height - 12, 'End Turn', {
             fontFamily: COMBAT_UI_CONFIG.styles.fontFamily,
             fontSize: COMBAT_UI_CONFIG.styles.fontSize,
             color: COMBAT_UI_CONFIG.styles.color,
             backgroundColor: COMBAT_UI_CONFIG.colors.endTurnBg,
             padding: { x: 6, y: 4 },
         }).setOrigin(1, 1)
-        this.endTurnButton.setInteractive({
-            hitArea: new Phaser.Geom.Rectangle(
-                -this.endTurnButton.displayOriginX,
-                -this.endTurnButton.displayOriginY,
-                this.endTurnButton.width,
-                this.endTurnButton.height,
-            ),
-            hitAreaCallback: Phaser.Geom.Rectangle.Contains,
-            useHandCursor: true,
-        }).on('pointerdown', () => this.onEndTurn?.())
+        this.endTurnButton.setInteractive({ useHandCursor: true }).on('pointerdown', () => this.onEndTurn?.())
     }
 
     private createPowerText(): void {
-        this.powerText = this.scene.add.text(120, 278, this.getPlayerPowers(), {
+        this.powerText = this.scene.add.text(110, 178, this.getPlayerPowers(), {
             fontFamily: 'monospace',
-            fontSize: '12px',
+            fontSize: '10px',
             color: '#bbbbbb',
         }).setOrigin(0.5, 0)
     }
@@ -141,20 +135,21 @@ export class PlayerDisplay {
     private createRelicText(): void {
         this.relicText = this.scene.add.text(16, 16, this.getRelicText(), {
             fontFamily: 'monospace',
-            fontSize: '12px',
+            fontSize: '11px',
             color: '#dddddd',
+            wordWrap: { width: this.scene.scale.width - 32 },
         })
     }
 
     private rebuildPotions(): void {
         this.potionTexts.forEach(text => text.destroy())
         this.potionTexts = []
-        const startX = 16
-        const startY = 318
+        const startX = 180
+        const startY = combatLayout(this.scene.scale.width, this.scene.scale.height).footerTop + 10
         this.run.potions.forEach((potion, index) => {
-            const text = this.scene.add.text(startX + index * 110, startY, POTION_DEFS[potion].name, {
+            const text = this.scene.add.text(startX + index * 128, startY, POTION_DEFS[potion].name, {
                 fontFamily: 'monospace',
-                fontSize: '12px',
+                fontSize: '11px',
                 color: '#ffffff',
                 backgroundColor: '#3a3a3a',
                 padding: { x: 6, y: 4 },
@@ -166,9 +161,10 @@ export class PlayerDisplay {
 
     private setupResizeHandler(): void {
         this.resizeHandler = (gameSize: Phaser.Structs.Size) => {
-            this.drawIcon?.setPosition(16, gameSize.height - 16)
-            this.energyText?.setPosition(72, gameSize.height - 56)
-            this.endTurnButton?.setPosition(gameSize.width - 66, gameSize.height - 46)
+            this.drawIcon?.setPosition(16, gameSize.height - 12)
+            this.energyText?.setPosition(78, gameSize.height - 12)
+            this.endTurnButton?.setPosition(gameSize.width - 16, gameSize.height - 12)
+            this.rebuildPotions()
         }
         this.scene.scale.on('resize', this.resizeHandler)
     }
@@ -184,7 +180,11 @@ export class PlayerDisplay {
 
     private getPlayerPowers(): string {
         if (this.engine.state.player.powers.length === 0) return ''
-        return this.engine.state.player.powers.map(power => `${power.id}:${power.stacks}`).join('  ')
+        return summarizeEffects(this.engine.state.player.powers.map(power => `${power.id}:${power.stacks}`), 32)
+    }
+
+    private getPlayerDetails(): string {
+        return ['Ironclad', ...this.engine.state.player.powers.map(power => `${power.id}:${power.stacks}`)].join('\n')
     }
 
     private getRelicText(): string {
@@ -195,6 +195,7 @@ export class PlayerDisplay {
         this.playerHpText?.setText(this.getPlayerHpLabel())
         this.energyText?.setText(this.getPlayerStatsText())
         this.powerText?.setText(this.getPlayerPowers())
+        this.playerNameText?.setText(this.getPlayerDetails())
         this.relicText?.setText(this.getRelicText())
     }
 

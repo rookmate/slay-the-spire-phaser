@@ -46,11 +46,11 @@ export class NeowScene extends Phaser.Scene {
 
     private renderOption(option: NeowOption, index: number): void {
         const x = 20 + (index % 2) * 390
-        const y = 96 + Math.floor(index / 2) * 210
+        const y = 88 + Math.floor(index / 2) * 176
         const panel = this.add.container(x, y)
         const bgColor = option.category === 'tradeoff' ? 0x2f2028 : 0x1f1f1f
         const borderColor = option.category === 'tradeoff' ? 0x8f5a76 : 0x4d4d4d
-        const panelBg = this.add.rectangle(0, 0, 360, 178, bgColor, 1).setOrigin(0, 0).setStrokeStyle(1, borderColor)
+        const panelBg = this.add.rectangle(0, 0, 360, 164, bgColor, 1).setOrigin(0, 0).setStrokeStyle(1, borderColor)
         const title = this.add.text(14, 12, option.label, {
             fontFamily: 'monospace',
             fontSize: '18px',
@@ -62,7 +62,7 @@ export class NeowScene extends Phaser.Scene {
             color: '#c4c4c4',
             wordWrap: { width: 220 },
         })
-        const footer = this.add.text(14, 146, option.category === 'tradeoff' ? 'Tradeoff' : 'Benefit', {
+        const footer = this.add.text(14, 138, option.category === 'tradeoff' ? 'Tradeoff' : 'Benefit', {
             fontFamily: 'monospace',
             fontSize: '13px',
             color: option.category === 'tradeoff' ? '#d9bdd9' : '#b2d1b2',
@@ -113,9 +113,9 @@ export class NeowScene extends Phaser.Scene {
         }
         if (option.preview?.curseId) {
             const curse = resolveCard(createCardInstance(option.preview.curseId))
-            const card = new Card(this, createCardInstance(option.preview.curseId), { x: 234, y: 16, scale: 0.75 })
+            const card = new Card(this, createCardInstance(option.preview.curseId), { x: 234, y: 16, scale: 0.65 })
             panel.add(card)
-            const note = this.add.text(240, 150, curse.name, {
+            const note = this.add.text(240, 138, curse.name, {
                 fontFamily: 'monospace',
                 fontSize: '12px',
                 color: '#f0c9e8',

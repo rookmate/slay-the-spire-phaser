@@ -58,7 +58,7 @@ export class RewardsScene extends Phaser.Scene {
 
         if (this.pendingPotionReward) this.renderPotionReward(this.pendingPotionReward)
 
-        this.continueButton = this.add.text(this.scale.width / 2, this.scale.height - 36, 'Continue', {
+        this.continueButton = this.add.text(this.scale.width / 2, this.scale.height - 22, 'Continue', {
             ...style,
             backgroundColor: '#666',
             padding: { x: 12, y: 8 },
@@ -73,11 +73,11 @@ export class RewardsScene extends Phaser.Scene {
     }
 
     private renderCardChoices(item: Extract<RewardItem, { kind: 'cards' }>): void {
-        const cardY = this.scale.height / 2 - 30
+        const cardY = 148
         const spacing = 140
-        const startX = this.scale.width / 2 - ((item.choices.length - 1) * spacing) / 2
+        const startX = (this.scale.width - Card.CARD_WIDTH - (item.choices.length - 1) * spacing) / 2
 
-        this.add.text(this.scale.width / 2, cardY - 90, 'Choose a card or skip', {
+        this.add.text(this.scale.width / 2, cardY - 28, 'Choose a card or skip', {
             fontFamily: 'monospace',
             fontSize: '18px',
             color: '#ffffff',
@@ -101,13 +101,13 @@ export class RewardsScene extends Phaser.Scene {
             this.choiceCards.push(view)
         })
 
-        const skip = this.add.text(this.scale.width / 2, cardY + 170, 'Skip', {
+        const skip = this.add.text(this.scale.width - 24, cardY, 'Skip', {
             fontFamily: 'monospace',
             fontSize: '18px',
             color: '#ffffff',
             backgroundColor: '#333',
             padding: { x: 8, y: 6 },
-        }).setOrigin(0.5, 0).setInteractive({ useHandCursor: true })
+        }).setOrigin(1, 0).setInteractive({ useHandCursor: true })
         skip.on('pointerdown', () => {
             this.pendingCardReward = false
             this.choiceCards.forEach(card => card.destroy())
@@ -118,7 +118,7 @@ export class RewardsScene extends Phaser.Scene {
     }
 
     private renderPotionReward(potionId: string): void {
-        const titleY = this.scale.height - 160
+        const titleY = this.scale.height - 110
         this.add.text(24, titleY, `Potion: ${POTION_DEFS[potionId as keyof typeof POTION_DEFS].name}`, {
             fontFamily: 'monospace',
             fontSize: '18px',
@@ -136,14 +136,14 @@ export class RewardsScene extends Phaser.Scene {
             return
         }
 
-        this.add.text(24, titleY + 26, 'Replace a potion or skip:', {
+        this.add.text(400, titleY, 'Replace a potion or skip:', {
             fontFamily: 'monospace',
             fontSize: '16px',
             color: '#ffffff',
         })
 
         this.run.potions.forEach((ownedPotion, index) => {
-            const text = this.add.text(24 + index * 180, titleY + 56, POTION_DEFS[ownedPotion].name, {
+            const text = this.add.text(24 + index * 180, titleY + 28, POTION_DEFS[ownedPotion].name, {
                 fontFamily: 'monospace',
                 fontSize: '15px',
                 color: '#ffffff',
@@ -161,7 +161,7 @@ export class RewardsScene extends Phaser.Scene {
             this.potionTexts.push(text)
         })
 
-        const skip = this.add.text(24, titleY + 92, 'Skip Potion', {
+        const skip = this.add.text(600, titleY + 28, 'Skip Potion', {
             fontFamily: 'monospace',
             fontSize: '15px',
             color: '#ffffff',

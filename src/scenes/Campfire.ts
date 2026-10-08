@@ -40,8 +40,11 @@ export class CampfireScene extends Phaser.Scene {
                 })
         }
 
-        this.add.text(16, 110, 'Smith (upgrade a card)', { ...style, backgroundColor: '#333', padding: { x: 8, y: 6 } })
-            .setInteractive({ useHandCursor: true })
+        const canSmith = this.run.deck.some(canUpgradeCard)
+        const smith = this.add.text(16, 110, canSmith ? 'Smith (upgrade a card)' : 'Smith (no upgrades available)', {
+            ...style, backgroundColor: canSmith ? '#333' : '#555', color: canSmith ? '#fff' : '#bbb', padding: { x: 8, y: 6 },
+        })
+        if (canSmith) smith.setInteractive({ useHandCursor: true })
             .on('pointerdown', () => {
                 this.selector.open({
                     title: 'Choose a card to upgrade',
@@ -56,6 +59,10 @@ export class CampfireScene extends Phaser.Scene {
                     },
                 })
             })
+        this.add.text(16, 160, 'Skip', { ...style, backgroundColor: '#333', padding: { x: 8, y: 6 } })
+            .setInteractive({ useHandCursor: true })
+            .on('pointerdown', () => this.leave())
+        this.events.once('shutdown', () => this.selector.destroy())
     }
 
     private leave(): void {

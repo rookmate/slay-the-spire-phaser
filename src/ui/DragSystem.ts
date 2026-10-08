@@ -2,7 +2,7 @@ import Phaser from 'phaser'
 import type { Engine } from '../core/engine'
 import type { CardInstance, CardDef } from '../core/state'
 import { Card } from './Card'
-import { CARD_DEFS, resolveCard } from '../core/cards'
+import { resolveCard } from '../core/cards'
 import { COMBAT_UI_CONFIG } from './CombatUIConfig'
 
 export class DragSystem {
@@ -11,8 +11,7 @@ export class DragSystem {
     private isDragging = false
     private dragCard?: Card
     private dragCardIndex = -1
-    private dragPreview?: Card
-    private validTargets: Phaser.GameObjects.Image[] = []
+    private validTargets: Phaser.GameObjects.GameObject[] = []
     private originalCardPosition?: { x: number, y: number, rotation: number, depth: number }
     private dragStartPosition?: { x: number, y: number }
 
@@ -83,8 +82,7 @@ export class DragSystem {
             y: pointer.worldY
         }
 
-        // Create drag preview and highlight targets
-        this.createDragPreview(pointer)
+        // Highlight legal drop targets.
         this.highlightValidTargets(cardDef)
 
         // Move original card to follow cursor
@@ -92,13 +90,10 @@ export class DragSystem {
     }
 
     updateDrag(pointer: Phaser.Input.Pointer): void {
-        if (!this.isDragging || !this.dragCard || !this.dragPreview) return
-
-        // Update drag preview position
-        this.dragPreview.setPosition(pointer.worldX, pointer.worldY)
+        if (!this.isDragging || !this.dragCard) return
 
         // Update original card position to follow cursor
-        this.dragCard.setPosition(pointer.worldX, pointer.worldY)
+        this.dragCard.setPosition(pointer.worldX - Card.CARD_WIDTH / 2, pointer.worldY - 30)
         this.dragCard.setRotation(0)
     }
 
@@ -110,52 +105,19 @@ export class DragSystem {
             this.cleanupDrag()
             return false
         }
-        const cardDef = CARD_DEFS[cardInstance.defId]
-        const resolvedCard = resolveCard(cardInstance)
-        if (!cardDef) {
-            this.cleanupDrag()
-            return false
-        }
-        let targetFound = false
-
-        // Check if this is a non-targeting or all-enemies card dragged upward
-        if (this.isUpwardDrag(pointer) && this.canAutoPlay(resolvedCard)) {
-            // Auto-play the card
-            const targets = this.getAutoPlayTargets(cardInstance)
-            this.onCardPlay?.(cardInstance, targets)
-            targetFound = true
-        } else if (resolvedCard.targeting?.type === 'single_enemy' || resolvedCard.targeting?.type === 'any') {
-            // Check if dropped on a valid target for targeting cards
-            if (this.getEnemyAtPoint) {
-                const targetEnemy = this.getEnemyAtPoint(pointer.worldX, pointer.worldY)
-                if (targetEnemy !== -1) {
-                    // Play the card on the target
-                    this.onCardPlay?.(cardInstance, [this.engine.state.enemies[targetEnemy].id])
-                    targetFound = true
-                }
-            }
+        const cardDef = resolveCard(cardInstance)
+        let targets: string[] | undefined
+        if (this.isUpwardDrag(pointer) && this.canAutoPlay(cardDef)) {
+            targets = this.getAutoPlayTargets(cardInstance)
+        } else if (cardDef.targeting?.type === 'single_enemy' || cardDef.targeting?.type === 'any') {
+            const targetEnemy = this.getEnemyAtPoint?.(pointer.worldX, pointer.worldY) ?? -1
+            if (targetEnemy !== -1) targets = [this.engine.state.enemies[targetEnemy].id]
         }
 
-        // Clean up drag state
+        // Playing can rebuild the hand or end combat, destroying this card.
         this.cleanupDrag()
-
-        return targetFound
-    }
-
-    private createDragPreview(pointer: Phaser.Input.Pointer): void {
-        const cardInstance = this.engine.state.player.hand[this.dragCardIndex]
-
-        // Create a semi-transparent copy of the card
-        this.dragPreview = new Card(this.scene, cardInstance, {
-            x: pointer.worldX,
-            y: pointer.worldY,
-            scale: 1.1,
-            interactive: false
-        })
-
-        // Make it semi-transparent and set depth
-        this.dragPreview.setAlpha(0.7)
-        this.dragPreview.setDepth(COMBAT_UI_CONFIG.depths.dragPreview)
+        if (targets) this.onCardPlay?.(cardInstance, targets)
+        return targets !== undefined
     }
 
     private isUpwardDrag(pointer: Phaser.Input.Pointer): boolean {
@@ -230,7 +192,7 @@ export class DragSystem {
                     COMBAT_UI_CONFIG.colors.targetHighlightAlpha
                 )
                 highlight.setDepth(COMBAT_UI_CONFIG.depths.targetHighlight)
-                this.validTargets.push(highlight as any)
+                this.validTargets.push(highlight)
             }
         })
     }
@@ -254,7 +216,7 @@ export class DragSystem {
                 COMBAT_UI_CONFIG.colors.targetHighlightAlpha
             )
             highlight.setDepth(COMBAT_UI_CONFIG.depths.targetHighlight)
-            this.validTargets.push(highlight as any)
+            this.validTargets.push(highlight)
         }
     }
 
@@ -286,8 +248,8 @@ export class DragSystem {
         text.setOrigin(0.5, 0.5)
         text.setDepth(COMBAT_UI_CONFIG.depths.targetHighlight + 1)
 
-        this.validTargets.push(highlight as any)
-        this.validTargets.push(text as any)
+        this.validTargets.push(highlight)
+        this.validTargets.push(text)
     }
 
     private highlightAllTargets(): void {
@@ -304,7 +266,7 @@ export class DragSystem {
     private getEffectiveCost(cardDef: CardDef): number {
         const hasCorruption = this.engine.state.player.powers.find(p => p.id === 'CORRUPTION')?.stacks ?? 0
         if (hasCorruption > 0 && cardDef.type === 'skill') return 0
-        if ('xCost' in cardDef && (cardDef as any).xCost) return this.engine.state.player.energy
+        if (cardDef.xCost) return this.engine.state.player.energy
         return cardDef.cost ?? 0
     }
 
@@ -316,12 +278,6 @@ export class DragSystem {
             this.dragCard.setPosition(this.originalCardPosition.x, this.originalCardPosition.y)
             this.dragCard.setRotation(this.originalCardPosition.rotation)
             this.dragCard.setDepth(this.originalCardPosition.depth)
-        }
-
-        // Clean up drag preview
-        if (this.dragPreview) {
-            this.dragPreview.destroy()
-            this.dragPreview = undefined
         }
 
         // Clear target highlights

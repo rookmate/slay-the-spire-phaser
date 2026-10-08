@@ -1,13 +1,14 @@
 import Phaser from 'phaser'
 import type { Engine } from '../core/engine'
 import type { CardInstance, PendingChoiceView } from '../core/state'
-import { Card } from './Card'
+import { CardGrid } from './CardGrid'
 
 export class CombatChoiceOverlay {
     private scene: Phaser.Scene
     private engine: Engine
     private container?: Phaser.GameObjects.Container
     private selectedInstanceIds = new Set<string>()
+    private grid?: CardGrid
     private currentChoice?: PendingChoiceView
     private onSubmit?: (instanceIds: string[]) => void
     private onCancel?: () => void
@@ -34,6 +35,7 @@ export class CombatChoiceOverlay {
         this.selectedInstanceIds.clear()
         this.container?.destroy(true)
         this.container = undefined
+        this.grid = undefined
 
         if (!choice) return
 
@@ -58,29 +60,13 @@ export class CombatChoiceOverlay {
             color: '#adadad',
         }))
 
-        const cols = 5
-        const spacingX = 132
-        const spacingY = 194
-        const startX = 20
-        const startY = 92
         const eligibleIds = new Set(choice.eligibleInstanceIds)
-
-        zoneCards.forEach((card, index) => {
-            const col = index % cols
-            const row = Math.floor(index / cols)
-            const view = new Card(this.scene, card, {
-                x: startX + col * spacingX,
-                y: startY + row * spacingY,
-                interactive: eligibleIds.has(card.instanceId),
-            })
-            if (!eligibleIds.has(card.instanceId)) view.setAlpha(0.4)
-            if (eligibleIds.has(card.instanceId)) {
-                view.on('pointerdown', () => this.handleCardSelection(card))
-            }
-            overlay.add(view)
-        })
-
-        const footerY = Math.min(this.scene.scale.height - 52, startY + Math.ceil(Math.max(1, zoneCards.length) / cols) * spacingY + 8)
+        this.grid = new CardGrid(this.scene, overlay, zoneCards, 92,
+            card => { this.handleCardSelection(card); this.grid?.refresh() },
+            card => eligibleIds.has(card.instanceId),
+            card => this.selectedInstanceIds.has(card.instanceId),
+        )
+        const footerY = this.scene.scale.height - 52
         const confirm = this.scene.add.text(this.scene.scale.width - 24, footerY, 'Confirm', {
             fontFamily: 'monospace',
             fontSize: '16px',
@@ -111,6 +97,7 @@ export class CombatChoiceOverlay {
     destroy(): void {
         this.container?.destroy(true)
         this.container = undefined
+        this.grid = undefined
         this.currentChoice = undefined
         this.selectedInstanceIds.clear()
     }
