@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
 import type { CardInstance } from '../core/state'
-import { Card } from './Card'
+import { CardGrid } from './CardGrid'
 
 export class DeckSelectionOverlay {
     private scene: Phaser.Scene
@@ -43,26 +43,10 @@ export class DeckSelectionOverlay {
         close.on('pointerdown', () => this.close())
         overlay.add(close)
 
-        const cols = 5
-        const spacingX = 130
-        const spacingY = 195
-        const startX = 20
-        const startY = 70
-
-        cards.forEach((card, index) => {
-            const col = index % cols
-            const row = Math.floor(index / cols)
-            const view = new Card(this.scene, card, {
-                x: startX + col * spacingX,
-                y: startY + row * spacingY,
-                interactive: true,
-            })
-            view.on('pointerdown', () => {
-                const originalIndex = opts.cards.findIndex(candidate => candidate === card)
-                opts.onSelect(card, originalIndex)
-                this.close()
-            })
-            overlay.add(view)
+        new CardGrid(this.scene, overlay, cards, 70, card => {
+            const originalIndex = opts.cards.findIndex(candidate => candidate === card)
+            this.close()
+            opts.onSelect(card, originalIndex)
         })
     }
 

@@ -36,7 +36,7 @@ export class OverlayManager {
             backgroundColor: COMBAT_UI_CONFIG.colors.discardBg
         }
 
-        this.discardIcon = this.scene.add.text(width - 16, height - 16, '🂠', style)
+        this.discardIcon = this.scene.add.text(width - 150, height - 12, '🂠', style)
             .setOrigin(1, 1)
             .setInteractive({ useHandCursor: true })
             .on('pointerdown', () => this.openDiscardOverlay())
@@ -44,7 +44,7 @@ export class OverlayManager {
 
         // Handle resize
         this.resizeHandler = (gameSize: Phaser.Structs.Size) => {
-            this.discardIcon?.setPosition(gameSize.width - 16, gameSize.height - 16)
+            this.discardIcon?.setPosition(gameSize.width - 150, gameSize.height - 12)
         }
         this.scene.scale.on('resize', this.resizeHandler)
     }

@@ -18,7 +18,7 @@ This repo is just me tinkering with game dev stuff, testing mechanics, and learn
 - TypeScript
 - Phaser
 - Vite
-- Vitest
+- Vitest and Playwright
 
 ## Running locally
 
@@ -41,6 +41,29 @@ Runs are saved at room entry and completion. Continue restarts an unfinished
 fight from its entry checkpoint, including its original potions and relic counters.
 Won fights save before reward selection; unfinished reward choices restart without
 duplicating gold or relics. Shops save purchases and remaining stock together.
+
+## Browser checks
+
+```bash
+npx playwright install chromium
+npm run test:browser
+```
+
+The browser suite starts Vite on port 5174 and uses real mouse clicks and drags.
+It covers combat, card selection across pages, crowded encounters, campfire exits,
+rewards, defeat, and saved-run reloads. A seeded run starts with the normal starter
+deck, earns its cards and relics, and plays through both acts. Its route and result
+are attached to the Playwright report. Smaller scenarios use explicit saved-run
+fixtures to exercise edge cases quickly.
+
+`tests/browser/index.html` starts the same game factory and scenes as the app.
+The test entry exposes the game for read-only inspection; it is excluded from the
+production build. Tests set up saved runs before pressing Continue and make all
+subsequent gameplay choices through the UI.
+
+GitHub Actions runs unit tests, the production build, and browser checks on pull
+requests and pushes to master. Failed browser checks upload screenshots, traces,
+and the HTML report. Open a local report with `npx playwright show-report`.
 
 ## Current status
 

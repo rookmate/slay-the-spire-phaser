@@ -2,6 +2,8 @@ import type Phaser from 'phaser'
 import type { Engine } from '../core/engine'
 import type { EnemyState } from '../core/state'
 import { COMBAT_UI_CONFIG } from './CombatUIConfig'
+import { enemySlots } from './layout'
+import { summarizeEffects } from './effectLabels'
 
 export class EnemyDisplay {
     private scene: Phaser.Scene
@@ -32,20 +34,27 @@ export class EnemyDisplay {
             color: COMBAT_UI_CONFIG.styles.color,
         }
 
+        const slots = enemySlots(this.scene.cameras.main.width, this.scene.cameras.main.height, this.engine.state.enemies.length)
         this.engine.state.enemies.forEach((enemy, index) => {
             this.enemyIds.push(enemy.id)
-            const position = this.calculateEnemyPosition(index)
+            const slot = slots[index]
             const texture = `enemy:${enemy.specId ?? enemy.name.toUpperCase().replace(/\s+/g, '_')}`
-            const sprite = this.scene.add.image(position.x, position.y, texture).setScale(0.5).setInteractive()
+            const sprite = this.scene.add.image(slot.x, slot.y + 64, texture).setInteractive({ useHandCursor: true })
+            sprite.setScale(Math.min((slot.width - 8) / sprite.width, 64 / sprite.height))
             sprite.on('pointerdown', () => {
                 if (enemy.hp > 0) this.onEnemyClick?.(index)
             })
             this.enemySprites.push(sprite)
 
-            const intent = this.scene.add.text(position.x, position.y - 80, this.getEnemyText(enemy), style).setOrigin(0.5, 1)
-            const hp = this.scene.add.text(position.x, position.y + 55, this.getEnemyHpLabel(enemy), { ...style, fontSize: COMBAT_UI_CONFIG.styles.hpFontSize }).setOrigin(0.5, 0)
-            const name = this.scene.add.text(position.x, position.y - 120, enemy.name, style).setOrigin(0.5, 1).setAlpha(0)
-            const powers = this.scene.add.text(position.x, position.y + 78, this.getEnemyPowers(enemy), { ...style, fontSize: '12px', color: '#bbbbbb' }).setOrigin(0.5, 0)
+            const labelStyle = { ...style, fontSize: '11px', align: 'center', wordWrap: { width: slot.width } }
+            const intent = this.scene.add.text(slot.x, slot.y, this.getEnemyText(enemy), labelStyle).setOrigin(0.5, 0)
+            const hp = this.scene.add.text(slot.x, slot.y + 100, this.getEnemyHpLabel(enemy), labelStyle).setOrigin(0.5, 0)
+            const name = this.scene.add.text(Math.min(this.scene.cameras.main.width - 110, slot.x), slot.y, this.getEnemyDetails(enemy), {
+                ...labelStyle, wordWrap: { width: 200 }, backgroundColor: '#111111', padding: { x: 6, y: 4 },
+            }).setOrigin(0.5, 0).setAlpha(0).setDepth(6000)
+            const powers = this.scene.add.text(slot.x, slot.y + 126, this.getEnemySummary(enemy, slot.width), {
+                fontFamily: style.fontFamily, fontSize: '10px', color: '#bbbbbb',
+            }).setOrigin(0.5, 0)
 
             sprite.on('pointerover', () => name.setAlpha(1))
             sprite.on('pointerout', () => name.setAlpha(0))
@@ -82,26 +91,24 @@ export class EnemyDisplay {
     }
 
     private getEnemyHpLabel(enemy: EnemyState): string {
-        return `🛡 ${enemy.block}  ♥ ${enemy.hp}/${enemy.maxHp}`
+        return `HP ${enemy.hp}/${enemy.maxHp}\nBlock ${enemy.block}`
     }
 
-    private getEnemyPowers(enemy: EnemyState): string {
+    private getEnemyPowers(enemy: EnemyState): string[] {
         const parts = enemy.powers.map(power => `${power.id}:${power.stacks}`)
         if (enemy.specId === 'BYRD') {
             if (enemy.aiState?.flying) parts.push(`FLYING:${Math.max(0, 3 - Number(enemy.aiState?.hitsTaken ?? 0))}`)
             if (enemy.aiState?.downed) parts.push('DOWNED')
         }
-        return parts.join('  ')
+        return parts
     }
 
-    private calculateEnemyPosition(index: number): { x: number; y: number } {
-        const enemyCount = this.engine.state.enemies.length
-        const screenWidth = this.scene.cameras.main.width
-        const screenHeight = this.scene.cameras.main.height
-        if (enemyCount === 1) return { x: screenWidth * 0.75, y: screenHeight * 0.4 }
-        if (enemyCount === 2) return { x: screenWidth * 0.68 + index * 120, y: screenHeight * 0.38 }
-        if (enemyCount <= 4) return { x: screenWidth * 0.62 + (index % 2) * 140, y: screenHeight * 0.32 + Math.floor(index / 2) * 110 }
-        return { x: screenWidth * 0.75, y: screenHeight * 0.18 + index * 60 }
+    private getEnemyDetails(enemy: EnemyState): string {
+        return [enemy.name, ...this.getEnemyPowers(enemy)].join('\n')
+    }
+
+    private getEnemySummary(enemy: EnemyState, width: number): string {
+        return summarizeEffects(this.getEnemyPowers(enemy), Math.floor(width / 6.1))
     }
 
     update(): void {
@@ -109,10 +116,12 @@ export class EnemyDisplay {
         if (enemies.length !== this.enemyIds.length || enemies.some((enemy, index) => enemy.id !== this.enemyIds[index])) {
             this.build()
         }
+        const slots = enemySlots(this.scene.cameras.main.width, this.scene.cameras.main.height, enemies.length)
         this.engine.state.enemies.forEach((enemy, index) => {
             this.enemyTexts[index]?.setText(this.getEnemyText(enemy))
             this.enemyHpTexts[index]?.setText(this.getEnemyHpLabel(enemy))
-            this.enemyPowerTexts[index]?.setText(this.getEnemyPowers(enemy))
+            this.enemyPowerTexts[index]?.setText(this.getEnemySummary(enemy, slots[index].width))
+            this.enemyNameTexts[index]?.setText(this.getEnemyDetails(enemy))
             this.enemySprites[index]?.setAlpha(enemy.hp > 0 ? 1 : 0.25)
         })
     }

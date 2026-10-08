@@ -12,7 +12,6 @@ import { getRunDestination } from '../core/progression'
 export class MapScene extends Phaser.Scene {
     run!: RunState
     gmap!: GeneratedMap
-    unknownWeights = defaultUnknownWeights()
     private meta = loadMeta()
     private currentNodeId?: string
     private mapLayer!: Phaser.GameObjects.Container
@@ -80,8 +79,9 @@ export class MapScene extends Phaser.Scene {
         this.run.mapProgress = { currentNodeId: node.id }
         let kind: RoomKind | UnknownOutcome = node.kind
         if (node.kind === 'unknown') {
-            const outcome = resolveUnknown(rng, this.unknownWeights)
-            this.unknownWeights = updateUnknownWeights(this.unknownWeights, outcome)
+            const weights = this.run.unknownWeights ?? defaultUnknownWeights()
+            const outcome = resolveUnknown(rng, weights)
+            this.run.unknownWeights = updateUnknownWeights(weights, outcome)
             kind = outcome
         }
 
