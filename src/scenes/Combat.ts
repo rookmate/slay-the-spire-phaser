@@ -1,17 +1,13 @@
 import Phaser from 'phaser'
-import { affectsRoomTier, getAscensionEnemyHpMultiplier, pickMoreAggressiveIntent, shouldUpgradeHallwayOpeningIntent } from '../core/ascension'
-import { Engine, createPlayerFromDeck } from '../core/engine'
-import { RNG } from '../core/rng'
-import { createEnemyFromSpec, rollEngineIntentForEnemy } from '../core/enemies'
-import { generateEncounter } from '../core/encounters'
+import { affectsRoomTier } from '../core/ascension'
+import { applyCombatVictory, createCombatEngine } from '../core/combat'
+import type { Engine } from '../core/engine'
 import { loadMeta } from '../core/meta'
 import type { RunState } from '../core/run'
 import { saveRun } from '../core/run'
 import { CombatUI } from '../ui/CombatUI'
 import type { RoomKind } from '../core/map'
-import { getEncounterEliteHpMultiplier, getPostCombatHeal, getRelicEnergyBonus } from '../core/relics'
-import { generateRewardBundle, type EncounterTier } from '../core/rewards'
-import { getEncounterActSeed, getEnemyActSeed } from '../core/acts'
+import { generateRewardBundle } from '../core/rewards'
 
 export class CombatScene extends Phaser.Scene {
     private engine!: Engine
@@ -28,49 +24,7 @@ export class CombatScene extends Phaser.Scene {
         this.run = data.run
         this.roomKind = data.roomKind ?? 'monster'
         this.meta = loadMeta()
-        const seed = this.run.seed
-        const act = this.run.act
-        const player = createPlayerFromDeck(seed, this.run.deck, this.run.player.hp, this.run.player.maxHp)
-        const combatIndex = this.run.combatCount ?? 0
-        const tier = this.getEncounterTier()
-        const encounterRng = new RNG(getEncounterActSeed(seed, act, tier, combatIndex))
-        const keys = generateEncounter(encounterRng, act, tier, combatIndex)
-        const enemies = keys.map((key, index) => createEnemyFromSpec(new RNG(getEnemyActSeed(seed, act, combatIndex, index)), key as any, `e${index + 1}`))
-        const eliteHpMultiplier = getEncounterEliteHpMultiplier(this.run, this.roomKind)
-        const ascensionHpMultiplier = getAscensionEnemyHpMultiplier(this.run.asc, affectsRoomTier(this.roomKind))
-        const totalHpMultiplier = eliteHpMultiplier * ascensionHpMultiplier
-
-        if (totalHpMultiplier !== 1) {
-            for (const enemy of enemies) {
-                enemy.maxHp = Math.max(1, Math.round(enemy.maxHp * totalHpMultiplier))
-                enemy.hp = Math.min(enemy.hp, enemy.maxHp)
-            }
-        }
-
-        this.engine = new Engine(seed, player, enemies, { asc: this.run.asc ?? 0, run: this.run })
-        for (let index = 0; index < this.engine.state.enemies.length; index++) {
-            const enemy = this.engine.state.enemies[index]
-            const intentSeed = `${getEnemyActSeed(seed, act, combatIndex, index)}-intent`
-            const initialState = JSON.parse(JSON.stringify(enemy.aiState ?? {}))
-            const firstIntent = rollEngineIntentForEnemy(new RNG(intentSeed), enemy, this.engine.state)
-            const firstState = JSON.parse(JSON.stringify(enemy.aiState ?? {}))
-            if (this.roomKind === 'monster' && shouldUpgradeHallwayOpeningIntent(this.run.asc)) {
-                enemy.aiState = JSON.parse(JSON.stringify(initialState))
-                const secondIntent = rollEngineIntentForEnemy(new RNG(`${intentSeed}-asc7`), enemy, this.engine.state)
-                const secondState = JSON.parse(JSON.stringify(enemy.aiState ?? {}))
-                const pickedIntent = pickMoreAggressiveIntent(firstIntent, secondIntent)
-                enemy.intent = pickedIntent
-                enemy.aiState = pickedIntent === firstIntent ? firstState : secondState
-            } else {
-                enemy.intent = firstIntent
-            }
-        }
-        this.engine.configurePlayerCombatBonuses({
-            baseEnergyPerTurn: 3 + getRelicEnergyBonus(this.run),
-        })
-        this.engine.initializeCombat()
-        this.engine.enqueue({ kind: 'DrawCards', count: 5 })
-        this.engine.runUntilIdle()
+        this.engine = createCombatEngine(this.run, this.roomKind)
 
         if (this.engine.state.victory) {
             this.handleVictory()
@@ -110,7 +64,6 @@ export class CombatScene extends Phaser.Scene {
             this.run.potions.splice(potionIndex, 1)
             this.ui.apply(events)
             this.ui.refreshRunData(this.run)
-            saveRun(this.run)
             this.checkOutcome()
         })
 
@@ -127,10 +80,11 @@ export class CombatScene extends Phaser.Scene {
     }
 
     private handleVictory(): void {
-        this.run.player.hp = Math.min(this.run.player.maxHp, this.engine.state.player.hp + getPostCombatHeal(this.run))
-        this.run.combatCount = (this.run.combatCount ?? 0) + 1
+        applyCombatVictory(this.run, this.engine.state.player)
+        this.run.pendingRoom = undefined
 
         if (this.roomKind === 'boss') {
+            this.run.actsCleared = [...(this.run.actsCleared ?? []), this.run.act]
             if (this.run.act === 2) {
                 this.scene.start('RunSummary', { run: this.run, result: 'victory' as const })
                 return
@@ -142,26 +96,20 @@ export class CombatScene extends Phaser.Scene {
                 sourceBossId,
                 choices: bossRelicChoices && bossRelicChoices.kind === 'boss_relics' ? bossRelicChoices.choices : [],
             }
-            this.run.actsCleared = [...(this.run.actsCleared ?? []), this.run.act]
             saveRun(this.run)
             this.scene.start('BossRelic', { run: this.run })
             return
         }
 
-        saveRun(this.run)
         const nodeId = this.run.mapProgress?.currentNodeId ?? `floor-${this.run.floor}`
-        const rewards = generateRewardBundle(`${this.run.seed}-reward-${nodeId}-${this.roomKind}`, this.getEncounterTier(), this.run, this.meta, { roomKind: this.roomKind, asc: this.run.asc })
+        const rewards = generateRewardBundle(`${this.run.seed}-reward-${nodeId}-${this.roomKind}`, affectsRoomTier(this.roomKind), this.run, this.meta, { roomKind: this.roomKind, asc: this.run.asc })
+        this.run.pendingRoom = { scene: 'Rewards', rewards }
+        saveRun(this.run)
         this.scene.start('Rewards', { run: this.run, rewards })
     }
 
     private handleDefeat(): void {
         this.run.player.hp = 0
         this.scene.start('RunSummary', { run: this.run, result: 'defeat' as const })
-    }
-
-    private getEncounterTier(): EncounterTier {
-        if (this.roomKind === 'elite') return 'elite'
-        if (this.roomKind === 'boss') return 'boss'
-        return 'hallway'
     }
 }

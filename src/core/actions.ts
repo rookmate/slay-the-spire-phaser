@@ -11,6 +11,7 @@ export type Action =
     | { kind: 'GainBlock'; target: EntityId; amount: number }
     | { kind: 'DiscardHand' }
     | { kind: 'EndTurn' }
+    | { kind: 'StartEnemyTurn' }
     | { kind: 'ApplyPower'; target: EntityId; powerId: PowerId; stacks: number }
     | { kind: 'LoseHp'; target: EntityId; amount: number }
     | { kind: 'ExhaustCard'; owner: EntityId; cardInstanceId?: string }

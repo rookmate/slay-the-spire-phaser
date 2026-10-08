@@ -4,9 +4,10 @@ import { loadMeta } from '../core/meta'
 import type { RunState } from '../core/run'
 import { saveRun } from '../core/run'
 import { RNG } from '../core/rng'
-import { generateMap, resolveUnknown, updateUnknownWeights, defaultUnknownWeights, type GeneratedMap, type MapNode } from '../core/map'
+import { generateMap, resolveUnknown, updateUnknownWeights, defaultUnknownWeights, type GeneratedMap, type MapNode, type RoomKind, type UnknownOutcome } from '../core/map'
 import { generateRewardBundle } from '../core/rewards'
 import { getRelicDisplayName } from '../core/relics'
+import { getRunDestination } from '../core/progression'
 
 export class MapScene extends Phaser.Scene {
     run!: RunState
@@ -75,53 +76,33 @@ export class MapScene extends Phaser.Scene {
 
     private enterNode(node: MapNode): void {
         const rng = new RNG(`${this.run.seed}-unknown-${this.run.floor}`)
-        // Update current node and persist
         this.currentNodeId = node.id
-        this.run.mapProgress = { currentNodeId: this.currentNodeId }
-        saveRun(this.run)
-        // Repaint to lock other nodes
-        this.children.removeAll()
-        const style = { fontFamily: 'monospace', fontSize: '18px', color: '#ffffff' }
-        this.add.text(16, 16, `Floor ${this.run.floor}  HP ${this.run.player.hp}/${this.run.player.maxHp}  Gold ${this.run.gold}`, style)
-        this.add.text(16, 40, `Relics: ${this.run.relics.map(id => getRelicDisplayName(this.run, id)).join(', ') || 'None'}  Potions: ${this.run.potions.length}/${this.run.maxPotionSlots}`, {
-            fontFamily: 'monospace',
-            fontSize: '14px',
-            color: '#cccccc',
-        })
-        this.add.text(16, 60, `Act ${this.run.act}  Ascension ${getAscensionLabel(this.run.asc)}`, {
-            fontFamily: 'monospace',
-            fontSize: '14px',
-            color: '#cccccc',
-        })
-        this.drawGraph()
+        this.run.mapProgress = { currentNodeId: node.id }
+        let kind: RoomKind | UnknownOutcome = node.kind
         if (node.kind === 'unknown') {
             const outcome = resolveUnknown(rng, this.unknownWeights)
             this.unknownWeights = updateUnknownWeights(this.unknownWeights, outcome)
-            if (outcome === 'monster') { this.scene.start('Combat', { run: this.run, roomKind: 'monster' }); return }
-            if (outcome === 'shop') { this.scene.start('Shop', { run: this.run }); return }
-            if (outcome === 'chest') {
-                this.scene.start('Rewards', {
-                    run: this.run,
-                    rewards: generateRewardBundle(`${this.run.seed}-reward-${node.id}-unknown-chest`, 'chest', this.run, this.meta, { roomKind: 'chest', asc: this.run.asc }),
-                })
-                return
+            kind = outcome
+        }
+
+        if (kind === 'monster' || kind === 'elite' || kind === 'boss') {
+            this.run.pendingRoom = { scene: 'Combat', roomKind: kind }
+        } else if (kind === 'rest') {
+            this.run.pendingRoom = { scene: 'Campfire' }
+        } else if (kind === 'shop') {
+            this.run.pendingRoom = { scene: 'Shop' }
+        } else if (kind === 'chest') {
+            const rewardKind = node.kind === 'unknown' ? 'unknown-chest' : 'chest'
+            this.run.pendingRoom = {
+                scene: 'Rewards',
+                rewards: generateRewardBundle(`${this.run.seed}-reward-${node.id}-${rewardKind}`, 'chest', this.run, this.meta, { roomKind: 'chest', asc: this.run.asc }),
             }
-            this.scene.start('Event', { run: this.run }); return
+        } else {
+            this.run.pendingRoom = { scene: 'Event' }
         }
-        const kind = node.kind
-        if (kind === 'monster') { this.scene.start('Combat', { run: this.run, roomKind: 'monster' }); return }
-        if (kind === 'rest') { this.scene.start('Campfire', { run: this.run }); return }
-        if (kind === 'shop') { this.scene.start('Shop', { run: this.run }); return }
-        if (kind === 'chest') {
-            this.scene.start('Rewards', {
-                run: this.run,
-                rewards: generateRewardBundle(`${this.run.seed}-reward-${node.id}-chest`, 'chest', this.run, this.meta, { roomKind: 'chest', asc: this.run.asc }),
-            })
-            return
-        }
-        if (kind === 'elite') { this.scene.start('Combat', { run: this.run, roomKind: 'elite' }); return }
-        if (kind === 'boss') { this.scene.start('Combat', { run: this.run, roomKind: 'boss' }); return }
-        this.scene.start('Event', { run: this.run })
+        saveRun(this.run)
+        const destination = getRunDestination(this.run)
+        this.scene.start(destination.scene, destination.data)
     }
 
     private drawGraph(): void {

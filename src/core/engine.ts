@@ -290,6 +290,9 @@ export class Engine {
         const evts: EmittedEvent[] = []
         const action = this.queue.shift()
         if (!action) return evts
+        // Consequences of this action resolve before the previously queued actions.
+        const remainingActions = this.queue
+        this.queue = []
 
         switch (action.kind) {
             case 'GainEnergy': {
@@ -304,16 +307,14 @@ export class Engine {
                 break
             }
             case 'Heal': {
-                const target = this.getEntity(action.target)
-                if (!target) break
-                target.hp = Math.min(target.maxHp, target.hp + action.amount)
-                evts.push({ kind: 'Healed', target: action.target, amount: action.amount, resultingHp: target.hp })
+                this.heal(action.target, action.amount, evts)
                 break
             }
             case 'DealDamage': {
                 const target = this.getEntity(action.target)
-                if (!target) break
+                if (!target || target.hp <= 0) break
                 const source = this.getEntity(action.source)
+                if (source && source.hp <= 0 && action.damageType !== 'thorns') break
                 let damage = action.amount
                 if (action.damageType !== 'thorns' && source) {
                     const weakStacks = source.powers.find(power => power.id === 'WEAK')?.stacks ?? 0
@@ -323,7 +324,7 @@ export class Engine {
                 damage = Math.max(0, damage)
                 const blockUsed = Math.min(target.block, damage)
                 target.block -= blockUsed
-                const actualDamage = Math.max(0, damage - blockUsed)
+                const actualDamage = Math.min(target.hp, Math.max(0, damage - blockUsed))
                 if (actualDamage > 0) target.hp = Math.max(0, target.hp - actualDamage)
 
                 evts.push({
@@ -337,7 +338,7 @@ export class Engine {
                 })
 
                 if (action.lifestealTo && actualDamage > 0) {
-                    this.enqueue({ kind: 'Heal', target: action.lifestealTo, amount: actualDamage })
+                    this.heal(action.lifestealTo, actualDamage, evts)
                 }
 
                 if (target === this.state.player && actualDamage > 0 && this.run) {
@@ -431,59 +432,63 @@ export class Engine {
                 this.state.player.hand = []
                 break
             }
+            case 'StartEnemyTurn': {
+                this.state.turn = 'enemy'
+                evts.push({ kind: 'TurnChanged', turn: 'enemy' })
+                this.tickTemporaryDebuffs(this.state.player)
+                for (const enemy of this.state.enemies) enemy.block = 0
+
+                for (const enemy of [...this.state.enemies]) {
+                    if (enemy.hp <= 0) continue
+                    if (enemy.intent?.kind === 'attack') {
+                        const enemyStrength = enemy.powers.find(power => power.id === 'STRENGTH')?.stacks ?? 0
+                        this.enqueue({
+                            kind: 'DealDamage',
+                            source: enemy.id,
+                            target: this.state.player.id,
+                            amount: Math.max(0, Math.round((enemy.intent.amount + enemyStrength) * this.getEnemyDamageMultiplier(enemy))),
+                        })
+                    } else if (enemy.intent?.kind === 'multi_attack') {
+                        const enemyStrength = enemy.powers.find(power => power.id === 'STRENGTH')?.stacks ?? 0
+                        this.enqueue({
+                            kind: 'DealMultiDamage',
+                            source: enemy.id,
+                            target: this.state.player.id,
+                            amount: Math.max(0, Math.round((enemy.intent.amount + enemyStrength) * this.getEnemyDamageMultiplier(enemy))),
+                            hits: enemy.intent.hits,
+                        })
+                    } else if (enemy.intent?.kind === 'block') {
+                        const scaled = Math.round(enemy.intent.amount * this.enemyBlockMultiplier())
+                        this.enqueue({ kind: 'GainBlock', target: enemy.id, amount: scaled })
+                    } else if (enemy.intent?.kind === 'debuff') {
+                        this.enqueue({ kind: 'ApplyPower', target: this.state.player.id, powerId: enemy.intent.debuff, stacks: enemy.intent.stacks })
+                    } else if (enemy.intent?.kind === 'status') {
+                        this.createCardsInDestination(enemy.intent.createdDefId, enemy.intent.destination, enemy.intent.count)
+                    } else if (enemy.intent?.kind === 'summon') {
+                        // Summons are handled by enemy hooks so new units do not act immediately.
+                    } else if (enemy.intent?.kind === 'buff') {
+                        const strengthGain = this.resolveEnemyBuffStrength(enemy, enemy.intent.desc)
+                        if (strengthGain > 0) this.enqueue({ kind: 'ApplyPower', target: enemy.id, powerId: 'STRENGTH', stacks: strengthGain })
+                    }
+                    onEnemyIntentResolved(this, enemy, enemy.intent)
+                }
+
+                this.enqueue({ kind: 'EndTurn' })
+                break
+            }
             case 'EndTurn': {
                 if (this.state.turn === 'player') {
                     this.processEndOfTurnHand(evts)
                     this.enqueue({ kind: 'DiscardHand' })
-                    this.state.turn = 'enemy'
-                    evts.push({ kind: 'TurnChanged', turn: 'enemy' })
                     this.doubleTapCharges = 0
                     this.onEndOfPlayerTurn()
-                    this.tickTemporaryDebuffs(this.state.player)
-
-                    for (const enemy of [...this.state.enemies]) {
-                        if (enemy.hp <= 0) continue
-                        if (enemy.intent?.kind === 'attack') {
-                            const enemyStrength = enemy.powers.find(power => power.id === 'STRENGTH')?.stacks ?? 0
-                            this.enqueue({
-                                kind: 'DealDamage',
-                                source: enemy.id,
-                                target: this.state.player.id,
-                                amount: Math.max(0, Math.round((enemy.intent.amount + enemyStrength) * this.getEnemyDamageMultiplier(enemy))),
-                            })
-                        } else if (enemy.intent?.kind === 'multi_attack') {
-                            const enemyStrength = enemy.powers.find(power => power.id === 'STRENGTH')?.stacks ?? 0
-                            this.enqueue({
-                                kind: 'DealMultiDamage',
-                                source: enemy.id,
-                                target: this.state.player.id,
-                                amount: Math.max(0, Math.round((enemy.intent.amount + enemyStrength) * this.getEnemyDamageMultiplier(enemy))),
-                                hits: enemy.intent.hits,
-                            })
-                        } else if (enemy.intent?.kind === 'block') {
-                            const scaled = Math.round(enemy.intent.amount * this.enemyBlockMultiplier())
-                            this.enqueue({ kind: 'GainBlock', target: enemy.id, amount: scaled })
-                        } else if (enemy.intent?.kind === 'debuff') {
-                            this.enqueue({ kind: 'ApplyPower', target: this.state.player.id, powerId: enemy.intent.debuff, stacks: enemy.intent.stacks })
-                        } else if (enemy.intent?.kind === 'status') {
-                            this.createCardsInDestination(enemy.intent.createdDefId, enemy.intent.destination, enemy.intent.count)
-                        } else if (enemy.intent?.kind === 'summon') {
-                            // Summons are handled by enemy hooks so new units do not act immediately.
-                        } else if (enemy.intent?.kind === 'buff') {
-                            const strengthGain = this.resolveEnemyBuffStrength(enemy, enemy.intent.desc)
-                            if (strengthGain > 0) this.enqueue({ kind: 'ApplyPower', target: enemy.id, powerId: 'STRENGTH', stacks: strengthGain })
-                        }
-                        onEnemyIntentResolved(this, enemy, enemy.intent)
-                    }
-
-                    this.enqueue({ kind: 'EndTurn' })
+                    this.enqueue({ kind: 'StartEnemyTurn' })
                 } else {
                     for (const enemy of this.state.enemies) this.tickTemporaryDebuffs(enemy)
                     this.state.turn = 'player'
                     this.state.player.energy = this.baseEnergyPerTurn
                     const hasBarricade = this.state.player.powers.find(power => power.id === 'BARRICADE')?.stacks ?? 0
                     if (hasBarricade === 0) this.state.player.block = 0
-                    for (const enemy of this.state.enemies) enemy.block = 0
                     this.normalizePlayerThorns()
                     this.onStartOfPlayerTurn()
                     for (const enemy of this.state.enemies) {
@@ -497,11 +502,13 @@ export class Engine {
             }
         }
 
+        this.queue.push(...remainingActions)
         return evts
     }
 
     runUntilIdle(): EmittedEvent[] {
         const all: EmittedEvent[] = []
+        if (this.state.victory || this.state.defeat || this.pendingChoice) return all
         while (true) {
             while (this.queue.length > 0) {
                 all.push(...this.step())
@@ -608,10 +615,15 @@ export class Engine {
         if (cardInstanceId) amount += this.getCardCombatBonusDamage(cardInstanceId)
         const strength = this.state.player.powers.find(power => power.id === 'STRENGTH')?.stacks ?? 0
         amount += strength
-        const weak = this.state.player.powers.find(power => power.id === 'WEAK')?.stacks ?? 0
-        if (weak > 0) amount = Math.round(amount * 0.75)
         if (this.run && cardInstanceId) amount = modifyAttackDamageFromRelics(this.getRelicContext(), amount, cardInstanceId)
         return Math.max(0, amount)
+    }
+
+    private heal(targetId: EntityId, amount: number, events: EmittedEvent[]): void {
+        const target = this.getEntity(targetId)
+        if (!target) return
+        target.hp = Math.min(target.maxHp, target.hp + amount)
+        events.push({ kind: 'Healed', target: targetId, amount, resultingHp: target.hp })
     }
 
     private resolveActiveLimbo(): void {
@@ -920,7 +932,8 @@ export function createDummyEnemy(id: string): EnemyState {
 
 export function createPlayerFromDeck(seed: string, deck: CardInstance[], hp: number, maxHp: number): PlayerState {
     const rng = new RNG(seed)
-    const fullDeck = [...deck]
+    const combatDeck = deck.map(card => ({ ...card }))
+    const fullDeck = [...combatDeck]
     rng.shuffleInPlace(fullDeck)
     return {
         id: 'player',
@@ -928,7 +941,7 @@ export function createPlayerFromDeck(seed: string, deck: CardInstance[], hp: num
         hp,
         block: 0,
         energy: 3,
-        deck: [...deck],
+        deck: combatDeck,
         drawPile: [...fullDeck],
         discardPile: [],
         exhaustPile: [],

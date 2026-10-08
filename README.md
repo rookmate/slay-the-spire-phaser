@@ -22,6 +22,8 @@ This repo is just me tinkering with game dev stuff, testing mechanics, and learn
 
 ## Running locally
 
+Use Node.js 22.12+ on the 22.x line, Node.js 24.x, or Node.js 26+.
+
 ```bash
 npm install
 npm run dev
@@ -34,6 +36,11 @@ npm run build
 npm run test
 npm run preview
 ```
+
+Runs are saved at room entry and completion. Continue restarts an unfinished
+fight from its entry checkpoint, including its original potions and relic counters.
+Won fights save before reward selection; unfinished reward choices restart without
+duplicating gold or relics. Shops save purchases and remaining stock together.
 
 ## Current status
 
