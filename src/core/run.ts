@@ -51,6 +51,7 @@ export interface RelicStateEntry {
 }
 
 export interface RunState {
+    earnedAchievements?: import('./achievements/catalog').AchievementId[]
     pendingAcquisitions?: AcquisitionStep[]
     acquisitionSequence?: number
     seenRelics?: RelicId[]

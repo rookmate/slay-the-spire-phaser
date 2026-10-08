@@ -1,3 +1,4 @@
+import { earnAchievement } from '../achievements/progress'
 import { recordPlayerHpLoss } from './cardCosts'
 import { hasMuzzle } from '../modes/endless'
 import { combatHealingAmount } from '../health'
@@ -242,7 +243,9 @@ function onEnemyKilledByCard(engine: Engine, cardInstanceId: string, _enemyId: E
         victim?.halfDead && !(victim.specId === 'DARKLING' && !engine.state.enemies.some((enemy) => enemy.hp > 0))
     if (!card || regrowing || victim?.tags?.includes('minion')) return
     CARD_DEFS[card.defId].onFatal?.({ engine, card })
-    if (card.defId !== 'FEED' || hasMuzzle(engine.run)) return
+    if (card.defId !== 'FEED') return
+    if (victim?.specId === 'DONU') earnAchievement(engine.run, 'OOH_DONUT')
+    if (hasMuzzle(engine.run)) return
     runtime.triggered = true
     const gain = card.upgradeLevel > 0 ? 4 : 3
     engine.state.player.maxHp += gain

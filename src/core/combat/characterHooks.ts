@@ -13,7 +13,7 @@ export function startEnemyPoison(engine: Engine): void {
     for (const enemy of engine.state.enemies.filter(e => e.hp > 0)) {
         const amount = powerAmount(enemy, 'POISON')
         if (amount <= 0) continue
-        engine.enqueue({ kind: 'LoseHp', target: enemy.id, amount, fromCard: false })
+        engine.enqueue({ kind: 'LoseHp', target: enemy.id, amount, fromCard: false, origin: 'poison' })
         engine.afterQueuedEffects(() => engine.setPowerStacks(enemy, 'POISON', Math.max(0, powerAmount(enemy, 'POISON') - 1)))
     }
 }

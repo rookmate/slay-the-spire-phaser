@@ -1,3 +1,8 @@
+import { ProfileRecoveryScene } from './scenes/ProfileRecovery'
+import { AchievementsScene } from './scenes/Achievements'
+import { ProfileScene } from './scenes/Profile'
+import { recoverProfileImport } from './core/profile/storage'
+import { attachNotifications } from './ui/notifications'
 import { attachSound } from './ui/sound'
 import { ChestScene } from './scenes/Chest'
 import { InventoryScene } from './scenes/Inventory'
@@ -43,12 +48,15 @@ const config: Phaser.Types.Core.GameConfig = {
       height: 1080
     }
   },
-  scene: [BootScene, ChestScene, InventoryScene, SettingsScene, RunHistoryScene, StartingDeckScene, BlightChestScene, CustomModifiersScene, RelicAcquisitionScene, MainMenuScene, NeowScene, MapScene, CombatScene, EventScene, CampfireScene, ShopScene, RewardsScene, BossRelicScene, RunSummaryScene, DeckBuilderScene],
+  scene: [BootScene, ProfileRecoveryScene, AchievementsScene, ProfileScene, ChestScene, InventoryScene, SettingsScene, RunHistoryScene, StartingDeckScene, BlightChestScene, CustomModifiersScene, RelicAcquisitionScene, MainMenuScene, NeowScene, MapScene, CombatScene, EventScene, CampfireScene, ShopScene, RewardsScene, BossRelicScene, RunSummaryScene, DeckBuilderScene],
 }
 
 export function createGame(): Phaser.Game {
+  try { recoverProfileImport() }
+  catch { return new Phaser.Game({ ...config, scene: [ProfileRecoveryScene] }) }
   const game = new Phaser.Game(config)
   attachSound(game)
+  attachNotifications(game)
   let sinceSave = 0
   game.events.on(Phaser.Core.Events.POST_STEP, (_time: number, delta: number) => {
     const scene = game.scene.getScenes(true)[0] as Phaser.Scene & { run?: RunState }

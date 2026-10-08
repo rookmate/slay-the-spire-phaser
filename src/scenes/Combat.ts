@@ -1,3 +1,4 @@
+import { commitAchievements } from '../core/achievements/progress'
 import { drawBattlefield } from '../ui/Battlefield'
 import { playCue } from '../ui/sound'
 import { finishCombat } from '../core/rooms'
@@ -5,7 +6,7 @@ import { getRunDestination } from '../core/progression'
 import Phaser from 'phaser'
 import { createCombatEngine } from '../core/combat'
 import type { Engine } from '../core/engine'
-import { loadMeta } from '../core/meta'
+import { loadMeta, saveMeta } from '../core/meta'
 import type { RunState } from '../core/run'
 import { saveRun } from '../core/run'
 import { CombatUI } from '../ui/CombatUI'
@@ -28,6 +29,7 @@ export class CombatScene extends Phaser.Scene {
         this.roomKind = data.roomKind ?? 'monster'
         this.meta = loadMeta()
         this.engine = createCombatEngine(this.run, this.roomKind)
+        this.flushAchievements()
 
         if (this.engine.state.victory) {
             this.handleOutcome()
@@ -76,7 +78,13 @@ export class CombatScene extends Phaser.Scene {
         })
     }
 
+    private flushAchievements(): void {
+        this.meta = loadMeta()
+        if (commitAchievements(this.meta, this.run).length) saveMeta(this.meta)
+    }
+
     private checkOutcome(): void {
+        this.flushAchievements()
         if (this.engine.state.victory) this.handleOutcome()
         else if (this.engine.state.defeat) this.handleOutcome()
     }
@@ -84,6 +92,7 @@ export class CombatScene extends Phaser.Scene {
     private handleOutcome(): void {
         playCue(this.engine.state.defeat ? 'defeat' : 'victory')
         const result = finishCombat(this.run, this.engine, this.roomKind, this.meta)
+        this.flushAchievements()
         saveRun(this.run)
         if (result) this.scene.start('RunSummary', { run: this.run, result })
         else { const next = getRunDestination(this.run); this.scene.start(next.scene, next.data) }

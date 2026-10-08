@@ -242,6 +242,7 @@ export interface EnemyState {
 }
 
 export interface CombatState {
+    achievementStats?: import('./achievements/catalog').AchievementCombat
     orbsChanneled: Record<OrbType, number>
     panacheCount?: number
     bombs?: { turns: number; damage: number }[]

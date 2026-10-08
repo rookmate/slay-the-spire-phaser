@@ -1,3 +1,4 @@
+import { campaignAchievements, combatAchievements, endingAchievements } from './achievements/progress'
 import { affectsRoomTier } from './ascension'
 import { finishBossCombat } from './campaign'
 import { applyCombatEscape, applyCombatVictory } from './combat'
@@ -34,6 +35,7 @@ export function openChest(run: RunState, meta: MetaState): boolean {
 export function finishCombat(run: RunState, engine: Engine, room: RoomKind, meta: MetaState): 'victory' | 'defeat' | undefined {
     if (!engine.state.victory && !engine.state.defeat) throw new Error('Combat has not ended')
     recordCombatStats(run, engine, room)
+    combatAchievements(run, engine)
     if (engine.state.defeat) { run.player.hp = 0; return 'defeat' }
     if (engine.state.escaped) { applyCombatEscape(run, engine.state.player, room); return }
     applyCombatVictory(run, engine.state.player)
@@ -49,7 +51,13 @@ export function finishCombat(run: RunState, engine: Engine, room: RoomKind, meta
     if (room === 'elite' && run.burningEliteActive) run.keys.emerald = true
     run.burningEliteActive = false
     if (room === 'monster') run.hallwayCount = (run.hallwayCount ?? 0) + 1
-    if (room === 'boss') return finishBossCombat(run, meta) === 'RunSummary' ? 'victory' : undefined
+    if (room === 'boss') {
+        const clearedAct = run.act
+        const finished = finishBossCombat(run, meta) === 'RunSummary'
+        if (clearedAct === 3) campaignAchievements(run)
+        if (clearedAct === 4) endingAchievements(run)
+        return finished ? 'victory' : undefined
+    }
     const nodeId = run.mapProgress?.currentNodeId ?? `floor-${run.floor}`
     const rewards = generateRewardBundle(`${run.seed}-reward-${nodeId}-${room}`, affectsRoomTier(room), run, meta, { roomKind: room, asc: run.asc })
     run.pendingRoom = { scene: 'Rewards', rewards }

@@ -31,7 +31,7 @@ export type Action =
     | { kind: 'EnemyEffect'; enemyId: EntityId; effect: import('./state').EnemyEffect }
     | { kind: 'PlayTopCard'; exhaust?: boolean }
     | { kind: 'ApplyPower'; target: EntityId; powerId: PowerId; stacks: number }
-    | { kind: 'LoseHp'; target: EntityId; amount: number; fromCard?: boolean }
+    | { kind: 'LoseHp'; origin?: 'poison'; target: EntityId; amount: number; fromCard?: boolean }
     | { kind: 'ExhaustCard'; owner: EntityId; cardInstanceId?: string }
 
 export type EmittedEvent =
