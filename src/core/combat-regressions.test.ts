@@ -103,7 +103,7 @@ describe('combat action ordering', () => {
 })
 
 describe('card damage and combat isolation', () => {
-    it.each([['STRIKE', 5], ['HEAVY_BLADE', 11], ['TWIN_STRIKE', 8]])('applies Weak once to %s', (cardId, damage) => {
+    it.each([['STRIKE', 4], ['HEAVY_BLADE', 10], ['TWIN_STRIKE', 6]])('applies Weak once to %s', (cardId, damage) => {
         const engine = combat([cardId])
         engine.state.player.powers.push({ id: 'WEAK', stacks: 1 })
         engine.playCard(engine.state.player.hand[0], ['enemy'])

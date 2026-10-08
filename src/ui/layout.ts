@@ -8,6 +8,7 @@ export function combatLayout(width: number, height: number) {
         hand: { x: 16, y: handTop, width: width - 32, height: CARD_SIZE.height },
         battlefield: { x: width * 0.3, y: 48, width: width * 0.7 - 16, height: handTop - 72 },
         footerTop,
+        piles: [0, 1].map(index => ({ x: width - 150, y: footerTop + index * 22 })),
     }
 }
 

@@ -1,10 +1,14 @@
-import type { EntityId } from './actions'
+import type { Action, EntityId } from './actions'
 
 export type CardType = 'attack' | 'skill' | 'power' | 'status' | 'curse'
 export type ChoiceZone = 'hand' | 'discard' | 'exhaust'
 export type CardDestination = 'hand' | 'drawPile' | 'drawPileTop' | 'discardPile' | 'exhaustPile'
 
 export type PowerId =
+    | 'FRAIL'
+    | 'ARTIFACT'
+    | 'NO_DRAW'
+    | 'COMBUST_HP_LOSS'
     | 'VULNERABLE'
     | 'WEAK'
     | 'STRENGTH'
@@ -28,6 +32,7 @@ export type PowerId =
 export interface PowerInstance {
     id: PowerId
     stacks: number
+    fresh?: boolean
 }
 
 export interface CardInstance {
@@ -62,7 +67,7 @@ export interface CardChoiceRequest extends PendingChoiceView {
 
 export interface CardEngineApi {
     state: CombatState
-    enqueue: (a: any) => void
+    enqueue: (a: Action) => void
     setDoubleTapCharges?: (charges: number) => void
     modifyOutgoingAttackDamageFromPlayer?: (base: number, cardInstanceId?: string) => number
     handleExhaustFromHand?: (card: CardInstance) => void
@@ -84,7 +89,7 @@ export interface CardEngineApi {
 
 export interface EnemyEngineApi {
     state: CombatState
-    enqueue: (a: any) => void
+    enqueue: (a: Action) => void
     spawnEnemies: (enemies: EnemyState[]) => void
     removeEnemy: (enemyId: EntityId) => void
     createCardsInDestination: (defId: string, destination: Exclude<CardDestination, 'drawPileTop' | 'exhaustPile'>, count?: number, upgradeLevel?: number) => CardInstance[]
@@ -99,6 +104,8 @@ export interface CardDef {
     name: string
     type: CardType
     cost: number
+    description?: (card: CardInstance) => string
+    damage?: (ctx: { card: CardInstance; player: PlayerState }) => number
     baseDamage?: number
     baseBlock?: number
     // Optional rarity metadata used by UI/builders; not used by engine rules
@@ -108,6 +115,8 @@ export interface CardDef {
     exhaust?: boolean
     xCost?: boolean
     unplayable?: boolean
+    innate?: boolean
+    retain?: boolean
     ethereal?: boolean
     upgrade?: {
         name?: string
@@ -117,6 +126,8 @@ export interface CardDef {
         exhaust?: boolean
         xCost?: boolean
         unplayable?: boolean
+        innate?: boolean
+        retain?: boolean
         ethereal?: boolean
     }
 

@@ -81,8 +81,8 @@ export class EnemyDisplay {
     }
 
     private getEnemyText(enemy: EnemyState): string {
-        if (enemy.intent?.kind === 'attack') return `${enemy.intent.amount} ⚔`
-        if (enemy.intent?.kind === 'multi_attack') return `${enemy.intent.amount}x${enemy.intent.hits} ⚔`
+        if (enemy.intent?.kind === 'attack') return `${this.engine.previewEnemyAttack(enemy)} ⚔`
+        if (enemy.intent?.kind === 'multi_attack') return `${this.engine.previewEnemyAttack(enemy)}x${enemy.intent.hits} ⚔`
         if (enemy.intent?.kind === 'block') return `${enemy.intent.amount} 🛡`
         if (enemy.intent?.kind === 'debuff') return `${enemy.intent.debuff} ↓`
         if (enemy.intent?.kind === 'status') return `${enemy.intent.createdDefId} x${enemy.intent.count}`

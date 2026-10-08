@@ -263,7 +263,7 @@ describe('deferred card systems', () => {
         playAndResolve(engine, player.hand[0], [])
 
         expect(engine.state.player.block).toBe(10)
-        expect(engine.state.player.exhaustPile.map(card => card.defId).sort()).toEqual(['DEFEND', 'SECOND_WIND', 'WOUND'])
+        expect(engine.state.player.exhaustPile.map(card => card.defId).sort()).toEqual(['DEFEND', 'WOUND'])
         expect(engine.state.player.hand.map(card => card.defId)).toEqual(['STRIKE'])
     })
 
@@ -358,13 +358,13 @@ describe('deferred card systems', () => {
         expect(canRestAtCampfire(run)).toBe(false)
         expect(engine.state.enemies[0].powers.find(power => power.id === 'STRENGTH')?.stacks).toBe(1)
         expect(engine.state.player.drawPile.filter(card => card.defId === 'WOUND')).toHaveLength(2)
-        expect(engine.state.enemies[0].hp).toBe(35)
+        expect(engine.state.enemies[0].hp).toBe(37)
 
         playAndResolve(engine, player.hand[2], ['e1'])
-        expect(engine.state.enemies[0].hp).toBe(24)
+        expect(engine.state.enemies[0].hp).toBe(27)
 
         playAndResolve(engine, player.hand[0], [])
-        expect(engine.state.enemies[0].hp).toBe(14)
+        expect(engine.state.enemies[0].hp).toBe(24)
 
         engine.enqueue({ kind: 'EndTurn' })
         engine.runUntilIdle()
@@ -500,7 +500,7 @@ describe('deferred card systems', () => {
 
         playAndResolve(engine, player.hand[0], [])
 
-        expect(engine.state.player.energy).toBe(5)
+        expect(engine.state.player.energy).toBe(4)
         expect(engine.state.player.exhaustPile.map(card => card.defId)).toContain('SEEING_RED')
     })
 

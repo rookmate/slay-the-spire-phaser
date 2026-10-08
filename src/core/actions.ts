@@ -1,14 +1,17 @@
 import type { PowerId } from './state'
 
 export type EntityId = string
+export type DamageType = 'attack' | 'effect' | 'thorns'
+export type BlockSource = 'card' | 'effect'
 
 export type Action =
     | { kind: 'GainEnergy'; amount: number }
     | { kind: 'DrawCards'; count: number }
-    | { kind: 'DealDamage'; source: EntityId; target: EntityId; amount: number; damageType?: 'attack' | 'thorns'; lifestealTo?: EntityId; sourceCardInstanceId?: string }
-    | { kind: 'DealMultiDamage'; source: EntityId; target: EntityId; amount: number; hits: number; damageType?: 'attack' | 'thorns'; sourceCardInstanceId?: string }
+    | { kind: 'DealDamage'; source: EntityId; target: EntityId; amount: number; damageType?: DamageType; lifestealTo?: EntityId; sourceCardInstanceId?: string }
+    | { kind: 'RandomAttack'; source: EntityId; amount: number; sourceCardInstanceId: string }
+    | { kind: 'DealMultiDamage'; source: EntityId; target: EntityId; amount: number; hits: number; damageType?: DamageType; sourceCardInstanceId?: string }
     | { kind: 'Heal'; target: EntityId; amount: number }
-    | { kind: 'GainBlock'; target: EntityId; amount: number }
+    | { kind: 'GainBlock'; target: EntityId; amount: number; blockSource?: BlockSource }
     | { kind: 'DiscardHand' }
     | { kind: 'EndTurn' }
     | { kind: 'StartEnemyTurn' }

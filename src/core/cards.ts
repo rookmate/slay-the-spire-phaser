@@ -1,18 +1,9 @@
+import { attackAmount, chooseOneCard, isUpgraded } from './cards/helpers'
+import { STATUS_CARDS } from './cards/status'
+import { POWER_CARDS } from './cards/power'
 import type { MetaState } from './meta'
 import { getEffectiveUnlockedCardIds } from './meta'
-import type { CardDef, CardEngineApi, CardInstance, ChoiceZone } from './state'
-
-function playerStrength(engine: { state: { player: { powers: Array<{ id: string; stacks: number }> } } }): number {
-    return engine.state.player.powers.find(power => power.id === 'STRENGTH')?.stacks ?? 0
-}
-
-function attackAmount(engine: CardEngineApi, card: CardInstance, base: number): number {
-    return engine.modifyOutgoingAttackDamageFromPlayer?.(base, card.instanceId) ?? (base + playerStrength(engine))
-}
-
-function isUpgraded(card: CardInstance): boolean {
-    return card.upgradeLevel > 0
-}
+import type { CardDef, CardEngineApi, CardInstance } from './state'
 
 let fallbackCardInstanceId = 0
 
@@ -44,7 +35,8 @@ export function createStarterDeck(): CardInstance[] {
 }
 
 export function canUpgradeCard(card: CardInstance): boolean {
-    return card.defId === 'SEARING_BLOW' || card.upgradeLevel === 0
+    const def = CARD_DEFS[card.defId]
+    return Boolean(def && def.type !== 'curse' && def.type !== 'status' && (card.defId === 'SEARING_BLOW' || card.upgradeLevel === 0))
 }
 
 export function getCardCombatBonusDamage(engine: CardEngineApi, instanceId: string): number {
@@ -53,31 +45,6 @@ export function getCardCombatBonusDamage(engine: CardEngineApi, instanceId: stri
 
 export function modifyCardCombatBonusDamage(engine: CardEngineApi, instanceId: string, delta: number): number {
     return engine.modifyCardCombatBonusDamage?.(instanceId, delta) ?? 0
-}
-
-function chooseOneCard(engine: CardEngineApi, opts: {
-    card: CardInstance
-    prompt: string
-    zone: ChoiceZone
-    eligibleInstanceIds: string[]
-    canSkip?: boolean
-    onSubmit: (instanceId: string) => void
-}): void {
-    if (opts.eligibleInstanceIds.length === 0) return
-    engine.beginChoice?.({
-        prompt: opts.prompt,
-        zone: opts.zone,
-        eligibleInstanceIds: opts.eligibleInstanceIds,
-        minSelections: 1,
-        maxSelections: 1,
-        canSkip: opts.canSkip ?? false,
-        sourceCardInstanceId: opts.card.instanceId,
-        onSubmit: (instanceIds) => {
-            const instanceId = instanceIds[0]
-            if (!instanceId) return
-            opts.onSubmit(instanceId)
-        },
-    })
 }
 
 function searingBlowDamage(upgradeLevel: number): number {
@@ -96,6 +63,8 @@ export interface ResolvedCardDef extends CardDef {
 }
 
 export const CARD_DEFS: Record<string, CardDef> = {
+    ...STATUS_CARDS,
+    ...POWER_CARDS,
     STRIKE: {
         id: 'STRIKE',
         name: 'Strike',
@@ -132,114 +101,6 @@ export const CARD_DEFS: Record<string, CardDef> = {
             engine.enqueue({ kind: 'ApplyPower', target, powerId: 'VULNERABLE', stacks: isUpgraded(card) ? 3 : 2 })
         },
     },
-    BARRICADE: {
-        id: 'BARRICADE',
-        name: 'Barricade',
-        type: 'power',
-        cost: 3,
-        rarity: 'rare',
-        targeting: { type: 'none' },
-        upgrade: { cost: 2 },
-        onPlay: ({ engine }) => {
-            engine.enqueue({ kind: 'ApplyPower', target: 'player', powerId: 'BARRICADE', stacks: 1 })
-        },
-    },
-    METALLICIZE: {
-        id: 'METALLICIZE',
-        name: 'Metallicize',
-        type: 'power',
-        cost: 1,
-        rarity: 'uncommon',
-        targeting: { type: 'none' },
-        upgrade: {},
-        onPlay: ({ engine, card }) => {
-            engine.enqueue({ kind: 'ApplyPower', target: 'player', powerId: 'METALLICIZE', stacks: isUpgraded(card) ? 4 : 3 })
-        },
-    },
-    DEMON_FORM: {
-        id: 'DEMON_FORM',
-        name: 'Demon Form',
-        type: 'power',
-        cost: 3,
-        rarity: 'rare',
-        targeting: { type: 'none' },
-        upgrade: {},
-        onPlay: ({ engine, card }) => {
-            engine.enqueue({ kind: 'ApplyPower', target: 'player', powerId: 'DEMON_FORM', stacks: isUpgraded(card) ? 3 : 2 })
-        },
-    },
-    CORRUPTION: {
-        id: 'CORRUPTION',
-        name: 'Corruption',
-        type: 'power',
-        cost: 3,
-        rarity: 'rare',
-        targeting: { type: 'none' },
-        upgrade: { cost: 2 },
-        onPlay: ({ engine }) => {
-            engine.enqueue({ kind: 'ApplyPower', target: 'player', powerId: 'CORRUPTION', stacks: 1 })
-        },
-    },
-    FEEL_NO_PAIN: {
-        id: 'FEEL_NO_PAIN',
-        name: 'Feel No Pain',
-        type: 'power',
-        cost: 1,
-        rarity: 'uncommon',
-        targeting: { type: 'none' },
-        upgrade: {},
-        onPlay: ({ engine, card }) => {
-            engine.enqueue({ kind: 'ApplyPower', target: 'player', powerId: 'FEEL_NO_PAIN', stacks: isUpgraded(card) ? 2 : 1 })
-        },
-    },
-    JUGGERNAUT: {
-        id: 'JUGGERNAUT',
-        name: 'Juggernaut',
-        type: 'power',
-        cost: 2,
-        rarity: 'rare',
-        targeting: { type: 'none' },
-        upgrade: {},
-        onPlay: ({ engine, card }) => {
-            engine.enqueue({ kind: 'ApplyPower', target: 'player', powerId: 'JUGGERNAUT', stacks: isUpgraded(card) ? 2 : 1 })
-        },
-    },
-    DARK_EMBRACE: {
-        id: 'DARK_EMBRACE',
-        name: 'Dark Embrace',
-        type: 'power',
-        cost: 2,
-        rarity: 'rare',
-        targeting: { type: 'none' },
-        upgrade: { cost: 1 },
-        onPlay: ({ engine, card }) => {
-            engine.enqueue({ kind: 'ApplyPower', target: 'player', powerId: 'DARK_EMBRACE', stacks: isUpgraded(card) ? 2 : 1 })
-        },
-    },
-    BRUTALITY: {
-        id: 'BRUTALITY',
-        name: 'Brutality',
-        type: 'power',
-        cost: 0,
-        rarity: 'rare',
-        targeting: { type: 'none' },
-        upgrade: {},
-        onPlay: ({ engine, card }) => {
-            engine.enqueue({ kind: 'ApplyPower', target: 'player', powerId: 'BRUTALITY', stacks: isUpgraded(card) ? 2 : 1 })
-        },
-    },
-    BERSERK: {
-        id: 'BERSERK',
-        name: 'Berserk',
-        type: 'power',
-        cost: 0,
-        rarity: 'rare',
-        targeting: { type: 'none' },
-        upgrade: {},
-        onPlay: ({ engine, card }) => {
-            engine.enqueue({ kind: 'ApplyPower', target: 'player', powerId: 'BERSERK', stacks: isUpgraded(card) ? 2 : 1 })
-        },
-    },
     DOUBLE_TAP: {
         id: 'DOUBLE_TAP',
         name: 'Double Tap',
@@ -264,7 +125,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         onPlay: ({ engine, card }) => {
             const limboCardId = engine.getLimboCard?.()?.instanceId
             const eligible = (engine.getCardsInZone?.('exhaust') ?? [])
-                .filter(entry => entry.instanceId !== limboCardId)
+                .filter(entry => entry.instanceId !== limboCardId && entry.defId !== 'EXHUME')
                 .map(entry => entry.instanceId)
 
             chooseOneCard(engine, {
@@ -339,7 +200,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         upgrade: { baseBlock: 11 },
         onPlay: ({ engine, card }) => {
             const resolved = resolveCard(card)
-            engine.enqueue({ kind: 'GainBlock', target: 'player', amount: resolved.baseBlock ?? 0 })
+            engine.enqueue({ kind: 'GainBlock', blockSource: 'card', target: 'player', amount: resolved.baseBlock ?? 0 })
             engine.enqueue({ kind: 'DrawCards', count: 1 })
         },
     },
@@ -364,14 +225,15 @@ export const CARD_DEFS: Record<string, CardDef> = {
         id: 'BODY_SLAM',
         name: 'Body Slam',
         type: 'attack',
+        damage: ({ player }) => player.block,
         cost: 1,
         rarity: 'common',
         targeting: { type: 'single_enemy', required: true },
         upgrade: { cost: 0 },
-        onPlay: ({ engine, source, targets }) => {
+        onPlay: ({ engine, source, targets, card }) => {
             const target = targets[0]
-            if (engine.state.player.block > 0) {
-                engine.enqueue({ kind: 'DealDamage', source, target, amount: engine.state.player.block })
+            {
+                engine.enqueue({ kind: 'DealDamage', source, target, amount: attackAmount(engine, card, engine.state.player.block) })
             }
         },
     },
@@ -426,7 +288,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         rarity: 'uncommon',
         baseDamage: 13,
         targeting: { type: 'single_enemy', required: true },
-        upgrade: { baseDamage: 16 },
+        upgrade: {},
         onPlay: ({ engine, source, targets, card }) => {
             const target = targets[0]
             const resolved = resolveCard(card)
@@ -442,12 +304,14 @@ export const CARD_DEFS: Record<string, CardDef> = {
         type: 'attack',
         cost: 1,
         rarity: 'common',
-        targeting: { type: 'single_enemy', required: true },
+        baseDamage: 3,
+        targeting: { type: 'none' },
         upgrade: {},
-        onPlay: ({ engine, source, targets, card }) => {
-            const target = targets[0]
-            const amount = attackAmount(engine, card, isUpgraded(card) ? 4 : 3)
-            for (let i = 0; i < 3; i++) engine.enqueue({ kind: 'DealDamage', source, target, amount })
+        onPlay: ({ engine, source, card }) => {
+            const amount = attackAmount(engine, card, 3)
+            for (let i = 0; i < (isUpgraded(card) ? 4 : 3); i++) {
+                engine.enqueue({ kind: 'RandomAttack', source, amount, sourceCardInstanceId: card.instanceId })
+            }
         },
     },
     THUNDERCLAP: {
@@ -496,30 +360,30 @@ export const CARD_DEFS: Record<string, CardDef> = {
         id: 'HEAVY_BLADE',
         name: 'Heavy Blade',
         type: 'attack',
+        baseDamage: 14,
+        damage: ({ player, card }) => 14 + (player.powers.find(power => power.id === 'STRENGTH')?.stacks ?? 0) * (isUpgraded(card) ? 4 : 2),
         cost: 2,
         rarity: 'common',
         targeting: { type: 'single_enemy', required: true },
-        upgrade: {},
+        upgrade: { baseDamage: 14 },
         onPlay: ({ engine, source, targets, card }) => {
             const target = targets[0]
-            const strength = playerStrength(engine)
-            const multiplier = isUpgraded(card) ? 5 : 3
-            engine.enqueue({ kind: 'DealDamage', source, target, amount: attackAmount(engine, card, 14 + strength * (multiplier - 1)) })
+            engine.enqueue({ kind: 'DealDamage', source, target, amount: attackAmount(engine, card, resolveCard(card).damage!({ player: engine.state.player, card })) })
         },
     },
     PERFECTED_STRIKE: {
         id: 'PERFECTED_STRIKE',
         name: 'Perfected Strike',
         type: 'attack',
+        baseDamage: 6,
+        damage: ({ player, card }) => 6 + [...player.hand, ...player.drawPile, ...player.discardPile, card].filter((entry, index, all) => all.findIndex(other => other.instanceId === entry.instanceId) === index && CARD_DEFS[entry.defId]?.name.toLowerCase().includes('strike')).length * (isUpgraded(card) ? 3 : 2),
         cost: 2,
         rarity: 'common',
         targeting: { type: 'single_enemy', required: true },
-        upgrade: {},
+        upgrade: { baseDamage: 6 },
         onPlay: ({ engine, source, targets, card }) => {
             const target = targets[0]
-            const strikeCount = engine.state.player.deck.filter(entry => CARD_DEFS[entry.defId]?.name.toLowerCase().includes('strike')).length
-            const perStrike = isUpgraded(card) ? 3 : 2
-            engine.enqueue({ kind: 'DealDamage', source, target, amount: attackAmount(engine, card, 6 + strikeCount * perStrike) })
+            engine.enqueue({ kind: 'DealDamage', source, target, amount: attackAmount(engine, card, resolveCard(card).damage!({ player: engine.state.player, card })) })
         },
     },
     TRUE_GRIT: {
@@ -533,7 +397,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         upgrade: { baseBlock: 9 },
         onPlay: ({ engine, card }) => {
             const resolved = resolveCard(card)
-            engine.enqueue({ kind: 'GainBlock', target: 'player', amount: resolved.baseBlock ?? 0 })
+            engine.enqueue({ kind: 'GainBlock', blockSource: 'card', target: 'player', amount: resolved.baseBlock ?? 0 })
             engine.deferChoice?.(() => {
                 const handCards = engine.getCardsInZone?.('hand') ?? []
                 if (handCards.length === 0) return
@@ -561,6 +425,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         type: 'skill',
         cost: 0,
         rarity: 'common',
+        exhaust: true,
         targeting: { type: 'none' },
         upgrade: {},
         onPlay: ({ engine, card }) => {
@@ -596,14 +461,15 @@ export const CARD_DEFS: Record<string, CardDef> = {
         id: 'CLASH',
         name: 'Clash',
         type: 'attack',
+        baseDamage: 14,
         cost: 0,
         rarity: 'common',
         targeting: { type: 'single_enemy', required: true },
-        upgrade: {},
+        upgrade: { baseDamage: 18 },
         canPlay: ({ engine }) => engine.state.player.hand.every(entry => CARD_DEFS[entry.defId]?.type === 'attack'),
         onPlay: ({ engine, source, targets, card }) => {
             const target = targets[0]
-            engine.enqueue({ kind: 'DealDamage', source, target, amount: attackAmount(engine, card, isUpgraded(card) ? 18 : 14) })
+            engine.enqueue({ kind: 'DealDamage', source, target, amount: attackAmount(engine, card, resolveCard(card).baseDamage ?? 0) })
         },
     },
     ARMAMENTS: {
@@ -616,9 +482,9 @@ export const CARD_DEFS: Record<string, CardDef> = {
         targeting: { type: 'none' },
         upgrade: {},
         onPlay: ({ engine, card }) => {
-            engine.enqueue({ kind: 'GainBlock', target: 'player', amount: resolveCard(card).baseBlock ?? 0 })
+            engine.enqueue({ kind: 'GainBlock', blockSource: 'card', target: 'player', amount: resolveCard(card).baseBlock ?? 0 })
             engine.deferChoice?.(() => {
-                const handCards = engine.getCardsInZone?.('hand') ?? []
+                const handCards = (engine.getCardsInZone?.('hand') ?? []).filter(canUpgradeCard)
                 if (handCards.length === 0) return
                 if (isUpgraded(card)) {
                     for (const entry of handCards) engine.upgradeCardInstance?.(entry.instanceId, ['hand'])
@@ -644,6 +510,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         upgrade: {},
         onPlay: ({ engine, card }) => {
             engine.enqueue({ kind: 'DrawCards', count: isUpgraded(card) ? 4 : 3 })
+            engine.enqueue({ kind: 'ApplyPower', target: 'player', powerId: 'NO_DRAW', stacks: 1 })
         },
     },
     BLOODLETTING: {
@@ -669,6 +536,10 @@ export const CARD_DEFS: Record<string, CardDef> = {
         upgrade: {},
         onPlay: ({ engine, card }) => {
             const handCards = engine.getCardsInZone?.('hand') ?? []
+            if (!handCards.length) {
+                engine.enqueue({ kind: 'DrawCards', count: isUpgraded(card) ? 3 : 2 })
+                return
+            }
             chooseOneCard(engine, {
                 card,
                 prompt: 'Choose a card to exhaust',
@@ -711,7 +582,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         targeting: { type: 'none' },
         upgrade: { cost: 1 },
         onPlay: ({ engine }) => {
-            if (engine.state.player.block > 0) engine.enqueue({ kind: 'GainBlock', target: 'player', amount: engine.state.player.block })
+            if (engine.state.player.block > 0) engine.enqueue({ kind: 'GainBlock', blockSource: 'effect', target: 'player', amount: engine.state.player.block })
         },
     },
     FLAME_BARRIER: {
@@ -725,7 +596,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         upgrade: { baseBlock: 16 },
         onPlay: ({ engine, card }) => {
             const resolved = resolveCard(card)
-            engine.enqueue({ kind: 'GainBlock', target: 'player', amount: resolved.baseBlock ?? 0 })
+            engine.enqueue({ kind: 'GainBlock', blockSource: 'card', target: 'player', amount: resolved.baseBlock ?? 0 })
             engine.addTemporaryThorns?.(isUpgraded(card) ? 6 : 4)
         },
     },
@@ -744,14 +615,15 @@ export const CARD_DEFS: Record<string, CardDef> = {
         id: 'HEMOKINESIS',
         name: 'Hemokinesis',
         type: 'attack',
+        baseDamage: 15,
         cost: 1,
         rarity: 'uncommon',
         targeting: { type: 'single_enemy', required: true },
-        upgrade: {},
+        upgrade: { baseDamage: 20 },
         onPlay: ({ engine, source, targets, card }) => {
             const target = targets[0]
             engine.enqueue({ kind: 'LoseHp', target: 'player', amount: 2 })
-            engine.enqueue({ kind: 'DealDamage', source, target, amount: attackAmount(engine, card, isUpgraded(card) ? 20 : 15) })
+            engine.enqueue({ kind: 'DealDamage', source, target, amount: attackAmount(engine, card, resolveCard(card).baseDamage ?? 0) })
         },
     },
     INTIMIDATE: {
@@ -760,6 +632,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         type: 'skill',
         cost: 0,
         rarity: 'uncommon',
+        exhaust: true,
         targeting: { type: 'none' },
         upgrade: {},
         onPlay: ({ engine, card }) => {
@@ -778,7 +651,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         targeting: { type: 'none' },
         upgrade: { baseBlock: 20 },
         onPlay: ({ engine, card }) => {
-            engine.enqueue({ kind: 'GainBlock', target: 'player', amount: resolveCard(card).baseBlock ?? 0 })
+            engine.enqueue({ kind: 'GainBlock', blockSource: 'card', target: 'player', amount: resolveCard(card).baseBlock ?? 0 })
             engine.createCardsInDestination?.('WOUND', 'hand', 2)
         },
     },
@@ -786,10 +659,12 @@ export const CARD_DEFS: Record<string, CardDef> = {
         id: 'PUMMEL',
         name: 'Pummel',
         type: 'attack',
+        baseDamage: 2,
         cost: 1,
         rarity: 'uncommon',
+        exhaust: true,
         targeting: { type: 'single_enemy', required: true },
-        upgrade: {},
+        upgrade: { baseDamage: 2 },
         onPlay: ({ engine, source, targets, card }) => {
             const target = targets[0]
             const amount = attackAmount(engine, card, 2)
@@ -801,11 +676,11 @@ export const CARD_DEFS: Record<string, CardDef> = {
         id: 'SEEING_RED',
         name: 'Seeing Red',
         type: 'skill',
-        cost: 0,
+        cost: 1,
         rarity: 'uncommon',
         targeting: { type: 'none' },
         exhaust: true,
-        upgrade: { exhaust: false },
+        upgrade: { cost: 0 },
         onPlay: ({ engine }) => {
             engine.enqueue({ kind: 'GainEnergy', amount: 2 })
         },
@@ -842,7 +717,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         targeting: { type: 'all_enemies', required: true },
         upgrade: {},
         onPlay: ({ engine, card }) => {
-            const stacks = isUpgraded(card) ? 3 : 2
+            const stacks = isUpgraded(card) ? 5 : 3
             for (const enemy of engine.state.enemies) {
                 if (enemy.hp > 0) {
                     engine.enqueue({ kind: 'ApplyPower', target: enemy.id, powerId: 'WEAK', stacks })
@@ -862,7 +737,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         onPlay: ({ engine, targets, card }) => {
             const target = targets[0]
             const enemy = engine.state.enemies.find(entry => entry.id === target)
-            if (enemy?.intent?.kind === 'attack') {
+            if (enemy?.intent?.kind === 'attack' || enemy?.intent?.kind === 'multi_attack') {
                 engine.enqueue({ kind: 'ApplyPower', target: 'player', powerId: 'STRENGTH', stacks: isUpgraded(card) ? 4 : 3 })
             }
         },
@@ -875,7 +750,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         rarity: 'uncommon',
         exhaust: true,
         targeting: { type: 'single_enemy', required: true },
-        upgrade: { exhaust: false },
+        upgrade: {},
         onPlay: ({ engine, targets, card }) => {
             const target = targets[0]
             engine.enqueue({ kind: 'ApplyPower', target, powerId: 'STRENGTH', stacks: isUpgraded(card) ? -3 : -2 })
@@ -886,7 +761,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         name: 'Flex',
         type: 'skill',
         cost: 0,
-        rarity: 'uncommon',
+        rarity: 'common',
         targeting: { type: 'none' },
         upgrade: {},
         onPlay: ({ engine, card }) => {
@@ -900,7 +775,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         name: 'Reckless Charge',
         type: 'attack',
         cost: 0,
-        rarity: 'common',
+        rarity: 'uncommon',
         targeting: { type: 'single_enemy', required: true },
         upgrade: { baseDamage: 10 },
         baseDamage: 7,
@@ -923,31 +798,18 @@ export const CARD_DEFS: Record<string, CardDef> = {
             engine.enqueue({ kind: 'ApplyPower', target: 'player', powerId: 'RAGE', stacks: isUpgraded(card) ? 5 : 3 })
         },
     },
-    EVOLVE: {
-        id: 'EVOLVE',
-        name: 'Evolve',
-        type: 'power',
-        cost: 1,
-        rarity: 'uncommon',
-        targeting: { type: 'none' },
-        upgrade: {},
-        onPlay: ({ engine, card }) => {
-            engine.enqueue({ kind: 'ApplyPower', target: 'player', powerId: 'EVOLVE', stacks: isUpgraded(card) ? 2 : 1 })
-        },
-    },
     SECOND_WIND: {
         id: 'SECOND_WIND',
         name: 'Second Wind',
         type: 'skill',
         cost: 1,
         rarity: 'uncommon',
-        exhaust: true,
         targeting: { type: 'none' },
         upgrade: {},
         onPlay: ({ engine, card }) => {
             const exhausted = engine.exhaustCardsInHand?.((entry) => resolveCard(entry).type !== 'attack') ?? []
-            if (exhausted.length > 0) {
-                engine.enqueue({ kind: 'GainBlock', target: 'player', amount: exhausted.length * (isUpgraded(card) ? 7 : 5) })
+            for (const _card of exhausted) {
+                engine.enqueue({ kind: 'GainBlock', blockSource: 'card', target: 'player', amount: isUpgraded(card) ? 7 : 5 })
             }
         },
     },
@@ -974,13 +836,14 @@ export const CARD_DEFS: Record<string, CardDef> = {
         id: 'BLUDGEON',
         name: 'Bludgeon',
         type: 'attack',
+        baseDamage: 32,
         cost: 3,
         rarity: 'rare',
         targeting: { type: 'single_enemy', required: true },
-        upgrade: {},
+        upgrade: { baseDamage: 42 },
         onPlay: ({ engine, source, targets, card }) => {
             const target = targets[0]
-            engine.enqueue({ kind: 'DealDamage', source, target, amount: attackAmount(engine, card, isUpgraded(card) ? 42 : 32) })
+            engine.enqueue({ kind: 'DealDamage', source, target, amount: attackAmount(engine, card, resolveCard(card).baseDamage ?? 0) })
         },
     },
     OFFERING: {
@@ -1009,7 +872,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         targeting: { type: 'none' },
         upgrade: { baseBlock: 40 },
         onPlay: ({ engine, card }) => {
-            engine.enqueue({ kind: 'GainBlock', target: 'player', amount: resolveCard(card).baseBlock ?? 0 })
+            engine.enqueue({ kind: 'GainBlock', blockSource: 'card', target: 'player', amount: resolveCard(card).baseBlock ?? 0 })
         },
     },
     LIMIT_BREAK: {
@@ -1033,6 +896,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         cost: 2,
         rarity: 'rare',
         baseDamage: 4,
+        exhaust: true,
         targeting: { type: 'all_enemies', required: true },
         upgrade: { baseDamage: 5 },
         onPlay: ({ engine, source, card }) => {
@@ -1050,30 +914,6 @@ export const CARD_DEFS: Record<string, CardDef> = {
             }
         },
     },
-    COMBUST: {
-        id: 'COMBUST',
-        name: 'Combust',
-        type: 'power',
-        cost: 1,
-        rarity: 'uncommon',
-        targeting: { type: 'none' },
-        upgrade: {},
-        onPlay: ({ engine, card }) => {
-            engine.enqueue({ kind: 'ApplyPower', target: 'player', powerId: 'COMBUST', stacks: isUpgraded(card) ? 7 : 5 })
-        },
-    },
-    FIRE_BREATHING: {
-        id: 'FIRE_BREATHING',
-        name: 'Fire Breathing',
-        type: 'power',
-        cost: 1,
-        rarity: 'uncommon',
-        targeting: { type: 'none' },
-        upgrade: {},
-        onPlay: ({ engine, card }) => {
-            engine.enqueue({ kind: 'ApplyPower', target: 'player', powerId: 'FIRE_BREATHING', stacks: isUpgraded(card) ? 10 : 6 })
-        },
-    },
     RAMPAGE: {
         id: 'RAMPAGE',
         name: 'Rampage',
@@ -1082,7 +922,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         rarity: 'uncommon',
         baseDamage: 8,
         targeting: { type: 'single_enemy', required: true },
-        upgrade: { baseDamage: 11 },
+        upgrade: {},
         onPlay: ({ engine, source, targets, card }) => {
             const target = targets[0]
             const resolved = resolveCard(card)
@@ -1121,6 +961,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         cost: 1,
         rarity: 'rare',
         baseDamage: 10,
+        exhaust: true,
         targeting: { type: 'single_enemy', required: true },
         upgrade: { baseDamage: 12 },
         onPlay: ({ engine, source, targets, card }) => {
@@ -1134,7 +975,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
         name: 'Dual Wield',
         type: 'skill',
         cost: 1,
-        rarity: 'rare',
+        rarity: 'uncommon',
         targeting: { type: 'none' },
         upgrade: {},
         onPlay: ({ engine, card }) => {
@@ -1154,89 +995,6 @@ export const CARD_DEFS: Record<string, CardDef> = {
                 },
             })
         },
-    },
-    WOUND: {
-        id: 'WOUND',
-        name: 'Wound',
-        type: 'status',
-        cost: 0,
-        unplayable: true,
-        poolEnabled: false,
-        targeting: { type: 'none' },
-    },
-    DAZED: {
-        id: 'DAZED',
-        name: 'Dazed',
-        type: 'status',
-        cost: 0,
-        unplayable: true,
-        ethereal: true,
-        poolEnabled: false,
-        targeting: { type: 'none' },
-    },
-    BURN: {
-        id: 'BURN',
-        name: 'Burn',
-        type: 'status',
-        cost: 0,
-        unplayable: true,
-        poolEnabled: false,
-        targeting: { type: 'none' },
-    },
-    SLIMED: {
-        id: 'SLIMED',
-        name: 'Slimed',
-        type: 'status',
-        cost: 1,
-        exhaust: true,
-        poolEnabled: false,
-        targeting: { type: 'none' },
-    },
-    INJURY: {
-        id: 'INJURY',
-        name: 'Injury',
-        type: 'curse',
-        cost: 0,
-        unplayable: true,
-        poolEnabled: false,
-        targeting: { type: 'none' },
-    },
-    CLUMSY: {
-        id: 'CLUMSY',
-        name: 'Clumsy',
-        type: 'curse',
-        cost: 0,
-        unplayable: true,
-        ethereal: true,
-        poolEnabled: false,
-        targeting: { type: 'none' },
-    },
-    REGRET: {
-        id: 'REGRET',
-        name: 'Regret',
-        type: 'curse',
-        cost: 0,
-        unplayable: true,
-        poolEnabled: false,
-        targeting: { type: 'none' },
-    },
-    PAIN: {
-        id: 'PAIN',
-        name: 'Pain',
-        type: 'curse',
-        cost: 0,
-        unplayable: true,
-        poolEnabled: false,
-        targeting: { type: 'none' },
-    },
-    PARASITE: {
-        id: 'PARASITE',
-        name: 'Parasite',
-        type: 'curse',
-        cost: 0,
-        unplayable: true,
-        poolEnabled: false,
-        targeting: { type: 'none' },
     },
 }
 
@@ -1275,6 +1033,8 @@ export function resolveCard(card: CardInstance): ResolvedCardDef {
         xCost,
         unplayable,
         ethereal,
+        innate: upgradeLevel > 0 ? (def.upgrade?.innate ?? def.innate) : def.innate,
+        retain: upgradeLevel > 0 ? (def.upgrade?.retain ?? def.retain) : def.retain,
         baseDamage,
         baseBlock,
     }

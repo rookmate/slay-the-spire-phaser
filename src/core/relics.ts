@@ -284,7 +284,7 @@ export const RELIC_DEFS: Record<RelicId, RelicDef> = {
         rarity: 'common',
         onPlayerTurnStart: ({ engine }) => {
             for (const enemy of engine.state.enemies) {
-                if (enemy.hp > 0) engine.enqueue({ kind: 'DealDamage', source: engine.state.player.id, target: enemy.id, amount: 3 })
+                if (enemy.hp > 0) engine.enqueue({ kind: 'DealDamage', source: engine.state.player.id, target: enemy.id, amount: 3, damageType: 'effect' })
             }
         },
     },
@@ -295,7 +295,7 @@ export const RELIC_DEFS: Record<RelicId, RelicDef> = {
         rarity: 'common',
         onCardExhausted: ({ engine }) => {
             for (const enemy of engine.state.enemies) {
-                if (enemy.hp > 0) engine.enqueue({ kind: 'DealDamage', source: engine.state.player.id, target: enemy.id, amount: 3 })
+                if (enemy.hp > 0) engine.enqueue({ kind: 'DealDamage', source: engine.state.player.id, target: enemy.id, amount: 3, damageType: 'effect' })
             }
         },
     },
