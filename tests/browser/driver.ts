@@ -47,6 +47,7 @@ export async function inspect(page: Page) {
             scene: scene.scene.key,
             run: scene.run,
             state: scene.engine?.state,
+            legalPlays: scene.engine?.getPlayableCards(),
             choice: scene.engine?.getPendingChoice(),
             map: scene.gmap,
             options: scene.options,

@@ -28,7 +28,7 @@ export const DEFECT_SKILLS: Record<string, CardDef> = {
         else ctx.engine.state.player.orbs = []
         energy(ctx, count); draw(ctx, count)
     }, { exhaust: true }),
-    FORCE_FIELD: skill('FORCE_FIELD', 'Force Field', 4, 'uncommon', () => 'Costs 1 less per Power played this combat.', ctx => block(ctx, up(ctx.card, 12, 16)), { baseBlock: 12, upgrade: { baseBlock: 16 }, dynamicCost: ({ engine, cost }) => Math.max(0, cost - (engine.state.powersPlayed ?? 0)) }),
+    FORCE_FIELD: skill('FORCE_FIELD', 'Force Field', 4, 'uncommon', () => 'Costs 1 less per Power played this combat.', ctx => block(ctx, up(ctx.card, 12, 16)), { baseBlock: 12, upgrade: { baseBlock: 16 }, dynamicCost: ({ engine, cost }) => cost - (engine.state.powersPlayed ?? 0) }),
     FUSION: skill('FUSION', 'Fusion', 2, 'uncommon', () => 'Channel 1 Plasma.', ctx => channel(ctx, 'plasma'), { upgrade: { cost: 1 } }),
     GENETIC_ALGORITHM: skill('GENETIC_ALGORITHM', 'Genetic Algorithm', 1, 'uncommon', c => `Gain ${c.permanentBlock ?? 1} Block. Permanently gain ${up(c, 2, 3)} more Block on this card.`, ctx => {
         block(ctx, ctx.card.permanentBlock ?? 1)

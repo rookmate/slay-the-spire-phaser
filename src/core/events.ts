@@ -59,7 +59,7 @@ export function transformCard(run: RunState, meta: MetaState, instanceId: string
     const def = CARD_DEFS[original.defId]
     const pool = (def.type === 'curse' ? RANDOM_CURSE_IDS
         : def.color === 'colorless' ? Object.values(CARD_DEFS).filter(c => c.color === 'colorless' && c.poolEnabled).map(c => c.id)
-        : selectCardPool({ character: run.character, source: 'transform', colors: cardColors(run), meta, unlockedIds: run.unlockedCardIds })).filter(id => id !== original.defId)
+        : selectCardPool({ character: run.character, source: 'transform', colors: cardColors({ ...run, character: def.color ?? run.character }), meta, unlockedIds: run.unlockedCardIds })).filter(id => id !== original.defId)
     if (!pool.length || !removeCardByInstanceId(run, instanceId)) return undefined
     const id = pool[new RNG(seed).int(0, pool.length - 1)]
     if (def.type === 'curse') return obtainCurse(run, id)

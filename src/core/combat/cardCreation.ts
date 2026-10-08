@@ -9,7 +9,7 @@ export function createCombatCard(engine: Engine, source: string | CardInstance, 
         : { ...source, instanceId: createCardInstance(source.defId).instanceId, retained: false }
     if (typeof source !== 'string') {
         const runtime = engine.getCombatCardRuntime(source.instanceId)
-        engine.state.cardRuntime[card.instanceId] = { bonusDamage: runtime.bonusDamage, bonusBlock: runtime.bonusBlock }
+        engine.state.cardRuntime[card.instanceId] = { ...runtime, triggered: false }
     }
     if (powerAmount(engine.state.player, 'MASTER_REALITY') > 0 && canUpgradeCard(card)) card.upgradeLevel++
     return card
