@@ -1,3 +1,4 @@
+import { roomBackdrop } from '../ui/theme'
 import Phaser from 'phaser'
 import { chooseStartingCard } from '../core/modes/setup'
 import { saveRun, type RunState } from '../core/run'
@@ -12,6 +13,7 @@ export class StartingDeckScene extends Phaser.Scene {
         const draft = this.run.startingDraft
         if (!draft) { const next = getRunDestination(this.run); this.scene.start(next.scene, next.data); return }
         this.children.removeAll(true)
+        roomBackdrop(this)
         this.add.text(24, 20, draft.kind === 'sealed' ? 'Sealed Deck' : 'Draft', { ...menuText, fontSize: '26px' })
         this.add.text(24, 64, `Choose ${draft.remaining} more cards. Deck: ${this.run.deck.length}`, menuText)
         new CardGrid(this, this.add.container(0, 0), draft.choices, 108, card => {

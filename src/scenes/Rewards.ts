@@ -1,3 +1,4 @@
+import { UI_FONT, roomBackdrop } from '../ui/theme'
 import { addRunMenu } from '../ui/runMenu'
 import Phaser from 'phaser'
 import { finishRewards } from '../core/campaign'
@@ -22,7 +23,7 @@ export class RewardsScene extends Phaser.Scene {
         this.run = data.run; this.rewards = data.rewards; this.message = ''; this.render()
     }
     private button(x: number, y: number, label: string, action: () => void): void {
-        this.add.text(x, y, label, { fontFamily: 'monospace', fontSize: '17px', color: '#fff', backgroundColor: '#333', padding: { x: 10, y: 8 } })
+        this.add.text(x, y, label, { resolution: 2, fontFamily: UI_FONT, fontSize: '17px', color: '#fff', backgroundColor: '#353126', padding: { x: 10, y: 8 } })
             .setInteractive({ useHandCursor: true }).on('pointerdown', action)
     }
     private claim(index: number, selection?: RewardSelection): void {
@@ -32,8 +33,9 @@ export class RewardsScene extends Phaser.Scene {
     private render(): void {
         if (this.run.pendingAcquisitions?.length) { this.scene.start('RelicAcquisition', { run: this.run }); return }
         this.children.removeAll(true)
+        roomBackdrop(this)
         addRunMenu(this, this.run); this.choiceCards = []; this.pendingCardReward = false; this.pendingPotionReward = undefined
-        this.add.text(24, 24, `Rewards    ${this.run.gold} Gold`, { fontFamily: 'monospace', fontSize: '24px', color: '#fff' })
+        this.add.text(24, 24, `Rewards    ${this.run.gold} Gold`, { resolution: 2, fontFamily: UI_FONT, fontSize: '24px', color: '#fff' })
         for (const [i, item] of this.rewards.items.entries()) {
             if (this.rewards.claimed?.includes(i)) continue
             if (item.kind === 'gold') { this.claim(i); this.message += `Gold +${item.amount}. `; continue }
@@ -48,7 +50,7 @@ export class RewardsScene extends Phaser.Scene {
                 this.claim(i); continue
             }
         }
-        this.add.text(24, 70, this.message, { fontFamily: 'monospace', fontSize: '15px', color: '#bcb', wordWrap: { width: 752 } })
+        this.add.text(24, 70, this.message, { resolution: 2, fontFamily: UI_FONT, fontSize: '15px', color: '#bcb', wordWrap: { width: 752 } })
         const index = this.rewards.items.findIndex((item, i) => item.kind !== 'boss_relics' && !this.rewards.claimed?.includes(i))
         const item = this.rewards.items[index]
         if (!item) {
@@ -58,8 +60,8 @@ export class RewardsScene extends Phaser.Scene {
         if (item.kind === 'cards') this.renderCards(item, index)
         if (item.kind === 'potion') {
             this.pendingPotionReward = item.potionId
-            this.add.text(24, 158, `${POTION_DEFS[item.potionId].name}: ${POTION_DEFS[item.potionId].description}`, { fontFamily: 'monospace', fontSize: '18px', color: '#fff' })
-            this.add.text(24, 210, 'Replace a potion:', { fontFamily: 'monospace', fontSize: '17px', color: '#ccc' })
+            this.add.text(24, 158, `${POTION_DEFS[item.potionId].name}: ${POTION_DEFS[item.potionId].description}`, { resolution: 2, fontFamily: UI_FONT, fontSize: '18px', color: '#fff' })
+            this.add.text(24, 210, 'Replace a potion:', { resolution: 2, fontFamily: UI_FONT, fontSize: '17px', color: '#d0c5ae' })
             this.run.potions.forEach((id, slot) => this.button(24 + slot % 3 * 252, 250 + Math.floor(slot / 3) * 54, POTION_DEFS[id].name, () => { complete({ replacePotion: slot }) }))
             this.button(635, 365, 'Skip Potion', () => complete('skip'))
         }
@@ -72,7 +74,7 @@ export class RewardsScene extends Phaser.Scene {
     private renderCards(item: Extract<RewardItem, { kind: 'cards' }>, index: number): void {
         this.pendingCardReward = true
         const remaining = this.rewards.items.filter((reward, i) => reward.kind === 'cards' && !this.rewards.claimed?.includes(i)).length
-        this.add.text(24, 115, `Choose a card or skip${remaining > 1 ? ` · ${remaining} rewards left` : ''}`, { fontFamily: 'monospace', fontSize: '18px', color: '#fff' })
+        this.add.text(24, 115, `Choose a card or skip${remaining > 1 ? ` · ${remaining} rewards left` : ''}`, { resolution: 2, fontFamily: UI_FONT, fontSize: '18px', color: '#fff' })
         const spacing = 150
         const start = (this.scale.width - Card.CARD_WIDTH - (item.choices.length - 1) * spacing) / 2
         item.choices.forEach((id, i) => {

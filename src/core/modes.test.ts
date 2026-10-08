@@ -47,13 +47,13 @@ describe('run modifiers and endless checkpoints', () => {
         expect(map.nodes.some(n => n.burning)).toBe(false)
         expect(canUseCampfire(run, 'recall')).toBe(false)
     })
-    it('applies custom combat effects and keeps card pools within unlock snapshots', () => {
+    it('applies custom combat effects and makes former card unlocks available to generation', () => {
         const run = createProfileRun(createDefaultMeta(), { mode: 'custom', modifiers: ['LETHALITY', 'TERMINAL', 'BLUE_CARDS'] })
         const engine = createCombatEngine(run, 'monster')
         expect(engine.state.player.powers).toContainEqual(expect.objectContaining({ id: 'STRENGTH', stacks: 3 }))
         expect(engine.state.player.orbSlots).toBe(1)
         expect(selectCombatCardPool(engine, { source: 'generated' })).toContain('BALL_LIGHTNING')
-        expect(selectCombatCardPool(engine, { source: 'any_generated' })).not.toContain('ECHO_FORM')
+        expect(selectCombatCardPool(engine, { source: 'any_generated' })).toContain('ECHO_FORM')
     })
     it('replaces Vintage card rewards, triples Midas gold, and disables smithing', () => {
         const meta = createDefaultMeta(), run = createNewRun({ seed: 'reward-modes' }), control = structuredClone(run)

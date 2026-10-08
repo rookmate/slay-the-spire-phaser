@@ -1,3 +1,4 @@
+import { UI_FONT } from './theme'
 import { cardDescription } from '../core/cardText'
 import type { Engine } from '../core/engine'
 import Phaser from 'phaser'
@@ -6,16 +7,18 @@ import type { CardInstance } from '../core/state'
 import { CARD_SIZE } from './layout'
 
 export interface CardOptions { engine?: Engine; x: number; y: number; scale?: number; interactive?: boolean; locked?: boolean }
-const colors = { ironclad: 0x954b40, silent: 0x617b48, defect: 0x4e7f88, watcher: 0x7c628e, colorless: 0x8a806a }
+const colors = { ironclad: 0x693c30, silent: 0x37452b, defect: 0x345354, watcher: 0x4c3b55, colorless: 0x59513e }
 
 export class Card extends Phaser.GameObjects.Container {
     private card: CardInstance
     private engine?: Engine
     private border: Phaser.GameObjects.Rectangle
+    private borderColor: number
     private description: Phaser.GameObjects.Text
     private fullDescription = ''
     private inspectHint: Phaser.GameObjects.Text
     private detail?: Phaser.GameObjects.Container
+    private shade: Phaser.GameObjects.Rectangle
     private locked: boolean
     public static readonly CARD_WIDTH = CARD_SIZE.width
     public static readonly CARD_HEIGHT = CARD_SIZE.height
@@ -26,18 +29,31 @@ export class Card extends Phaser.GameObjects.Container {
         this.locked = !!opts.locked
         const def = resolveCard(card), w = Card.CARD_WIDTH, h = Card.CARD_HEIGHT
         const color = def.type === 'curse' ? 0x655068 : def.type === 'status' ? 0x646466 : colors[def.color ?? 'colorless']
-        const bg = scene.add.rectangle(0, 0, w, h, 0x29262b).setOrigin(0)
-        const header = scene.add.rectangle(0, 0, w, 46, color).setOrigin(0)
-        this.border = scene.add.rectangle(0, 0, w, h, 0, 0).setOrigin(0).setStrokeStyle(1, 0xb7a78a)
-        const title = scene.add.text(8, 7, def.name, { fontFamily: 'monospace', fontSize: '12px', fontStyle: 'bold', color: card.upgradeLevel ? '#dbefb3' : '#fff4dc', wordWrap: { width: w - 40, useAdvancedWrap: true }, lineSpacing: 1 })
-        const cost = scene.add.text(w - 25, 7, def.xCost ? 'X' : String(opts.engine?.getCardCost(card) ?? def.cost), { fontFamily: 'monospace', fontSize: '15px', color: '#f5d78a', backgroundColor: '#211e24', padding: { x: 4, y: 2 } })
-        const type = scene.add.text(8, 50, `${def.type}${def.rarity && def.rarity !== 'basic' ? ` · ${def.rarity}` : ''}`, { fontFamily: 'monospace', fontSize: '10px', color: '#c5bba8' })
-        this.description = scene.add.text(8, 68, '', { fontFamily: 'monospace', fontSize: '11px', color: '#f1e8d7', wordWrap: { width: w - 16 }, lineSpacing: 1 })
-        this.inspectHint = scene.add.text(8, h - 15, opts.locked ? 'Locked' : '', { fontFamily: 'monospace', fontSize: '9px', color: '#dac395' })
-        this.add([bg, header, title, cost, type, this.description, this.inspectHint, this.border])
-        const inspect = scene.add.text(w - 20, h - 19, '?', { fontFamily: 'monospace', fontSize: '14px', color: '#f5d78a', backgroundColor: '#211e24', padding: { x: 3, y: 1 } }).setInteractive({ useHandCursor: true })
+        const bg = scene.add.rectangle(0, 0, w, h, 0x211e18).setOrigin(0)
+        this.add(bg)
+        if (scene.textures.exists('art:cards')) {
+            const frame = /DEFEND|SURVIVOR|VIGILANCE|SHRUG|ARMAMENTS|IMPERVIOUS|ENTRENCH|METALLICIZE/.test(card.defId) ? 1
+                : def.color === 'silent' ? 2 : def.color === 'defect' ? 4 : def.color === 'watcher' ? 5
+                    : def.type === 'attack' ? 0 : def.type === 'power' ? 3 : 1
+            this.add(scene.add.image(w / 2, 67, 'art:cards', frame).setDisplaySize(w - 8, w - 8))
+        }
+        const header = scene.add.rectangle(0, 0, w, 36, color).setOrigin(0)
+        const paper = scene.add.rectangle(4, 96, w - 8, h - 100, 0xe5d8b9).setOrigin(0)
+        const rarityColor = def.rarity === 'rare' ? 0xd3b36a : def.rarity === 'uncommon' ? 0x9dbaae : 0x8c7958
+        this.borderColor = rarityColor
+        this.border = scene.add.rectangle(0, 0, w, h, 0, 0).setOrigin(0).setStrokeStyle(1, rarityColor)
+        const title = scene.add.text(8, 5, def.name, { resolution: 2, fontFamily: UI_FONT, fontSize: '13px', fontStyle: 'bold', color: card.upgradeLevel ? '#e2edb6' : '#fff0d5', wordWrap: { width: w - 38, useAdvancedWrap: true }, lineSpacing: 0 }).setResolution(2)
+        const costDisc = scene.add.circle(w - 17, 17, 12, 0x201d16).setStrokeStyle(1, 0xc6a66b)
+        const cost = scene.add.text(w - 17, 16, def.xCost ? 'X' : String(opts.engine?.getCardCost(card) ?? def.cost), { resolution: 2, fontFamily: UI_FONT, fontSize: '17px', fontStyle: 'bold', color: '#f5d78a' }).setOrigin(0.5).setResolution(2)
+        const type = scene.add.text(w / 2, 100, `${def.type}${def.rarity && def.rarity !== 'basic' ? ` · ${def.rarity}` : ''}`, { resolution: 2, fontFamily: UI_FONT, fontSize: '9px', color: '#6b5033' }).setOrigin(0.5, 0).setResolution(2)
+        this.description = scene.add.text(10, 115, '', { resolution: 2, fontFamily: UI_FONT, fontSize: '12px', color: '#2d281f', wordWrap: { width: w - 20 }, lineSpacing: 1 }).setResolution(2)
+        this.inspectHint = scene.add.text(9, h - 14, opts.locked ? 'Locked' : '', { resolution: 2, fontFamily: UI_FONT, fontSize: '9px', color: '#705531' }).setResolution(2)
+        this.add([header, paper, title, costDisc, cost, type, this.description, this.inspectHint, this.border])
+        const inspect = scene.add.text(w - 23, h - 21, '?', { resolution: 2, fontFamily: UI_FONT, fontSize: '14px', fontStyle: 'bold', color: '#644923', padding: { x: 5, y: 1 } }).setResolution(2).setInteractive({ useHandCursor: true })
         inspect.on('pointerdown', (_pointer: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => { event?.stopPropagation(); this.showDetails(!this.detail) })
         this.add(inspect)
+        this.shade = scene.add.rectangle(0, 0, w, h, 0x151512, 0.3).setOrigin(0).setVisible(false)
+        this.add(this.shade)
         this.setDescription(cardDescription(card, opts.engine))
         this.setSize(w, h); this.setScale(opts.scale ?? 1)
         if (opts.locked) this.setAlpha(0.5)
@@ -52,13 +68,14 @@ export class Card extends Phaser.GameObjects.Container {
         const local = this.getLocalPoint(x, y)
         return local.x >= 0 && local.x <= Card.CARD_WIDTH && local.y >= 0 && local.y <= Card.CARD_HEIGHT
     }
-    setSelected(selected: boolean): void { this.border.setStrokeStyle(selected ? 3 : 1, selected ? 0xf4d58a : 0xb7a78a) }
+    setSelected(selected: boolean): void { this.border.setStrokeStyle(selected ? 3 : 1, selected ? 0xf4d58a : this.borderColor) }
+    setDimmed(dimmed: boolean): void { this.shade.setVisible(dimmed) }
     setCombatPreview(engine: Engine, targetId?: string): void { this.setDescription(cardDescription(this.card, engine, targetId)) }
     private setDescription(text: string): void {
         this.fullDescription = text
         this.inspectHint.setText(this.locked ? 'Locked' : '')
         this.description.setText(text)
-        const maxHeight = Card.CARD_HEIGHT - 90
+        const maxHeight = Card.CARD_HEIGHT - 134
         if (this.description.height <= maxHeight) return
         let shortened = text
         while (this.description.height > maxHeight && shortened.length) {
@@ -73,14 +90,14 @@ export class Card extends Phaser.GameObjects.Container {
         const def = resolveCard(this.card), width = 224
         const bounds = this.getBounds()
         const x = this.engine ? (bounds.x < 240 ? this.scene.scale.width - width - 12 : 12) : Phaser.Math.Clamp(bounds.centerX - width / 2, 12, this.scene.scale.width - width - 12)
-        const title = this.scene.add.text(12, 12, def.name, { fontFamily: 'monospace', fontSize: '16px', fontStyle: 'bold', color: this.card.upgradeLevel ? '#dbefb3' : '#f6e9cf', wordWrap: { width: width - 24 } })
-        const body = this.scene.add.text(12, title.height + 25, this.fullDescription, { fontFamily: 'monospace', fontSize: '14px', color: '#f1e8d7', wordWrap: { width: width - 24 }, lineSpacing: 3 })
+        const title = this.scene.add.text(12, 12, def.name, { resolution: 2, fontFamily: UI_FONT, fontSize: '16px', fontStyle: 'bold', color: this.card.upgradeLevel ? '#dbefb3' : '#f6e9cf', wordWrap: { width: width - 24 } })
+        const body = this.scene.add.text(12, title.height + 25, this.fullDescription, { resolution: 2, fontFamily: UI_FONT, fontSize: '15px', color: '#f1e8d7', wordWrap: { width: width - 24 }, lineSpacing: 3 })
         const height = body.y + body.height + 12
         const y = this.engine ? 64 : Math.max(12, Math.min(bounds.y - height - 8, this.scene.scale.height - height - 12))
         let depth = 5900
         for (let parent = this.parentContainer; parent; parent = parent.parentContainer) depth = Math.max(depth, parent.depth + 1)
         this.detail = this.scene.add.container(x, y).setDepth(depth)
-        this.detail.add([this.scene.add.rectangle(0, 0, width, height, 0x252228).setOrigin(0).setStrokeStyle(1, 0xb7a78a), title, body])
+        this.detail.add([this.scene.add.rectangle(0, 0, width, height, 0x24231e).setOrigin(0).setStrokeStyle(1, 0xc3a771), title, body])
         const close = this.scene.add.text(width - 19, 2, '×', { fontSize: '16px', color: '#f5d78a' }).setInteractive({ useHandCursor: true })
         close.on('pointerdown', () => this.showDetails(false)); this.detail.add(close)
     }

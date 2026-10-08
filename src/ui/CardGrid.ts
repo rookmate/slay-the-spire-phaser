@@ -1,3 +1,4 @@
+import { UI_FONT } from './theme'
 import type Phaser from 'phaser'
 import type { CardInstance } from '../core/state'
 import { Card } from './Card'
@@ -54,11 +55,11 @@ export class CardGrid {
             this.container.add(view)
         })
 
-        const style = { fontFamily: 'monospace', fontSize: '16px', color: '#fff', padding: { x: 10, y: 7 } }
+        const style = { resolution: 2, fontFamily: UI_FONT, fontSize: '16px', color: '#fff', padding: { x: 10, y: 7 } }
         this.container.add(this.scene.add.text(120, layout.footerY, `${this.page + 1} / ${pages}`, style))
         for (const [label, x, delta] of [['Previous', 20, -1], ['Next', 220, 1]] as const) {
             const enabled = this.page + delta >= 0 && this.page + delta < pages
-            const button = this.scene.add.text(x, layout.footerY, label, { ...style, backgroundColor: '#333' }).setAlpha(enabled ? 1 : 0.35)
+            const button = this.scene.add.text(x, layout.footerY, label, { ...style, backgroundColor: '#353126' }).setAlpha(enabled ? 1 : 0.35)
             if (enabled) button.setInteractive({ useHandCursor: true }).on('pointerdown', () => {
                 this.page += delta
                 this.refresh()

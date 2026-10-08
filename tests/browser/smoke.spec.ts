@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { createNewRun } from '../../src/core/run'
 import { createCardInstance } from '../../src/core/cards'
-import { boot, clickCard, clickPoint, clickText, dragCard, expectScene, inspect, readSavedProgress, reloadRun } from './driver'
+import { boot, clickMapNode, clickCard, clickPoint, clickText, dragCard, expectScene, inspect, readSavedProgress, reloadRun } from './driver'
 
 test('draws the whole hand, plays by dragging, ends a turn, and resumes combat', async ({ page }) => {
     const run = createNewRun({ seed: 'browser-combat' })
@@ -180,7 +180,7 @@ test('unknown-room probabilities survive reload as part of the run', async ({ pa
     await reloadRun(page, 'Map')
     // The only outgoing node is 11:0. With the saved weights it resolves to a
     // monster; resetting weights at reload incorrectly produces an event.
-    await clickText(page, '?')
+    await clickMapNode(page, '11:0')
     await expectScene(page, 'Combat')
     expect((await inspect(page)).run!.unknownWeights).toEqual({ event: 0.75, monster: 0.1, shop: 0.08, chest: 0.07 })
     expect(errors).toEqual([])

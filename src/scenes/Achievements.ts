@@ -1,3 +1,4 @@
+import { roomBackdrop } from '../ui/theme'
 import Phaser from 'phaser'
 import { ACHIEVEMENTS, ACHIEVEMENT_IDS } from '../core/achievements/catalog'
 import { loadMeta } from '../core/meta'
@@ -10,6 +11,7 @@ export class AchievementsScene extends Phaser.Scene {
     create(): void { this.render() }
     private render(): void {
         this.children.removeAll(true)
+        roomBackdrop(this)
         const earned = loadMeta().achievements ?? {}
         const ids = ACHIEVEMENT_IDS.filter(id => this.filter === 'all' || (this.filter === 'earned') === !!earned[id])
         const pages = Math.max(1, Math.ceil(ids.length / 5)); this.page = Math.min(this.page, pages - 1)

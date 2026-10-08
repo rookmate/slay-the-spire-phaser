@@ -1,3 +1,4 @@
+import { roomBackdrop } from '../ui/theme'
 import Phaser from 'phaser'
 import { loadMeta, type RunHistoryEntry } from '../core/meta'
 import { CHARACTERS } from '../core/characters'
@@ -10,6 +11,7 @@ export class RunHistoryScene extends Phaser.Scene {
     create(): void { this.page = 0; this.render() }
     private render(): void {
         this.children.removeAll(true)
+        roomBackdrop(this)
         const history = loadMeta().history ?? []
         this.add.text(24, 20, 'Run History', { ...menuText, fontSize: '26px' })
         if (!history.length) this.add.text(24, 95, 'Completed runs will appear here.', menuText)
@@ -20,6 +22,7 @@ export class RunHistoryScene extends Phaser.Scene {
     }
     private showEntry(entry: RunHistoryEntry): void {
         this.children.removeAll(true)
+        roomBackdrop(this)
         this.add.text(24, 20, `${CHARACTERS[entry.character].name} · ${entry.result} · ${entry.score} points`, { ...menuText, fontSize: '22px' })
         this.add.text(24, 58, `${entry.mode} · Seed ${entry.seed} · Floor ${entry.floor} · ${Math.floor(entry.elapsedSeconds / 60)}m`, menuText)
         new CardGrid(this, this.add.container(0, 0), entry.deck.filter(c => CARD_DEFS[c.id]).map(c => createCardInstance(c.id, c.upgrade)), 104, () => {})

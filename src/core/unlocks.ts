@@ -15,8 +15,7 @@ export const UNLOCK_TRACKS: Record<CharacterId, UnlockBundle[]> = {
 }
 export const IRONCLAD_UNLOCK_TRACK = UNLOCK_TRACKS.ironclad
 export function getBaseUnlockedCardIds(): string[] {
-    const locked = new Set(Object.values(UNLOCK_TRACKS).flatMap(track => track.flatMap(bundle => bundle.cards)))
-    return Object.keys(CARD_DEFS).filter(id => !locked.has(id))
+    return Object.keys(CARD_DEFS)
 }
 export function getBaseUnlockedRelicIds(): RelicId[] {
     const locked = new Set(Object.values(UNLOCK_TRACKS).flatMap(track => track.flatMap(bundle => bundle.relics)))

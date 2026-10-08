@@ -1,3 +1,4 @@
+import { UI_FONT } from './theme'
 import { CHARACTERS } from '../core/characters'
 import { powerAmount } from '../core/combatMath'
 import { potionMultiplier } from '../core/potions'
@@ -65,20 +66,20 @@ export class PlayerDisplay {
         this.createEndTurnButton()
         this.createPowerText()
         this.createRelicText()
-        this.resourceText = this.scene.add.text(16, 42, '', { fontFamily: 'monospace', fontSize: '10px', color: '#dbc5a3', wordWrap: { width: 215 } })
+        this.resourceText = this.scene.add.text(16, 42, '', { resolution: 2, fontFamily: UI_FONT, fontSize: '10px', color: '#dbc5a3', wordWrap: { width: 215 } })
         this.rebuildPotions()
         this.setupResizeHandler()
     }
 
     private createPlayerSprite(): void {
-        this.playerSprite = this.scene.add.image(110, 116, `player:${this.run.character}`).setDisplaySize(65, 75)
+        this.playerSprite = this.scene.add.image(110, 111, `player:${this.run.character}`).setDisplaySize(77, 91)
     }
 
     private createPlayerHpText(): void {
         if (!this.playerSprite) return
-        this.playerHpText = this.scene.add.text(this.playerSprite.x, this.playerSprite.y + 38, this.getPlayerHpLabel(), {
-            fontFamily: COMBAT_UI_CONFIG.styles.fontFamily,
-            fontSize: COMBAT_UI_CONFIG.styles.hpFontSize,
+        this.playerHpText = this.scene.add.text(this.playerSprite.x, 157, this.getPlayerHpLabel(), {
+            resolution: 2, fontFamily: COMBAT_UI_CONFIG.styles.fontFamily,
+            fontSize: '12px',
             color: COMBAT_UI_CONFIG.styles.color,
         }).setOrigin(0.5, 0)
     }
@@ -86,7 +87,7 @@ export class PlayerDisplay {
     private createPlayerNameText(): void {
         if (!this.playerSprite) return
         this.playerNameText = this.scene.add.text(this.playerSprite.x, 48, this.getPlayerDetails(), {
-            fontFamily: COMBAT_UI_CONFIG.styles.fontFamily,
+            resolution: 2, fontFamily: COMBAT_UI_CONFIG.styles.fontFamily,
             fontSize: '11px',
             color: COMBAT_UI_CONFIG.styles.color,
             backgroundColor: '#111111', padding: { x: 6, y: 4 }, wordWrap: { width: 190 },
@@ -99,8 +100,8 @@ export class PlayerDisplay {
     private createEnergyDisplay(): void {
         const { height } = this.scene.scale
         this.energyText = this.scene.add.text(78, height - 12, this.getPlayerStatsText(), {
-            fontFamily: COMBAT_UI_CONFIG.styles.fontFamily,
-            fontSize: COMBAT_UI_CONFIG.styles.fontSize,
+            resolution: 2, fontFamily: COMBAT_UI_CONFIG.styles.fontFamily,
+            fontSize: '14px', fontStyle: 'bold',
             color: COMBAT_UI_CONFIG.styles.color,
             backgroundColor: COMBAT_UI_CONFIG.colors.energyBg,
             padding: { x: 6, y: 4 },
@@ -109,11 +110,11 @@ export class PlayerDisplay {
 
     private createDrawIcon(): void {
         const { height } = this.scene.scale
-        this.drawIcon = this.scene.add.text(16, height - 12, '🃏', {
-            fontFamily: COMBAT_UI_CONFIG.styles.fontFamily,
-            fontSize: COMBAT_UI_CONFIG.styles.iconFontSize,
+        this.drawIcon = this.scene.add.text(16, height - 12, 'Draw', {
+            resolution: 2, fontFamily: COMBAT_UI_CONFIG.styles.fontFamily,
+            fontSize: '13px',
             color: COMBAT_UI_CONFIG.styles.color,
-            padding: { x: 6, y: 2 },
+            padding: { x: 8, y: 7 },
             backgroundColor: COMBAT_UI_CONFIG.colors.discardBg,
         }).setOrigin(0, 1).setInteractive({ useHandCursor: true }).on('pointerdown', () => this.onOpenDeck?.())
     }
@@ -121,18 +122,20 @@ export class PlayerDisplay {
     private createEndTurnButton(): void {
         const { width, height } = this.scene.scale
         this.endTurnButton = this.scene.add.text(width - 16, height - 12, 'End Turn', {
-            fontFamily: COMBAT_UI_CONFIG.styles.fontFamily,
-            fontSize: COMBAT_UI_CONFIG.styles.fontSize,
+            resolution: 2, fontFamily: COMBAT_UI_CONFIG.styles.fontFamily,
+            fontSize: '14px', fontStyle: 'bold',
             color: COMBAT_UI_CONFIG.styles.color,
             backgroundColor: COMBAT_UI_CONFIG.colors.endTurnBg,
-            padding: { x: 6, y: 4 },
-        }).setOrigin(1, 1)
+            padding: { x: 14, y: 7 },
+        }).setOrigin(1, 1).setResolution(2)
         this.endTurnButton.setInteractive({ useHandCursor: true }).on('pointerdown', () => this.onEndTurn?.())
+            .on('pointerover', () => this.endTurnButton?.setBackgroundColor('#c37d4d'))
+            .on('pointerout', () => this.endTurnButton?.setBackgroundColor(COMBAT_UI_CONFIG.colors.endTurnBg))
     }
 
     private createPowerText(): void {
         this.powerText = this.scene.add.text(110, 178, this.getPlayerPowers(), {
-            fontFamily: 'monospace',
+            resolution: 2, fontFamily: UI_FONT,
             fontSize: '10px',
             color: '#bbbbbb',
         }).setOrigin(0.5, 0)
@@ -140,7 +143,7 @@ export class PlayerDisplay {
 
     private createRelicText(): void {
         this.relicText = this.scene.add.text(16, 16, this.getRelicText(), {
-            fontFamily: 'monospace',
+            resolution: 2, fontFamily: UI_FONT,
             fontSize: '11px',
             color: '#dddddd',
             wordWrap: { width: this.scene.scale.width - 32 },
@@ -154,10 +157,10 @@ export class PlayerDisplay {
         const startY = combatLayout(this.scene.scale.width, this.scene.scale.height).footerTop + 10
         this.run.potions.forEach((potion, index) => {
             const text = this.scene.add.text(startX + index * 82, startY, POTION_DEFS[potion].name.replace(' Potion', ''), {
-                fontFamily: 'monospace',
+                resolution: 2, fontFamily: UI_FONT,
                 fontSize: '10px', fixedWidth: 78, fixedHeight: 34, wordWrap: { width: 66 },
                 color: '#ffffff',
-                backgroundColor: '#3a3a3a',
+                backgroundColor: '#353126',
                 padding: { x: 6, y: 4 },
             }).setInteractive({ useHandCursor: true })
             text.on('pointerdown', () => this.openPotionMenu(index))
@@ -177,11 +180,11 @@ export class PlayerDisplay {
 
     private getPlayerHpLabel(): string {
         const player = this.engine.state.player
-        return `🛡 ${player.block}  ♥ ${player.hp}/${player.maxHp}`
+        return `${player.hp}/${player.maxHp} HP${player.block ? ` · ${player.block} Block` : ''}`
     }
 
     private getPlayerStatsText(): string {
-        return `⚡ ${this.engine.state.player.energy}/${this.engine.getBaseEnergyPerTurn()}`
+        return `Energy ${this.engine.state.player.energy}/${this.engine.getBaseEnergyPerTurn()}`
     }
 
     private getPlayerPowers(): string {
@@ -229,14 +232,14 @@ export class PlayerDisplay {
         const menu = this.scene.add.container(0, 0).setDepth(12000); this.potionMenu = menu
         menu.add(this.scene.add.rectangle(0, 0, 800, 450, 0, 0.6).setOrigin(0).setInteractive())
         menu.add(this.scene.add.rectangle(200, 80, 400, 200, 0x222222).setOrigin(0).setStrokeStyle(1, 0x777777))
-        menu.add(this.scene.add.text(218, 100, `${def.name}${potionMultiplier(this.run, id) === 2 ? ' ×2' : ''}\n\n${def.description}`, { fontFamily: 'monospace', fontSize: '16px', color: '#fff', wordWrap: { width: 365 } }))
+        menu.add(this.scene.add.text(218, 100, `${def.name}${potionMultiplier(this.run, id) === 2 ? ' ×2' : ''}\n\n${def.description}`, { resolution: 2, fontFamily: UI_FONT, fontSize: '16px', color: '#fff', wordWrap: { width: 365 } }))
         const buttons: [string, () => void][] = [
             ['Use', () => { this.closePotionMenu(); this.onUsePotion?.(index) }],
             ['Discard', () => { this.run.potions.splice(index, 1); this.closePotionMenu(); this.rebuildPotions() }],
             ['Cancel', () => this.closePotionMenu()],
         ]
         buttons.forEach(([label, action], i) => {
-            const text = this.scene.add.text(218 + i * 122, 230, label, { fontFamily: 'monospace', fontSize: '16px', color: '#fff', backgroundColor: '#444', padding: { x: 8, y: 8 } })
+            const text = this.scene.add.text(218 + i * 122, 230, label, { resolution: 2, fontFamily: UI_FONT, fontSize: '16px', color: '#fff', backgroundColor: '#493c29', padding: { x: 8, y: 8 } })
             const enabled = label !== 'Use' || !def.autoRevivePercent
             if (enabled) text.setInteractive({ useHandCursor: true }).on('pointerdown', action)
             else text.setAlpha(0.4)

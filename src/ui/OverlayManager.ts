@@ -1,3 +1,4 @@
+import { UI_FONT } from './theme'
 import { combatLayout } from './layout'
 import type Phaser from 'phaser'
 import type { Engine } from '../core/engine'
@@ -16,6 +17,7 @@ export class OverlayManager {
     private overlay?: Phaser.GameObjects.Container
     private pile?: Pile
     private buttons: Phaser.GameObjects.Text[] = []
+    private onOpen?: () => void
     private readonly resizeHandler = () => {
         const { piles } = combatLayout(this.scene.scale.width, this.scene.scale.height)
         this.buttons.forEach((button, index) => button.setPosition(piles[index].x, piles[index].y))
@@ -29,7 +31,7 @@ export class OverlayManager {
         this.engine = engine
         for (const [label, pile] of [['Discard', 'discardPile'], ['Exhaust', 'exhaustPile']] as const) {
             const button = scene.add.text(0, 0, label, {
-                fontFamily: 'monospace', fontSize: '11px', color: '#fff', backgroundColor: '#333', padding: { x: 5, y: 1 },
+                resolution: 2, fontFamily: UI_FONT, fontSize: '11px', color: '#fff', backgroundColor: '#353126', padding: { x: 5, y: 1 },
             }).setOrigin(1, 0).setDepth(COMBAT_UI_CONFIG.depths.ui).setInteractive({ useHandCursor: true })
                 .on('pointerdown', () => this.togglePile(pile))
             this.buttons.push(button)
@@ -40,6 +42,7 @@ export class OverlayManager {
 
     openDiscardOverlay(): void { this.togglePile('discardPile') }
     openDeckOverlay(): void { this.togglePile('drawPile') }
+    setOnOpen(callback: () => void): void { this.onOpen = callback }
 
     private togglePile(pile: Pile): void {
         if (this.pile === pile) this.close()
@@ -47,15 +50,16 @@ export class OverlayManager {
     }
 
     private showPile(pile: Pile): void {
+        this.onOpen?.()
         this.close()
         this.pile = pile
         const { width, height } = this.scene.scale
         const overlay = this.scene.add.container(0, 0).setDepth(COMBAT_UI_CONFIG.depths.overlay)
         this.overlay = overlay
         overlay.add(this.scene.add.rectangle(0, 0, width, height, 0x111111, 0.98).setOrigin(0).setInteractive())
-        overlay.add(this.scene.add.text(20, 20, pile === 'drawPile' && this.engine.run?.relics.includes('FROZEN_EYE') ? 'Draw Pile, next card first' : titles[pile], { fontFamily: 'monospace', fontSize: '16px', color: '#fff' }))
+        overlay.add(this.scene.add.text(20, 20, pile === 'drawPile' && this.engine.run?.relics.includes('FROZEN_EYE') ? 'Draw Pile, next card first' : titles[pile], { resolution: 2, fontFamily: UI_FONT, fontSize: '16px', color: '#fff' }))
         overlay.add(this.scene.add.text(width - 20, 16, 'Close', {
-            fontFamily: 'monospace', fontSize: '16px', color: '#fff', backgroundColor: '#444', padding: { x: 8, y: 6 },
+            resolution: 2, fontFamily: UI_FONT, fontSize: '16px', color: '#fff', backgroundColor: '#493c29', padding: { x: 8, y: 6 },
         }).setOrigin(1, 0).setInteractive({ useHandCursor: true }).on('pointerdown', () => this.close()))
         const cards = [...this.engine.state.player[pile]]
         if (pile === 'drawPile' && !this.engine.run?.relics.includes('FROZEN_EYE')) cards.sort((a, b) => resolveCard(a).name.localeCompare(resolveCard(b).name))

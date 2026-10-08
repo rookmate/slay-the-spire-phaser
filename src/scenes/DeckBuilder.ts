@@ -1,3 +1,4 @@
+import { roomBackdrop } from '../ui/theme'
 import Phaser from 'phaser'
 import { CARD_DEFS, createCardInstance, canUpgradeCard } from '../core/cards'
 import { getEffectiveUnlockedCardIds, loadMeta } from '../core/meta'
@@ -13,6 +14,7 @@ export class DeckBuilderScene extends Phaser.Scene {
     create(data: { run: RunState }): void { this.run = data.run; this.render() }
     private render(): void {
         this.children.removeAll(true)
+        roomBackdrop(this)
         this.add.text(24, 18, 'Card Library', { ...menuText, fontSize: '24px' })
         ;(['ironclad', 'silent', 'defect', 'watcher', 'colorless', 'curse', 'status'] as const).forEach((color, i) => menuButton(this, 16 + i * 111, 56, color[0].toUpperCase() + color.slice(1), () => { this.color = color; this.render() }))
         const unlocked = getEffectiveUnlockedCardIds(loadMeta())

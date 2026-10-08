@@ -6,7 +6,7 @@ import { loadMeta, saveMeta } from '../core/meta'
 export function attachNotifications(game: Phaser.Game): void {
     const notice = document.createElement('div')
     notice.setAttribute('role', 'status'); notice.setAttribute('aria-live', 'polite')
-    notice.style.cssText = 'display:none;position:fixed;top:12px;left:50%;transform:translateX(-50%);width:min(620px,90vw);box-sizing:border-box;padding:10px 16px;background:#252228;color:#f1e8d7;border:1px solid #b7a78a;font:14px/1.4 monospace;z-index:10;pointer-events:none;white-space:pre-line;'
+    notice.style.cssText = 'display:none;position:fixed;top:12px;left:50%;transform:translateX(-50%);width:min(620px,90vw);box-sizing:border-box;padding:10px 16px;background:#24231e;color:#f1e8d7;border:1px solid #9b7b48;font:15px/1.4 Barlow,sans-serif;z-index:10;pointer-events:none;white-space:pre-line;'
     document.body.append(notice)
     let until = 0
     const timer = setInterval(() => {

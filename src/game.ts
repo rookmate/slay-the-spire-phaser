@@ -1,4 +1,5 @@
 import { ProfileRecoveryScene } from './scenes/ProfileRecovery'
+import './style.css'
 import { AchievementsScene } from './scenes/Achievements'
 import { ProfileScene } from './scenes/Profile'
 import { recoverProfileImport } from './core/profile/storage'
@@ -35,14 +36,10 @@ const config: Phaser.Types.Core.GameConfig = {
   dom: { createContainer: true },
   audio: { noAudio: true },
   parent: 'app',
-  backgroundColor: '#1a1a1a',
+  backgroundColor: '#151512',
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
-    min: {
-      width: 800,
-      height: 450
-    },
     max: {
       width: 1920,
       height: 1080

@@ -117,9 +117,9 @@ describe('campaign relic rules and pools', () => {
         const smith = createNewRun(); smith.pendingRoom = { scene: 'Campfire' }; smith.relics = ['FUSION_HAMMER']
         expect(useCampfire(smith, 'smith', smith.deck[0].instanceId)).toBe(false)
     })
-    it('includes each character base cards and excludes their original locked cards', () => {
+    it('includes each character base cards and former card unlocks immediately', () => {
         const unlocked = getEffectiveUnlockedCardIds(meta())
         for (const id of ['ARMAMENTS', 'DAGGER_THROW', 'BALL_LIGHTNING', 'CUT_THROUGH_FATE']) expect(unlocked.has(id)).toBe(true)
-        for (const id of ['HEAVY_BLADE', 'CATALYST', 'ECHO_FORM', 'BLASPHEMY']) expect(unlocked.has(id)).toBe(false)
+        for (const id of ['HEAVY_BLADE', 'CATALYST', 'ECHO_FORM', 'BLASPHEMY']) expect(unlocked.has(id)).toBe(true)
     })
 })

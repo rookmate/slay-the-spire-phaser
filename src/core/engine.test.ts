@@ -65,11 +65,11 @@ describe('deferred card systems', () => {
         expect(clampAscension(24)).toBe(20)
     })
 
-    it('starts with the base unlock pool and grants ironclad tiers sequentially', () => {
+    it('starts with every card while keeping sequential Ironclad relic progression', () => {
         const meta = { bestAscensionUnlocked: 0, totalWins: 0, totalRuns: 0, ironcladUnlockTier: 0, unlockedCardIds: [], unlockedRelicIds: [] }
 
         expect(getEffectiveUnlockedCardIds(meta).has('CLEAVE')).toBe(true)
-        expect(getEffectiveUnlockedCardIds(meta).has('LIMIT_BREAK')).toBe(false)
+        expect(getEffectiveUnlockedCardIds(meta).has('LIMIT_BREAK')).toBe(true)
         expect(getEffectiveUnlockedRelicIds(meta).has('ANCHOR')).toBe(true)
         expect(getEffectiveUnlockedRelicIds(meta).has('OMAMORI')).toBe(false)
 

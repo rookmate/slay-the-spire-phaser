@@ -2,7 +2,7 @@ import type { Engine } from './engine'
 import { cardColors } from './modes/modifiers'
 import { CARD_DEFS } from './cards'
 import type { CharacterId } from './characters'
-import { getEffectiveUnlockedCardIds, type MetaState } from './meta'
+import { getBaseUnlockedCardIds, getEffectiveUnlockedCardIds, type MetaState } from './meta'
 import type { CardColor, CardDef, CardType } from './state'
 
 export interface CardPoolOptions {
@@ -19,7 +19,8 @@ const cannotGenerate = new Set(['FEED', 'REAPER', 'BANDAGE_UP', 'SELF_REPAIR', '
 
 /** Character and source determine eligibility; reward generation owns rarity rolls. */
 export function selectCardPool(options: CardPoolOptions): string[] {
-    const unlocked = options.unlockedIds ? new Set(options.unlockedIds)
+    // Old room checkpoints may still contain a restricted card snapshot.
+    const unlocked = options.unlockedIds ? new Set([...getBaseUnlockedCardIds(), ...options.unlockedIds])
         : options.meta ? getEffectiveUnlockedCardIds(options.meta) : undefined
     const colors: readonly string[] = options.colors ?? [options.character]
     return Object.values(CARD_DEFS).filter(card => {

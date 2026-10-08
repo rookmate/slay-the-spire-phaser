@@ -1,3 +1,4 @@
+import { UI_FONT, roomBackdrop } from '../ui/theme'
 import Phaser from 'phaser'
 import { canUpgradeCard } from '../core/cards'
 import { loadMeta } from '../core/meta'
@@ -12,15 +13,16 @@ export class NeowScene extends Phaser.Scene {
     options: NeowOption[] = []
     constructor() { super('Neow') }
     create(data: { run: RunState }): void {
+        roomBackdrop(this)
         this.run = data.run; this.selector = new DeckSelectionOverlay(this)
         this.options = rollNeowOptions(this.run.neowSeed, this.run.neowFull ?? true)
-        this.add.text(24, 24, 'Neow', { fontFamily: 'monospace', fontSize: '28px', color: '#fff' })
-        this.add.text(24, 72, 'Choose a blessing for your climb.', { fontFamily: 'monospace', fontSize: '18px', color: '#bbb' })
+        this.add.text(24, 24, 'Neow', { resolution: 2, fontFamily: UI_FONT, fontSize: '28px', color: '#fff' })
+        this.add.text(24, 72, 'Choose a blessing for your climb.', { resolution: 2, fontFamily: UI_FONT, fontSize: '18px', color: '#bdb29d' })
         this.options.forEach((option, i) => {
             const y = 108 + i * 80
-            this.add.text(24, y, option.label, { fontFamily: 'monospace', fontSize: '18px', color: '#fff', backgroundColor: '#303030', padding: { x: 12, y: 10 } })
+            this.add.text(24, y, option.label, { resolution: 2, fontFamily: UI_FONT, fontSize: '18px', color: '#fff', backgroundColor: '#353126', padding: { x: 12, y: 10 } })
                 .setInteractive({ useHandCursor: true }).on('pointerdown', () => this.chooseOption(option))
-            this.add.text(24, y + 44, option.description, { fontFamily: 'monospace', fontSize: '14px', color: '#bbb', wordWrap: { width: 744 } })
+            this.add.text(24, y + 44, option.description, { resolution: 2, fontFamily: UI_FONT, fontSize: '14px', color: '#bdb29d', wordWrap: { width: 744 } })
         })
         this.events.once('shutdown', () => this.selector.destroy())
     }

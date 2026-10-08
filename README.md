@@ -28,7 +28,9 @@ npm run build
   A20's second Act 3 boss, and the final rest/shop/elite/Heart sequence.
 - Merchant stock, discounts, removal, Courier restocking, Orrery, campfire relic
   actions, and a choice to leave chests closed.
-- Five XP unlock tiers and Ascension progression for each character, card library,
+- All four characters and their complete card collections are available immediately,
+  including in existing saves and imported profiles. Relic XP tiers and Ascension
+  progression remain per character, with a card library,
   score breakdowns, and the last 500 runs in local history.
 - Standard, seeded, local daily, and custom runs. Custom modifiers include
   Draft, Sealed Deck, mixed card pools, Endless, and Blight Chests.
@@ -48,7 +50,8 @@ counters. Active play time is saved separately so the timer cannot overwrite a
 combat checkpoint. Won fights and outstanding reward choices save without
 duplicating gold or relics. Shops save purchases and stock together.
 
-Content XP is earned across run modes. Standard runs advance Ascension and key
+XP is earned across run modes and continues relic progression. Cards do not
+require XP unlocks. Standard runs advance Ascension and key
 progression. Seeded runs reproduce this implementation's rules and RNG; a seed
 from the commercial game will produce a different run. Daily challenges use a
 UTC date and save scores on this device. Saves and profiles use browser local
@@ -74,9 +77,15 @@ npm run test:browser
 The suite starts Vite on port 5174 and drives the game through mouse clicks and
 drags. It covers combat, all characters, card-selection pages, crowded encounters,
 potion replacement, draft selections, events, the A20/Heart route, and reloads.
-A seeded starter-deck run earns its cards and relics and plays all three acts;
+A seeded starter-deck run uses keyboard card controls, earns its cards and relics,
+and plays all three acts;
 its route and result are attached to the Playwright report. Smaller tests use
 explicit saved-run fixtures to exercise edge cases quickly.
+
+The long campaign has a 15-minute limit and no automatic retry. Its trace keeps
+actions and source references without capturing a screenshot or DOM snapshot on
+every action; failure screenshots and the route log remain enabled. Dedicated
+drag, targeting, and animation tests retain full traces.
 
 `tests/browser/index.html` starts the production game factory and scenes with a
 read-only inspector. That entry is excluded from the production build. Tests
@@ -86,10 +95,9 @@ master. Failed checks upload screenshots, traces, and an HTML report.
 
 ## Remaining differences
 
-The original artwork, animations, music, achievement system, official daily
-leaderboards, platform integrations, and cloud saves are not reproduced. Some
-enemies share portraits or use generated placeholders; character art and sound
-cues are simplified. Scores, rare event eligibility, and modifier combinations
+The original artwork and audio, official daily leaderboards, platform
+integrations, and cloud saves are not reproduced. Enemy portraits are simplified,
+and cards share a small illustration atlas. Scores, rare event eligibility, and modifier combinations
 still need broader comparison with the original. The test suite covers many
 interactions, not every possible card/relic/enemy combination.
 
@@ -102,7 +110,9 @@ Rules were checked against original-game references for
 [potions](https://slaythespire.wiki.gg/wiki/Potions), and
 [custom modes](https://slaythespire.wiki.gg/wiki/Custom_Mode).
 
-Presentation uses original SVG portraits for all four characters and all 68 enemy IDs. Each act has its own combat backdrop and synthesized musical theme. Settings control master, music, and effects volume separately; reduced motion disables shakes, flashes, and impact motion. Audio starts after a click or keypress and pauses in hidden tabs.
+Presentation uses painted backgrounds, character portraits, and shared card illustrations, with SVG portraits for all 68 enemy IDs. The map uses room symbols and a scrollable route. Barlow fonts ship locally under the SIL Open Font License in `public/fonts/OFL.txt`; generated artwork and its prompts are recorded in [`public/art/sources.json`](public/art/sources.json). Each act has a synthesized musical theme. Settings control master, music, and effects volume separately. Audio starts after a click or keypress and pauses in hidden tabs.
+
+Targeted cards stay lifted in the hand while a curved arrow marks the selected enemy. Keyboard selection uses the same aiming display. Release over an enemy to play, or press Escape to cancel. Untargeted cards follow your drag and show when they are ready to play. Reduced motion removes card travel, shakes, flashes, and impact motion.
 
 Hover a card, tap its `?`, or press Alt+1–0 in combat to read its complete rules. Escape closes hand inspection. The inspection button also works on locked cards and inside card-choice dialogs.
 

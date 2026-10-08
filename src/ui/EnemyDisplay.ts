@@ -33,7 +33,7 @@ export class EnemyDisplay {
     private build(): void {
         this.clearEnemies()
         const style = {
-            fontFamily: COMBAT_UI_CONFIG.styles.fontFamily,
+            resolution: 2, fontFamily: COMBAT_UI_CONFIG.styles.fontFamily,
             fontSize: COMBAT_UI_CONFIG.styles.fontSize,
             color: COMBAT_UI_CONFIG.styles.color,
         }
@@ -53,16 +53,16 @@ export class EnemyDisplay {
             this.healthTracks.push(this.scene.add.rectangle(slot.x - barWidth / 2, slot.y + 109, barWidth, 3, 0x443239).setOrigin(0))
             this.healthBars.push(this.scene.add.rectangle(slot.x - barWidth / 2, slot.y + 109, barWidth * enemy.hp / enemy.maxHp, 3, 0xc88a78).setOrigin(0))
 
-            const labelStyle = { ...style, fontSize: '11px', align: 'center', wordWrap: { width: slot.width } }
+            const labelStyle = { ...style, fontSize: '12px', align: 'center', wordWrap: { width: slot.width } }
             const nameLength = Math.max(5, Math.floor(slot.width / 5.5))
-            this.enemyTitleTexts.push(this.scene.add.text(slot.x, slot.y + 19, enemy.name.length <= nameLength ? enemy.name : `${enemy.name.slice(0, nameLength - 1)}…`, { ...labelStyle, fontSize: '9px', color: '#bcbcbc' }).setOrigin(0.5, 0))
+            this.enemyTitleTexts.push(this.scene.add.text(slot.x, slot.y + 19, enemy.name.length <= nameLength ? enemy.name : `${enemy.name.slice(0, nameLength - 1)}…`, { ...labelStyle, fontSize: '9px', color: '#c5b69a' }).setOrigin(0.5, 0))
             const intent = this.scene.add.text(slot.x, slot.y, this.getEnemyText(enemy), labelStyle).setOrigin(0.5, 0)
             const hp = this.scene.add.text(slot.x, slot.y + 114, this.getEnemyHpLabel(enemy), labelStyle).setOrigin(0.5, 0)
             const name = this.scene.add.text(Math.min(this.scene.cameras.main.width - 110, slot.x), slot.y, this.getEnemyDetails(enemy), {
                 ...labelStyle, wordWrap: { width: 200 }, backgroundColor: '#111111', padding: { x: 6, y: 4 },
             }).setOrigin(0.5, 0).setAlpha(0).setDepth(6000)
             const powers = this.scene.add.text(slot.x, slot.y + 129, this.getEnemySummary(enemy, slot.width), {
-                fontFamily: style.fontFamily, fontSize: '10px', color: '#bbbbbb',
+                fontFamily: style.fontFamily, fontSize: '10px', color: '#ccbfa5',
             }).setOrigin(0.5, 0)
 
             sprite.on('pointerover', () => name.setAlpha(1))
@@ -95,9 +95,9 @@ export class EnemyDisplay {
 
     private getEnemyText(enemy: EnemyState): string {
         if (this.engine.run?.relics.includes('RUNIC_DOME')) return '?'
-        if (enemy.intent?.kind === 'attack') return `${this.engine.previewEnemyAttack(enemy)} ⚔`
-        if (enemy.intent?.kind === 'multi_attack') return `${this.engine.previewEnemyAttack(enemy)}x${enemy.intent.hits} ⚔`
-        if (enemy.intent?.kind === 'block') return `${enemy.intent.amount} 🛡`
+        if (enemy.intent?.kind === 'attack') return `Attack ${this.engine.previewEnemyAttack(enemy)}`
+        if (enemy.intent?.kind === 'multi_attack') return `Attack ${this.engine.previewEnemyAttack(enemy)}×${enemy.intent.hits}`
+        if (enemy.intent?.kind === 'block') return `Block ${enemy.intent.amount}`
         if (enemy.intent?.kind === 'debuff') return `${enemy.intent.debuff} ↓`
         if (enemy.intent?.kind === 'status') return `${enemy.intent.createdDefId} x${enemy.intent.count}`
         if (enemy.intent?.kind === 'summon') return `Summon`
@@ -105,7 +105,7 @@ export class EnemyDisplay {
     }
 
     private getEnemyHpLabel(enemy: EnemyState): string {
-        return `${enemy.hp}/${enemy.maxHp}  B${enemy.block}`
+        return `${enemy.hp}/${enemy.maxHp}${enemy.block ? ` · ${enemy.block} Block` : ''}`
     }
 
     private getEnemyPowers(enemy: EnemyState): string[] {

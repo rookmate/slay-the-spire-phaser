@@ -42,13 +42,14 @@ describe('original character progression', () => {
         expect(result.unlockBundle?.cards).toContain('ECHO_FORM')
         expect(result.unlockedNext).toBe(false); expect(keysUnlocked(meta)).toBe(false)
     })
-    it('opens characters in sequence and keys after all three original character clears', () => {
+    it('starts with every character and earns keys after all three original character clears', () => {
         const meta = createDefaultMeta()
+        for (const character of ['ironclad', 'silent', 'defect', 'watcher'] as const) expect(getCharacterProgress(meta, character).unlocked).toBe(true)
         recordRunResult(meta, createNewRun({ mode: 'standard' }), 'defeat')
         expect(getCharacterProgress(meta, 'silent').unlocked).toBe(true)
         recordRunResult(meta, createNewRun({ character: 'silent', mode: 'standard' }), 'victory')
         expect(getCharacterProgress(meta, 'defect').unlocked).toBe(true)
-        expect(getCharacterProgress(meta, 'watcher').unlocked).toBe(false)
+        expect(getCharacterProgress(meta, 'watcher').unlocked).toBe(true)
         recordRunResult(meta, createNewRun({ character: 'defect', mode: 'standard' }), 'victory')
         expect(getCharacterProgress(meta, 'watcher').unlocked).toBe(true)
         expect(keysUnlocked(meta)).toBe(false)

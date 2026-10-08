@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { createNewRun } from '../../src/core/run'
 import { createCardInstance } from '../../src/core/cards'
-import { boot, clickCard, clickText, dragCard, expectScene, inspect, readSavedProgress, reloadRun } from './driver'
+import { boot, clickMapNode, clickCard, clickText, dragCard, expectScene, inspect, readSavedProgress, reloadRun } from './driver'
 
 test('plays an untargeted power and colorless skill by dragging', async ({ page }) => {
     const run = createNewRun({ seed: 'untargeted' }); run.neowCompleted = true
@@ -157,7 +157,7 @@ test('chains the A20 bosses, resumes the second, and follows the key route throu
             expect(ui.run!.act).toBe(4)
             const node = ui.map!.byId[ui.run!.mapProgress?.currentNodeId ? ui.map!.byId[ui.run!.mapProgress.currentNodeId].edgesTo[0] : ui.map!.startIds[0]]
             actFourRooms.push(node.kind)
-            await clickText(page, ui.texts.find(text => text.enabled && ['R', '$', 'E', 'B'].includes(text.text))!.text)
+            await clickMapNode(page, node.id)
         } else if (ui.scene === 'Campfire') await clickText(page, ui.texts.find(t => t.enabled && t.text.startsWith('Rest'))!.text)
         else if (ui.scene === 'Shop') await clickText(page, 'Leave')
         else if (ui.scene === 'Rewards') {

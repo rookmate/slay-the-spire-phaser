@@ -2,15 +2,26 @@ import { loadSettings } from '../core/settings'
 import { playCue } from './sound'
 import Phaser from 'phaser'
 import { COMBAT_UI_CONFIG } from './CombatUIConfig'
+import { Card } from './Card'
 
 export class VisualEffects {
     private scene: Phaser.Scene
     private damageNumbers: Phaser.GameObjects.Text[] = []
     private impacts = new Set<Phaser.GameObjects.Graphics>()
     private damageNumberPool: Phaser.GameObjects.Text[] = []
+    private playedCards = new Set<Card>()
 
     constructor(scene: Phaser.Scene) {
         this.scene = scene
+    }
+
+    playCard(card: Card, x: number, y: number): void {
+        if (loadSettings().reducedMotion) { card.destroy(); return }
+        this.playedCards.add(card)
+        card.setName('played-card').setDepth(COMBAT_UI_CONFIG.depths.dragCard)
+        this.scene.tweens.add({ targets: card, x: x - Card.CARD_WIDTH * 0.15, y: y - Card.CARD_HEIGHT * 0.15,
+            scale: 0.3, alpha: 0, duration: 200, ease: 'Cubic.In',
+            onComplete: () => { this.playedCards.delete(card); card.destroy() } })
     }
 
     showDamageNumber(amount: number, x: number, y: number, isHealing = false): void {
@@ -21,7 +32,7 @@ export class VisualEffects {
         let damageText = this.damageNumberPool.pop()
         if (!damageText) {
             damageText = this.scene.add.text(0, 0, '', {
-                fontFamily: COMBAT_UI_CONFIG.styles.fontFamily,
+                resolution: 2, fontFamily: COMBAT_UI_CONFIG.styles.fontFamily,
                 fontSize: '24px',
                 color: isHealing ? '#00ff00' : '#ff4444',
                 stroke: '#000000',
@@ -94,6 +105,8 @@ export class VisualEffects {
     }
 
     destroy(): void {
+        for (const card of this.playedCards) { this.scene.tweens.killTweensOf(card); card.destroy() }
+        this.playedCards.clear()
         for (const mark of this.impacts) { this.scene.tweens.killTweensOf(mark); mark.destroy() }
         this.impacts.clear()
         for (const text of this.damageNumbers) this.scene.tweens.killTweensOf(text)

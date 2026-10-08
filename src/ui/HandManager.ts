@@ -12,6 +12,7 @@ export class HandManager {
     private handContainer: Phaser.GameObjects.Container
     private handInputArea: Phaser.GameObjects.Rectangle
     private currentHoverIndex: number | null = null
+    private selectedCard?: Card
     private onCardDrag?: (card: Card, cardIndex: number, pointer: Phaser.Input.Pointer) => void
 
     constructor(scene: Phaser.Scene, engine: Engine) {
@@ -20,13 +21,13 @@ export class HandManager {
         this.handContainer = scene.add.container(0, 0).setDepth(COMBAT_UI_CONFIG.depths.hand)
         this.handInputArea = scene.add.rectangle(0, 0, 1, 1, 0, 0).setOrigin(0, 0).setInteractive()
         this.handInputArea.on('pointermove', (pointer: Phaser.Input.Pointer) => {
-            if (pointer.isDown || !engine.canAcceptInput()) return
+            if (pointer.isDown || this.selectedCard || !engine.canAcceptInput()) return
             const card = this.cardAtPoint(pointer.worldX, pointer.worldY)
             const index = card ? this.handCards.indexOf(card) : null
             if (index !== this.currentHoverIndex) this.layoutHand(index)
         })
         this.handInputArea.on('pointerout', (pointer: Phaser.Input.Pointer) => {
-            if (!pointer.isDown) this.layoutHand(null)
+            if (!pointer.isDown && !this.selectedCard) this.layoutHand(null)
         })
         this.handInputArea.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
             const card = this.cardAtPoint(pointer.worldX, pointer.worldY)
@@ -42,6 +43,7 @@ export class HandManager {
     }
 
     rebuildHand(): void {
+        this.selectedCard = undefined
         this.handCards.forEach(card => this.scene.tweens.killTweensOf(card))
         this.handContainer.removeAll(true)
         this.handCards = this.engine.state.player.hand.map(instance => {
@@ -65,10 +67,12 @@ export class HandManager {
         const positions = handPositions(this.scene.scale.width, this.scene.scale.height, this.handCards.length, hovered)
         this.handCards.forEach((card, index) => {
             this.scene.tweens.killTweensOf(card)
-            card.showDetails(index === hovered)
+            card.showDetails(!this.selectedCard && index === hovered)
+            card.setSelected(card === this.selectedCard)
+            card.setDimmed(!!this.selectedCard && card !== this.selectedCard)
             this.handContainer.bringToTop(card)
             card.setDepth(index === hovered ? COMBAT_UI_CONFIG.depths.handHover : index)
-            if (animate && !loadSettings().reducedMotion) this.scene.tweens.add({ targets: card, ...positions[index], duration: 100 })
+            if (animate && !loadSettings().reducedMotion) this.scene.tweens.add({ targets: card, ...positions[index], duration: 150, ease: 'Cubic.Out' })
             else card.setPosition(positions[index].x, positions[index].y)
         })
         if (hovered !== null) this.handContainer.bringToTop(this.handCards[hovered])
@@ -76,6 +80,20 @@ export class HandManager {
 
     getHandCards(): Card[] {
         return this.handCards
+    }
+
+    focusCard(card?: Card): void {
+        this.selectedCard = card
+        this.layoutHand(card ? this.handCards.indexOf(card) : null)
+    }
+
+    detachCard(card: Card): void {
+        this.scene.tweens.killTweensOf(card)
+        this.handCards = this.handCards.filter(view => view !== card)
+        this.handContainer.remove(card)
+        this.scene.add.existing(card)
+        card.showDetails(false)
+        card.iterate((child: Phaser.GameObjects.GameObject) => child.disableInteractive())
     }
 
     inspectCard(index: number): void {
