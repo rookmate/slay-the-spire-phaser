@@ -1,4 +1,5 @@
-import { CARD_DEFS, canUpgradeCard, createCardInstance, getUnlockedCollectibleCards } from './cards'
+import { CARD_DEFS, RANDOM_CURSE_IDS, canRemoveCard, canUpgradeCard, getUnlockedCollectibleCards } from './cards'
+import { CHARACTERS } from './characters'
 import { transformCard } from './events'
 import { changeMaxHp, gainGold } from './health'
 import type { MetaState } from './meta'
@@ -6,7 +7,7 @@ import { applyRelicAcquisition } from './relics'
 import { cardChoices, drawBossRelics, drawPotion, drawRelic } from './rewardPools'
 import type { RewardItem } from './rewards'
 import { RNG } from './rng'
-import { obtainCurse, removeCardByInstanceId, type RunState } from './run'
+import { obtainCard, obtainCurse, removeCardByInstanceId, type RunState } from './run'
 
 export type NeowReward = 'REMOVE_CARD' | 'TRANSFORM_CARD' | 'UPGRADE_CARD' | 'CHOOSE_CARD' | 'COLORLESS_CARD' | 'RANDOM_RARE' | 'MAX_HP' | 'LAMENT' | 'COMMON_RELIC' | 'GAIN_100_GOLD' | 'THREE_POTIONS' | 'REMOVE_TWO' | 'TRANSFORM_TWO' | 'GAIN_250_GOLD' | 'RARE_CARD' | 'RARE_COLORLESS' | 'RARE_RELIC' | 'LARGE_MAX_HP' | 'BOSS_SWAP'
 export type NeowDrawback = 'MAX_HP' | 'DAMAGE' | 'CURSE' | 'GOLD'
@@ -47,7 +48,7 @@ export function applyNeowOption(run: RunState, meta: MetaState, selected: NeowOp
         if (new Set(instanceIds).size !== selected.selectionCount) return false
         for (const id of instanceIds) {
             const card = run.deck.find(c => c.instanceId === id)
-            if (!card || card.defId === 'ASCENDERS_BANE' || (selected.requiresSelection === 'upgrade' && !canUpgradeCard(card))) return false
+            if (!card || (selected.requiresSelection === 'upgrade' ? !canUpgradeCard(card) : !canRemoveCard(card))) return false
         }
     }
     const rng = new RNG(`${run.neowSeed}-${selected.id}`)
@@ -55,8 +56,7 @@ export function applyNeowOption(run: RunState, meta: MetaState, selected: NeowOp
     if (selected.drawback === 'MAX_HP') changeMaxHp(run, -Math.floor(run.player.maxHp * 0.1))
     if (selected.drawback === 'DAMAGE') run.player.hp -= Math.floor(run.player.hp / 10) * 3
     if (selected.drawback === 'CURSE') {
-        const pool = Object.values(CARD_DEFS).filter(c => c.type === 'curse' && c.id !== 'ASCENDERS_BANE')
-        obtainCurse(run, pool[rng.int(0, pool.length - 1)].id)
+        obtainCurse(run, RANDOM_CURSE_IDS[rng.int(0, RANDOM_CURSE_IDS.length - 1)])
     }
     const items: RewardItem[] = []
     const id = selected.id
@@ -68,12 +68,12 @@ export function applyNeowOption(run: RunState, meta: MetaState, selected: NeowOp
     if (id === 'GAIN_100_GOLD' || id === 'GAIN_250_GOLD') gainGold(run, id === 'GAIN_100_GOLD' ? 100 : 250)
     if (id === 'MAX_HP' || id === 'LARGE_MAX_HP') changeMaxHp(run, Math.floor(run.player.maxHp * (id === 'MAX_HP' ? 0.1 : 0.2)))
     if (id === 'LAMENT') applyRelicAcquisition(run, 'NEOWS_LAMENT')
-    if (id === 'COMMON_RELIC' || id === 'RARE_RELIC') applyRelicAcquisition(run, drawRelic(rng, meta, run.relics, id === 'COMMON_RELIC' ? 'common' : 'rare'))
-    if (id === 'RANDOM_RARE') { const pool = getUnlockedCollectibleCards(meta, 'rare'); run.deck.push(createCardInstance(pool[rng.int(0, pool.length - 1)])) }
-    if (id === 'THREE_POTIONS') for (let i = 0; i < 3; i++) items.push({ kind: 'potion', potionId: drawPotion(rng) })
+    if (id === 'COMMON_RELIC' || id === 'RARE_RELIC') applyRelicAcquisition(run, drawRelic(rng, meta, run, id === 'COMMON_RELIC' ? 'common' : 'rare'))
+    if (id === 'RANDOM_RARE') { const pool = getUnlockedCollectibleCards(meta, 'rare', run.character); obtainCard(run, pool[rng.int(0, pool.length - 1)]) }
+    if (id === 'THREE_POTIONS') for (let i = 0; i < 3; i++) items.push({ kind: 'potion', potionId: drawPotion(rng, run.character, 'uniform') })
     if (id === 'BOSS_SWAP') {
-        run.relics = run.relics.filter(relic => relic !== 'BURNING_BLOOD')
-        applyRelicAcquisition(run, drawBossRelics(rng, run.relics)[0])
+        run.relics = run.relics.filter(relic => relic !== CHARACTERS[run.character].starterRelic)
+        applyRelicAcquisition(run, drawBossRelics(rng, run, meta, 1)[0])
     }
     if (id === 'CHOOSE_CARD' || id === 'RARE_CARD') items.push({ kind: 'cards', choices: cardChoices(rng, meta, 3, run, id === 'RARE_CARD' ? 'boss' : 'hallway') })
     if (id === 'COLORLESS_CARD' || id === 'RARE_COLORLESS') {

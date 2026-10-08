@@ -165,7 +165,7 @@ describe('review regressions', () => {
         expect(engine.state.player.maxHp).toBe(86)
     })
     it('Parasite costs max HP only on successful removal, and Omamori prevents acquisition', () => {
-        const run = createNewRun('parasite')
+        const run = createNewRun({ seed: 'parasite' })
         const parasite = obtainCurse(run, 'PARASITE')
         expect(run.player).toEqual({ hp: 80, maxHp: 80 })
         removeCardByInstanceId(run, parasite.instanceId)

@@ -86,6 +86,7 @@ export class EnemyDisplay {
     }
 
     private getEnemyText(enemy: EnemyState): string {
+        if (this.engine.run?.relics.includes('RUNIC_DOME')) return '?'
         if (enemy.intent?.kind === 'attack') return `${this.engine.previewEnemyAttack(enemy)} ⚔`
         if (enemy.intent?.kind === 'multi_attack') return `${this.engine.previewEnemyAttack(enemy)}x${enemy.intent.hits} ⚔`
         if (enemy.intent?.kind === 'block') return `${enemy.intent.amount} 🛡`

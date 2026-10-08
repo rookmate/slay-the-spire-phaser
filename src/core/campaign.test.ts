@@ -31,18 +31,18 @@ describe('Ironclad campaign', () => {
         expect(CARD_DEFS.VOID.poolEnabled).toBe(false)
     })
     it('builds each ascension starting deck at its own threshold', () => {
-        expect(createNewRun('s', 5).player).toEqual({ hp: 80, maxHp: 80 })
-        expect(createNewRun('s', 6).player).toEqual({ hp: 72, maxHp: 80 })
-        expect(createNewRun('s', 10).deck.some(card => card.defId === 'ASCENDERS_BANE')).toBe(true)
-        expect(createNewRun('s', 11).maxPotionSlots).toBe(2)
-        expect(createNewRun('s', 14).player).toEqual({ hp: 68, maxHp: 75 })
-        const run = createNewRun('s', 20)
+        expect(createNewRun({ seed: 's', ascension: 5 }).player).toEqual({ hp: 80, maxHp: 80 })
+        expect(createNewRun({ seed: 's', ascension: 6 }).player).toEqual({ hp: 72, maxHp: 80 })
+        expect(createNewRun({ seed: 's', ascension: 10 }).deck.some(card => card.defId === 'ASCENDERS_BANE')).toBe(true)
+        expect(createNewRun({ seed: 's', ascension: 11 }).maxPotionSlots).toBe(2)
+        expect(createNewRun({ seed: 's', ascension: 14 }).player).toEqual({ hp: 68, maxHp: 75 })
+        const run = createNewRun({ seed: 's', ascension: 20 })
         const curse = run.deck.find(card => card.defId === 'ASCENDERS_BANE')!
         expect(removeCardByInstanceId(run, curse.instanceId)).toBeUndefined()
         expect(run.deck).toContain(curse)
     })
     it('offers gold and rare cards before the boss relic, then heals into the next act', () => {
-        const run = createNewRun('reward-route', 5)
+        const run = createNewRun({ seed: 'reward-route', ascension: 5 })
         run.neowCompleted = true; run.player.hp = 20; run.floor = 16
         expect(finishBossCombat(run, meta)).toBe('Rewards')
         expect(getRunDestination(run).scene).toBe('Rewards')
@@ -57,7 +57,7 @@ describe('Ironclad campaign', () => {
         expect(run.act).toBe(3)
     })
     it('requires all three keys for Act 4 and heals on entry', () => {
-        const run = createNewRun('keys'); run.act = 3; run.player.hp = 23
+        const run = createNewRun({ seed: 'keys' }); run.act = 3; run.player.hp = 23
         expect(hasAllKeys(run)).toBe(false)
         expect(finishBossCombat(run, meta)).toBe('RunSummary')
         run.keys = { ruby: true, sapphire: true, emerald: true }
@@ -67,7 +67,7 @@ describe('Ironclad campaign', () => {
         expect(finishBossCombat(run, meta)).toBe('RunSummary')
     })
     it('chains two distinct bosses at A20 without healing or rewards between', () => {
-        const run = createNewRun('double-boss', 20); run.act = 3; run.player.hp = 19
+        const run = createNewRun({ seed: 'double-boss', ascension: 20 }); run.act = 3; run.player.hp = 19
         const first = getRunBoss(run)
         expect(finishBossCombat(run, meta)).toBe('Combat')
         expect(getRunBoss(run)).not.toBe(first); expect(run.player.hp).toBe(19)
@@ -103,7 +103,7 @@ describe('Ironclad campaign', () => {
         let raw = JSON.stringify({ seed: 'broken' })
         vi.stubGlobal('localStorage', { getItem: () => raw })
         expect(loadRun()).toBeUndefined()
-        const legacy = { ...createNewRun('legacy'), keys: undefined, mapRows: undefined }
+        const legacy = { ...createNewRun({ seed: 'legacy' }), keys: undefined, mapRows: undefined }
         raw = JSON.stringify(legacy)
         expect(loadRun()?.keys).toEqual({ ruby: false, sapphire: false, emerald: false })
         expect(loadRun()?.mapRows).toBe(15)
@@ -205,7 +205,7 @@ describe('boss and elite mechanics', () => {
         expect(heart.hp).toBe(heart.maxHp - cap * 2)
     })
     it('changes which surrounded enemy has a back attack when targeting a card', () => {
-        const run = createNewRun('surrounded'); run.act = 4
+        const run = createNewRun({ seed: 'surrounded' }); run.act = 4
         const engine = createCombatEngine(run, 'elite')
         const [shield, spear] = engine.state.enemies
         shield.intent = { kind: 'attack', amount: 10 }; spear.intent = { kind: 'attack', amount: 10 }
@@ -222,7 +222,7 @@ describe('boss and elite mechanics', () => {
 
 describe('campaign review regressions', () => {
     it('preserves the real outgoing edge of a pre-campaign save', () => {
-        const run = { ...createNewRun('legacy-0'), keys: undefined, mapRows: undefined, mapProgress: { currentNodeId: '1:4' }, neowCompleted: true }
+        const run = { ...createNewRun({ seed: 'legacy-0' }), keys: undefined, mapRows: undefined, mapProgress: { currentNodeId: '1:4' }, neowCompleted: true }
         vi.stubGlobal('localStorage', { getItem: () => JSON.stringify(run) })
         const loaded = loadRun()!
         const map = generateMap(loaded.seed, loaded.act, loaded.mapRows, 7, loaded.asc)

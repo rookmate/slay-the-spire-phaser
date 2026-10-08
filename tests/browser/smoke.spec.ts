@@ -4,7 +4,7 @@ import { createCardInstance } from '../../src/core/cards'
 import { boot, clickCard, clickPoint, clickText, dragCard, expectScene, inspect, reloadRun } from './driver'
 
 test('draws the whole hand, plays by dragging, ends a turn, and resumes combat', async ({ page }) => {
-    const run = createNewRun('browser-combat')
+    const run = createNewRun({ seed: 'browser-combat' })
     run.neowCompleted = true
     run.pendingRoom = { scene: 'Combat', roomKind: 'monster' }
     const errors = await boot(page, run)
@@ -28,13 +28,13 @@ test('draws the whole hand, plays by dragging, ends a turn, and resumes combat',
 })
 
 test('can select the last card of a large deck at a campfire', async ({ page }) => {
-    const run = createNewRun('browser-pages')
+    const run = createNewRun({ seed: 'browser-pages' })
     run.neowCompleted = true
     run.pendingRoom = { scene: 'Campfire' }
     run.deck = Array.from({ length: 16 }, () => createCardInstance('STRIKE'))
     const last = run.deck.at(-1)!
     const errors = await boot(page, run)
-    await clickText(page, 'Smith (upgrade a card)')
+    await clickText(page, 'Smith · upgrade a card')
     for (let pageIndex = 0; pageIndex < 3; pageIndex++) await clickText(page, 'Next')
     await clickCard(page, last.instanceId)
     await expectScene(page, 'Map')
@@ -43,14 +43,14 @@ test('can select the last card of a large deck at a campfire', async ({ page }) 
 })
 
 test('can leave a campfire when Coffee Dripper and an upgraded deck block both services', async ({ page }) => {
-    const run = createNewRun('browser-campfire')
+    const run = createNewRun({ seed: 'browser-campfire' })
     run.neowCompleted = true
     run.pendingRoom = { scene: 'Campfire' }
     run.relics.push('COFFEE_DRIPPER')
     run.deck = run.deck.map(card => ({ ...card, upgradeLevel: 1 }))
     const errors = await boot(page, run)
     const ui = await inspect(page)
-    expect(ui.texts.filter(t => t.enabled).map(t => t.text)).toEqual(['Recall (obtain Ruby Key)', 'Skip'])
+    expect(ui.texts.filter(t => t.enabled).map(t => t.text)).toEqual(['Recall · obtain Ruby Key', 'Skip', 'Bag', 'Menu'])
     await clickText(page, 'Skip')
     await expectScene(page, 'Map')
     expect((await inspect(page)).run!.floor).toBe(2)
@@ -58,7 +58,7 @@ test('can leave a campfire when Coffee Dripper and an upgraded deck block both s
 })
 
 test('combat card choices can reach the second page and resolve through a card click', async ({ page }) => {
-    const run = createNewRun('browser-choice')
+    const run = createNewRun({ seed: 'browser-choice' })
     run.neowCompleted = true
     run.pendingRoom = { scene: 'Combat', roomKind: 'monster' }
     run.relics.push('BAG_OF_PREPARATION')
@@ -78,14 +78,14 @@ test('combat card choices can reach the second page and resolve through a card c
 })
 
 test('defeat clears the save and records the result only once across reload', async ({ page }) => {
-    const run = createNewRun('browser-defeat')
+    const run = createNewRun({ seed: 'browser-defeat' })
     run.neowCompleted = true
     run.pendingRoom = { scene: 'Combat', roomKind: 'boss' }
     run.player.hp = 1
     const errors = await boot(page, run)
     for (let turn = 0; turn < 5 && (await inspect(page)).scene === 'Combat'; turn++) await clickText(page, 'End Turn')
     await expectScene(page, 'RunSummary')
-    expect((await inspect(page)).texts.some(t => t.text === 'Run DEFEAT!')).toBe(true)
+    expect((await inspect(page)).texts.some(t => t.text === 'Ironclad · DEFEAT')).toBe(true)
     const before = await page.evaluate(() => ({ run: localStorage.getItem('sts_run_v7'), meta: JSON.parse(localStorage.getItem('sts_meta_v2')!) }))
     expect(before.run).toBeNull()
     expect(before.meta.totalRuns).toBe(1)
@@ -97,7 +97,7 @@ test('defeat clears the save and records the result only once across reload', as
 })
 
 test('five enemies and multiple effects stay above the hand; hover shows every effect', async ({ page }) => {
-    const run = createNewRun('crowd-21')
+    const run = createNewRun({ seed: 'crowd-21' })
     run.neowCompleted = true
     run.combatCount = 4
     run.hallwayCount = 4
@@ -108,7 +108,7 @@ test('five enemies and multiple effects stay above the hand; hover shows every e
     const errors = await boot(page, run)
     const ui = await inspect(page)
     expect(ui.enemies).toHaveLength(5)
-    const controls = ui.texts.filter(text => text.enabled && (text.text.endsWith('Potion') || ['Discard', 'Exhaust', 'End Turn'].includes(text.text)))
+    const controls = ui.texts.filter(text => text.enabled && (['Weak', 'Fire', 'Dexterity'].includes(text.text) || ['Discard', 'Exhaust', 'End Turn'].includes(text.text)))
     expect(controls).toHaveLength(6)
     for (const [index, a] of controls.entries()) {
         for (const b of controls.slice(index + 1)) {
@@ -128,8 +128,8 @@ test('five enemies and multiple effects stay above the hand; hover shows every e
     for (const id of ['DEMON_FORM', 'METALLICIZE']) {
         await dragCard(page, (await inspect(page)).state!.player.hand.find(card => card.defId === id)!.instanceId)
     }
-    await clickText(page, 'Dexterity Potion')
-    await clickText(page, 'Weak Potion')
+    await clickText(page, 'Dexterity'); await clickText(page, 'Use')
+    await clickText(page, 'Weak'); await clickText(page, 'Use')
     await clickPoint(page, ui.enemies[4].x, ui.enemies[4].y)
     const buffed = await inspect(page)
     const labels = buffed.texts.filter(text => text.depth === 0 && text.y >= 174 && text.y < 196 && text.text)
@@ -139,7 +139,7 @@ test('five enemies and multiple effects stay above the hand; hover shows every e
     expect(details.text).toContain('VULNERABLE:1')
     expect(details.text).toContain('STRENGTH:1')
     expect(details.text).toContain('WEAK:3')
-    await clickText(page, 'Fire Potion')
+    await clickText(page, 'Fire'); await clickText(page, 'Use')
     await clickPoint(page, ui.enemies[4].x, ui.enemies[4].y)
     expect((await inspect(page)).state!.enemies[4].hp).toBe(0)
     expect((await inspect(page)).run!.potions).toEqual([])
@@ -147,7 +147,7 @@ test('five enemies and multiple effects stay above the hand; hover shows every e
 })
 
 test('card and potion rewards have separate controls and survive reload without duplicate gold', async ({ page }) => {
-    const run = createNewRun('browser-rewards')
+    const run = createNewRun({ seed: 'browser-rewards' })
     run.neowCompleted = true
     run.potions = ['BLOCK_POTION', 'STRENGTH_POTION', 'DEXTERITY_POTION']
     run.pendingRoom = { scene: 'Rewards', rewards: { tier: 'hallway', items: [
@@ -170,7 +170,7 @@ test('card and potion rewards have separate controls and survive reload without 
 })
 
 test('unknown-room probabilities survive reload as part of the run', async ({ page }) => {
-    const run = createNewRun('weights-5')
+    const run = createNewRun({ seed: 'weights-5' })
     run.mapRows = 15
     run.neowCompleted = true
     run.floor = 5

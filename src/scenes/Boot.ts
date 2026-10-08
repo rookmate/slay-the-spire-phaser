@@ -1,3 +1,4 @@
+import { loadCharacterPortraits } from '../ui/portraits'
 import Phaser from 'phaser'
 import { ENEMIES } from '../core/enemies'
 // import { createNewRun, loadRun, saveRun } from '../core/run'
@@ -19,6 +20,7 @@ export class BootScene extends Phaser.Scene {
     }
 
     preload(): void {
+        loadCharacterPortraits(this)
         // Player
         this.load.image('player:ironclad', ironcladPng)
         // Enemies
@@ -64,7 +66,7 @@ export class BootScene extends Phaser.Scene {
 
     create(): void {
         // Every encounter needs a targetable portrait, including newly added foes.
-        // Original illustrations for these enemies are supplied by the presentation stage.
+        // Fallback portraits remain placeholders until original enemy art is available.
         for (const enemy of Object.values(ENEMIES)) {
             const key = `enemy:${enemy.id}`
             if (this.textures.exists(key)) continue

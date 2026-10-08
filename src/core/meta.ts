@@ -1,7 +1,29 @@
-import type { RelicId } from './run'
-import { getBaseUnlockedCardIds as getBaseUnlockedCardIdsFromTrack, getBaseUnlockedRelicIds as getBaseUnlockedRelicIdsFromTrack, IRONCLAD_UNLOCK_TRACK, type UnlockBundle } from './unlocks'
+import { clampAscension, MAX_ASCENSION } from './ascension'
+import { CHARACTER_IDS, type CharacterId } from './characters'
+import type { CardInstance } from './state'
+import type { RelicId, RunState } from './run'
+import { getBaseUnlockedCardIds, getBaseUnlockedRelicIds, UNLOCK_TRACKS, UNLOCK_XP, type UnlockBundle } from './unlocks'
+export { clampAscension, getBaseUnlockedCardIds, getBaseUnlockedRelicIds }
 
+export interface CharacterProgress {
+    unlocked: boolean
+    ascension: number
+    unlockTier: number
+    xp: number
+    act3Cleared: boolean
+    previousRunReachedBoss: boolean
+}
+export interface RunHistoryEntry {
+    id: string; date: string; character: CharacterId; mode: RunState['mode']; seed: string; ascension: number
+    result: 'victory' | 'defeat'; floor: number; actsCleared: number[]; score: number; elapsedSeconds: number
+    deck: { id: string; upgrade: number }[]; relics: RelicId[]
+}
 export interface MetaState {
+    customUnlocked?: boolean
+    version?: 3
+    characters?: Record<CharacterId, CharacterProgress>
+    history?: RunHistoryEntry[]
+    noteCard?: Pick<CardInstance, 'defId' | 'upgradeLevel' | 'permanentDamage' | 'permanentBlock'>
     previousRunReachedBoss?: boolean
     lastRecordedRunId?: string
     bestAscensionUnlocked: number
@@ -11,97 +33,79 @@ export interface MetaState {
     unlockedCardIds: string[]
     unlockedRelicIds: RelicId[]
 }
-
-import { MAX_ASCENSION } from './ascension'
-
 const META_KEY = 'sts_meta_v2'
-
-function createDefaultMeta(): MetaState {
-    return {
-        bestAscensionUnlocked: 0,
-        totalWins: 0,
-        totalRuns: 0,
-        ironcladUnlockTier: 0,
-        unlockedCardIds: [],
-        unlockedRelicIds: [],
-    }
+export function createDefaultMeta(): MetaState {
+    return { version: 3, bestAscensionUnlocked: 0, totalWins: 0, totalRuns: 0, ironcladUnlockTier: 0, unlockedCardIds: [], unlockedRelicIds: [], history: [] }
 }
-
+function progressDefaults(character: CharacterId): CharacterProgress {
+    return { unlocked: character === 'ironclad', ascension: 0, unlockTier: 0, xp: 0, act3Cleared: false, previousRunReachedBoss: false }
+}
+export function getCharacterProgress(meta: MetaState, character: CharacterId): CharacterProgress {
+    if (!meta.characters) {
+        meta.characters = Object.fromEntries(CHARACTER_IDS.map(id => [id, progressDefaults(id)])) as Record<CharacterId, CharacterProgress>
+        Object.assign(meta.characters.ironclad, { ascension: clampAscension(meta.bestAscensionUnlocked), unlockTier: Math.min(5, meta.ironcladUnlockTier), previousRunReachedBoss: !!meta.previousRunReachedBoss, act3Cleared: meta.totalWins > 0 })
+        if (meta.totalRuns > 0) meta.characters.silent.unlocked = true
+    }
+    return meta.characters[character]
+}
 export function loadMeta(): MetaState {
-    const raw = localStorage.getItem(META_KEY)
-    if (!raw) return createDefaultMeta()
     try {
-        const parsed = JSON.parse(raw) as Partial<MetaState>
-        return {
-            ...createDefaultMeta(),
-            ...parsed,
-            ironcladUnlockTier: Math.max(0, Math.min(IRONCLAD_UNLOCK_TRACK.length, Math.floor(parsed.ironcladUnlockTier ?? 0))),
-            unlockedCardIds: parsed.unlockedCardIds ?? [],
-            unlockedRelicIds: parsed.unlockedRelicIds ?? [],
+        const parsed = JSON.parse(localStorage.getItem(META_KEY) ?? 'null') as Partial<MetaState> | null
+        if (!parsed || typeof parsed !== 'object') return createDefaultMeta()
+        const meta = { ...createDefaultMeta(), ...parsed, unlockedCardIds: parsed.unlockedCardIds ?? [], unlockedRelicIds: parsed.unlockedRelicIds ?? [] }
+        for (const id of CHARACTER_IDS) {
+            const progress = getCharacterProgress(meta, id)
+            meta.characters![id] = { ...progressDefaults(id), ...progress, ascension: clampAscension(progress?.ascension ?? 0), unlockTier: Math.max(0, Math.min(5, progress?.unlockTier ?? 0)), xp: Math.max(0, progress?.xp ?? 0) }
         }
-    } catch {
-        return createDefaultMeta()
-    }
+        meta.version = 3
+        return meta
+    } catch { return createDefaultMeta() }
 }
-
-export function saveMeta(meta: MetaState): void {
-    localStorage.setItem(META_KEY, JSON.stringify(meta))
+export function saveMeta(meta: MetaState): void { localStorage.setItem(META_KEY, JSON.stringify(meta)) }
+export function getSelectableAscensions(meta: MetaState, character: CharacterId = 'ironclad'): number[] {
+    return Array.from({ length: getCharacterProgress(meta, character).ascension + 1 }, (_, index) => index)
 }
-
-export function clampAscension(level: number): number {
-    return Math.max(0, Math.min(MAX_ASCENSION, Math.floor(level)))
-}
-
-export function getSelectableAscensions(meta: MetaState): number[] {
-    const max = clampAscension(meta.bestAscensionUnlocked)
-    return Array.from({ length: max + 1 }, (_, index) => index)
-}
-
-export function unlockNextAscension(meta: MetaState, clearedAscension: number): boolean {
+export function unlockNextAscension(meta: MetaState, clearedAscension: number, character: CharacterId = 'ironclad'): boolean {
+    const progress = getCharacterProgress(meta, character)
     const cleared = clampAscension(clearedAscension)
-    const current = clampAscension(meta.bestAscensionUnlocked)
-    if (cleared !== current || current >= MAX_ASCENSION) return false
-    meta.bestAscensionUnlocked = current + 1
+    if (cleared !== progress.ascension || progress.ascension >= MAX_ASCENSION) return false
+    progress.ascension++
+    if (character === 'ironclad') meta.bestAscensionUnlocked = progress.ascension
     return true
 }
-
+function earnedBundles(meta: MetaState): UnlockBundle[] {
+    return CHARACTER_IDS.flatMap(id => UNLOCK_TRACKS[id].slice(0, getCharacterProgress(meta, id).unlockTier))
+}
 export function getEffectiveUnlockedCardIds(meta: MetaState): Set<string> {
-    return new Set([...getBaseUnlockedCardIds(), ...meta.unlockedCardIds])
+    return new Set([...getBaseUnlockedCardIds(), ...meta.unlockedCardIds, ...earnedBundles(meta).flatMap(bundle => bundle.cards)])
 }
-
 export function getEffectiveUnlockedRelicIds(meta: MetaState): Set<RelicId> {
-    return new Set([...getBaseUnlockedRelicIds(), ...meta.unlockedRelicIds])
+    return new Set([...getBaseUnlockedRelicIds(), ...meta.unlockedRelicIds, ...earnedBundles(meta).flatMap(bundle => bundle.relics)])
 }
-
-export function getNextIroncladUnlockBundle(meta: MetaState): UnlockBundle | undefined {
-    return IRONCLAD_UNLOCK_TRACK[meta.ironcladUnlockTier]
-}
-
-export function grantNextIroncladUnlock(meta: MetaState): UnlockBundle | undefined {
-    const bundle = getNextIroncladUnlockBundle(meta)
+export function grantNextUnlock(meta: MetaState, character: CharacterId): UnlockBundle | undefined {
+    const progress = getCharacterProgress(meta, character)
+    const bundle = UNLOCK_TRACKS[character][progress.unlockTier]
     if (!bundle) return undefined
-    meta.ironcladUnlockTier = Math.min(IRONCLAD_UNLOCK_TRACK.length, meta.ironcladUnlockTier + 1)
-    for (const cardId of bundle.cards) {
-        if (!meta.unlockedCardIds.includes(cardId)) meta.unlockedCardIds.push(cardId)
-    }
-    for (const relicId of bundle.relics) {
-        if (!meta.unlockedRelicIds.includes(relicId)) meta.unlockedRelicIds.push(relicId)
-    }
+    progress.unlockTier++
+    if (character === 'ironclad') meta.ironcladUnlockTier = progress.unlockTier
+    meta.unlockedCardIds = [...new Set([...meta.unlockedCardIds, ...bundle.cards])]
+    meta.unlockedRelicIds = [...new Set([...meta.unlockedRelicIds, ...bundle.relics])]
     return bundle
 }
-
-export function getBaseUnlockedCardIds(): string[] {
-    return getBaseUnlockedCardIdsFromTrack()
+export function grantNextIroncladUnlock(meta: MetaState): UnlockBundle | undefined { return grantNextUnlock(meta, 'ironclad') }
+export function awardUnlockXp(meta: MetaState, character: CharacterId, score: number): UnlockBundle | undefined {
+    const progress = getCharacterProgress(meta, character)
+    const cost = UNLOCK_XP[progress.unlockTier]
+    if (!cost) return undefined
+    progress.xp += Math.max(0, Math.floor(score))
+    if (progress.xp < cost) return undefined
+    progress.xp -= cost
+    const bundle = grantNextUnlock(meta, character)
+    const nextCost = UNLOCK_XP[progress.unlockTier]
+    if (nextCost && progress.xp > nextCost) progress.xp = nextCost - 1
+    return bundle
 }
-
-export function getBaseUnlockedRelicIds(): RelicId[] {
-    return getBaseUnlockedRelicIdsFromTrack()
+export function keysUnlocked(meta: MetaState): boolean {
+    return (['ironclad', 'silent', 'defect'] as const).every(id => getCharacterProgress(meta, id).act3Cleared)
 }
-
-export function getDailySeed(): string {
-    const d = new Date()
-    const yyyy = d.getUTCFullYear()
-    const mm = String(d.getUTCMonth() + 1).padStart(2, '0')
-    const dd = String(d.getUTCDate()).padStart(2, '0')
-    return `daily-${yyyy}-${mm}-${dd}`
-}
+export function getDailySeed(date = new Date()): string { return `daily-${date.toISOString().slice(0, 10)}` }

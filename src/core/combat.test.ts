@@ -12,7 +12,7 @@ afterEach(() => vi.unstubAllGlobals())
 
 describe('encounter setup and completion', () => {
     it('starts the Guardian at its first move and advances once per turn', () => {
-        const run = Array.from({ length: 30 }, (_, i) => createNewRun(`guardian-${i}`)).find(run => getRunBoss(run) === 'THE_GUARDIAN')!
+        const run = Array.from({ length: 30 }, (_, i) => createNewRun({ seed: `guardian-${i}` })).find(run => getRunBoss(run) === 'THE_GUARDIAN')!
         const engine = createCombatEngine(run, 'boss')
         const enemy = engine.state.enemies[0]
         expect(enemy.specId).toBe('THE_GUARDIAN')
@@ -25,7 +25,7 @@ describe('encounter setup and completion', () => {
     })
 
     it.each([3, 7])('starts fresh enemies at their scaled maximum on ascension %i', asc => {
-        const run = createNewRun('scaled-enemies', asc)
+        const run = createNewRun({ seed: 'scaled-enemies', ascension: asc })
         const engine = createCombatEngine(run, 'monster')
         for (const [index, enemy] of engine.state.enemies.entries()) {
             const base = createEnemyState(enemy.specId!, enemy.id, run.asc, new RNG(getEnemyActSeed(run.seed, run.act, 0, index)))
@@ -36,7 +36,7 @@ describe('encounter setup and completion', () => {
     })
 
     it('applies Preserved Insect to both current and maximum elite health', () => {
-        const run = createNewRun('insect')
+        const run = createNewRun({ seed: 'insect' })
         run.relics.push('PRESERVED_INSECT')
         for (const [index, enemy] of createCombatEngine(run, 'elite').state.enemies.entries()) {
             expect(enemy.maxHp).toBe(Math.round(createEnemyState(enemy.specId!, enemy.id, run.asc, new RNG(getEnemyActSeed(run.seed, run.act, 0, index))).maxHp * 0.75))
@@ -45,7 +45,7 @@ describe('encounter setup and completion', () => {
     })
 
     it('samples the ascension opening without advancing AI twice', () => {
-        const run = createNewRun('act-two-opening', 7)
+        const run = createNewRun({ seed: 'act-two-opening', ascension: 7 })
         run.act = 2
         const engine = createCombatEngine(run, 'monster')
         for (const [index, enemy] of engine.state.enemies.entries()) {
@@ -62,7 +62,7 @@ describe('encounter setup and completion', () => {
             setItem: (_key: string, value: string) => { saved = value },
             getItem: () => saved,
         })
-        const run = createNewRun('feed-persistence')
+        const run = createNewRun({ seed: 'feed-persistence' })
         run.deck = [createCardInstance('FEED')]
         const player = createPlayerFromDeck(run.seed, run.deck, 78, 80)
         player.hand = player.drawPile.splice(0)

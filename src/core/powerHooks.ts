@@ -1,6 +1,6 @@
 import type { Engine } from './engine'
 import type { CardInstance } from './state'
-import { resolveCard } from './cards'
+import { CARD_DEFS, resolveCard } from './cards'
 import { powerAmount } from './combatMath'
 
 export function onStartOfPlayerTurn(engine: Engine): void {
@@ -41,6 +41,7 @@ export function onEndOfPlayerTurn(engine: Engine): void {
 }
 
 export function onCardDrawn(engine: Engine, card: CardInstance): void {
+    CARD_DEFS[card.defId].onDraw?.({ engine, card })
     if (card.defId === 'VOID') engine.enqueue({ kind: 'GainEnergy', amount: -Math.min(1, engine.state.player.energy) })
     const resolved = resolveCard(card)
     if (resolved.type !== 'status' && resolved.type !== 'curse') return

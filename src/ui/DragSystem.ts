@@ -1,3 +1,4 @@
+import { relicAllowsUnplayable } from '../core/combat/relicRules'
 import Phaser from 'phaser'
 import type { Engine } from '../core/engine'
 import type { CardInstance, CardDef } from '../core/state'
@@ -10,7 +11,7 @@ export class DragSystem {
     private engine: Engine
     private isDragging = false
     private dragCard?: Card
-    private dragCardIndex = -1
+    private dragCardId?: string
     private validTargets: Phaser.GameObjects.GameObject[] = []
     private originalCardPosition?: { x: number, y: number, rotation: number, depth: number }
     private dragStartPosition?: { x: number, y: number }
@@ -41,13 +42,13 @@ export class DragSystem {
         this.getPlayerSprite = callback
     }
 
-    startDrag(card: Card, cardIndex: number, pointer: Phaser.Input.Pointer): void {
+    startDrag(card: Card, _cardIndex: number, pointer: Phaser.Input.Pointer): void {
         if (this.isDragging || !this.engine.canAcceptInput()) return
 
-        const cardInstance = this.engine.state.player.hand[cardIndex]
+        const cardInstance = this.engine.state.player.hand.find(c => c.instanceId === card.getCardInstance().instanceId)
         if (!cardInstance) return
         const cardDef = resolveCard(cardInstance)
-        if (!cardDef || cardDef.unplayable) return
+        if (!cardDef || (cardDef.unplayable && !relicAllowsUnplayable(this.engine, cardInstance))) return
 
         // Mirror engine cost modifiers so drag availability matches actual playability.
         const effectiveCost = this.engine.getCardCost(cardInstance)
@@ -66,7 +67,7 @@ export class DragSystem {
 
         this.isDragging = true
         this.dragCard = card
-        this.dragCardIndex = cardIndex
+        this.dragCardId = cardInstance.instanceId
 
         // Store original position and starting position for upward drag detection
         this.originalCardPosition = {
@@ -102,7 +103,7 @@ export class DragSystem {
     endDrag(pointer: Phaser.Input.Pointer): boolean {
         if (!this.isDragging) return false
 
-        const cardInstance = this.engine.state.player.hand[this.dragCardIndex]
+        const cardInstance = this.engine.state.player.hand.find(c => c.instanceId === this.dragCardId)
         if (!cardInstance) {
             this.cleanupDrag()
             return false
@@ -280,9 +281,11 @@ export class DragSystem {
 
         // Reset drag state
         this.dragCard = undefined
-        this.dragCardIndex = -1
+        this.dragCardId = undefined
         this.originalCardPosition = undefined
     }
+
+    cancelDrag(): void { if (this.isDragging) this.cleanupDrag() }
 
     isCurrentlyDragging(): boolean {
         return this.isDragging

@@ -1,3 +1,5 @@
+import { loadSettings } from '../core/settings'
+import { playCue } from './sound'
 import Phaser from 'phaser'
 import { COMBAT_UI_CONFIG } from './CombatUIConfig'
 
@@ -11,6 +13,8 @@ export class VisualEffects {
     }
 
     showDamageNumber(amount: number, x: number, y: number, isHealing = false): void {
+        playCue(isHealing ? 'heal' : 'damage')
+        const reducedMotion = loadSettings().reducedMotion
         // Get or create a damage number text object
         let damageText = this.damageNumberPool.pop()
         if (!damageText) {
@@ -25,7 +29,7 @@ export class VisualEffects {
         }
 
         // Configure the damage number
-        damageText.setText(amount.toString())
+        damageText.setText(amount.toString()).setColor(isHealing ? '#b8e994' : '#ff7766')
         damageText.setPosition(x, y)
         damageText.setAlpha(1)
         damageText.setScale(1)
@@ -37,9 +41,9 @@ export class VisualEffects {
         // Animate the damage number
         this.scene.tweens.add({
             targets: damageText,
-            y: y - 60,
+            y: reducedMotion ? y : y - 60,
             alpha: 0,
-            scale: 1.2,
+            scale: reducedMotion ? 1 : 1.2,
             duration: COMBAT_UI_CONFIG.animations.damageNumberDuration,
             ease: 'Power2',
             onComplete: () => {
@@ -55,6 +59,7 @@ export class VisualEffects {
     }
 
     screenShake(intensity: number = 1, duration: number = COMBAT_UI_CONFIG.animations.screenShakeDuration): void {
+        if (loadSettings().reducedMotion) return
         this.scene.cameras.main.shake(duration, intensity * COMBAT_UI_CONFIG.animations.screenShakeIntensity)
     }
 

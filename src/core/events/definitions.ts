@@ -1,17 +1,10 @@
-import { canUpgradeCard, resolveCard } from '../cards'
-import type { RunState } from '../run'
-import type { EventChoiceDef, EventDef, EventId } from './model'
-
-const choice = (id: string, label: string, description = '', extra: Partial<EventChoiceDef> = {}): EventChoiceDef => ({ id, label, description, ...extra })
-const leave = () => choice('LEAVE', 'Leave')
-const worse = (run: RunState, normal: number, asc: number) => run.asc >= 15 ? asc : normal
-const cost = (amount: number) => (run: RunState) => run.gold < amount
-const remove = (id: string, label: string, description = 'Remove 1 card.'): EventChoiceDef => choice(id, label, description, { requiresSelection: 'remove', disabled: run => !run.deck.some(c => c.defId !== 'ASCENDERS_BANE') })
-const upgrade = (id: string): EventChoiceDef => choice(id, 'Upgrade', 'Upgrade 1 card.', { requiresSelection: 'upgrade', disabled: run => !run.deck.some(canUpgradeCard) })
-const transform = (id: string): EventChoiceDef => choice(id, 'Transform', 'Transform 1 card.', { requiresSelection: 'transform', disabled: run => !run.deck.some(c => c.defId !== 'ASCENDERS_BANE') })
-const event = (id: EventId, title: string, body: string, choices: EventDef['choices'], eligible?: EventDef['eligible']): EventDef => ({ id, title, body, choices, eligible })
+import { choice, leave, worse, cost, remove, upgrade, transform, event } from './helpers'
+import { ADDITIONAL_EVENTS } from './additionalDefinitions'
+import { resolveCard } from '../cards'
+import type { EventDef, EventId } from './model'
 
 export const EVENT_DEFS: Record<EventId, EventDef> = {
+    ...ADDITIONAL_EVENTS,
     WORLD_OF_GOOP: event('WORLD_OF_GOOP', 'World of Goop', 'Gold lies beneath a pool of burning slime.', run => [choice('WORLD_OF_GOOP_REACH', 'Reach in', 'Lose 11 HP. Gain 75 Gold.'), choice('WORLD_OF_GOOP_LEAVE', 'Leave', `Lose ${run.asc >= 15 ? '35–75' : '20–50'} Gold.`)]),
     CLERIC: event('CLERIC', 'The Cleric', 'A cleric offers healing and a lighter deck.', run => [choice('CLERIC_HEAL', 'Heal', 'Pay 35 Gold. Heal 25% max HP.', { disabled: cost(35) }), { ...remove('CLERIC_PURGE', 'Purge', `Pay ${worse(run, 50, 75)} Gold. Remove 1 card.`), disabled: cost(worse(run, 50, 75)) }, leave()], run => run.gold >= 35),
     UPGRADE_SHRINE: event('UPGRADE_SHRINE', 'Upgrade Shrine', 'The shrine can sharpen one of your techniques.', () => [upgrade('UPGRADE_SHRINE_UPGRADE'), leave()]),
@@ -28,7 +21,7 @@ export const EVENT_DEFS: Record<EventId, EventDef> = {
     THE_LIBRARY: event('THE_LIBRARY', 'The Library', 'Books and a quiet reading chair await you.', run => [choice('LIBRARY_READ', 'Read', 'Choose 1 of 20 cards.', { requiresSelection: 'reward' }), choice('LIBRARY_SLEEP', 'Sleep', `Heal ${worse(run, 33, 20)}% max HP.`)]),
     GOLDEN_SHRINE: event('GOLDEN_SHRINE', 'Golden Shrine', 'Gold has collected around the shrine.', run => [choice('SHRINE_PRAY', 'Pray', `Gain ${worse(run, 100, 50)} Gold.`), choice('SHRINE_DESECRATE', 'Desecrate', 'Gain 275 Gold. Obtain Regret.'), leave()]),
     TRANSMOGRIFIER: event('TRANSMOGRIFIER', 'Transmogrifier', 'The machine can exchange one card for another.', () => [transform('TRANSMOGRIFY'), leave()]),
-    DUPLICATOR: event('DUPLICATOR', 'Duplicator', 'The machine can copy one card, including its upgrades.', () => [choice('DUPLICATE', 'Copy', 'Obtain a copy of a card.', { requiresSelection: 'copy' }), leave()]),
+    DUPLICATOR: event('DUPLICATOR', 'Duplicator', 'The machine can copy one card, including its upgrades.', () => [choice('DUPLICATE', 'Copy', 'Obtain a copy of a card.', { requiresSelection: 'copy' }), leave()], r => r.act >= 2),
     WHEEL_OF_CHANGE: event('WHEEL_OF_CHANGE', 'Wheel of Change', 'The wheel must turn before you can continue.', run => run.eventState?.step === 'remove' ? [remove('WHEEL_REMOVE', 'Remove a card')] : [choice('WHEEL_SPIN', 'Spin', 'One of six outcomes: Gold, relic, healing, curse, removal, or damage.')]),
     FALLING: event('FALLING', 'Falling', 'You must release something to catch the ledge.', run => {
         const cards = (run.eventState?.cards ?? []).map(id => run.deck.find(c => c.instanceId === id)).filter(c => c !== undefined)

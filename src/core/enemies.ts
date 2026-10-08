@@ -1,3 +1,4 @@
+import { EVENT_ENEMIES } from './enemies/eventEnemies'
 import type { CardType, CombatState, EnemyState } from './state'
 import type { Engine } from './engine'
 import { RNG } from './rng'
@@ -9,7 +10,7 @@ import type { EnemySpec } from './enemies/model'
 export type { EnemySpec } from './enemies/model'
 export type { EnemyIntent as Intent } from './state'
 
-export const ENEMIES: Record<string, EnemySpec> = { ...ACT_ONE_ENEMIES, ...ACT_TWO_ENEMIES, ...ACT_THREE_ENEMIES, ...ACT_FOUR_ENEMIES }
+export const ENEMIES: Record<string, EnemySpec> = { ...EVENT_ENEMIES, ...ACT_ONE_ENEMIES, ...ACT_TWO_ENEMIES, ...ACT_THREE_ENEMIES, ...ACT_FOUR_ENEMIES }
 
 export function createEnemyState(key: string, id: string, asc = 0, rng = new RNG(`${key}-${id}`)): EnemyState {
     const spec = ENEMIES[key]
@@ -25,7 +26,8 @@ export function createEnemyState(key: string, id: string, asc = 0, rng = new RNG
 export function createEnemyFromSpec(rng: RNG, key: string, id: string): EnemyState {
     const enemy = createEnemyState(key, id, 0, rng)
     enemy.intent = rollEngineIntentForEnemy(rng, enemy, {
-        player: { id: 'player', hp: 80, maxHp: 80, block: 0, energy: 3, powers: [], hand: [], deck: [], drawPile: [], discardPile: [], exhaustPile: [] },
+        player: { id: 'player', character: 'ironclad', orbs: [], orbSlots: 0, stance: 'neutral', hp: 80, maxHp: 80, block: 0, energy: 3, powers: [], hand: [], deck: [], drawPile: [], discardPile: [], exhaustPile: [] },
+        orbsChanneled: { lightning: 0, frost: 0, dark: 0, plasma: 0 }, discardsThisTurn: 0,
         enemies: [enemy], turn: 'player', victory: false, defeat: false, limbo: [], cardRuntime: {},
     })
     return enemy
@@ -44,6 +46,7 @@ export function onEnemyHitByPlayerAttack(engine: Engine, enemy: EnemyState, dama
     if (enemy.specId) ENEMIES[enemy.specId]?.onHitByPlayerAttack?.(engine, enemy, damage)
 }
 export function onPlayerCardPlayed(engine: Engine, enemy: EnemyState, cardType: CardType): void {
+    if (enemy.hp > 0 && enemy.specId !== 'GIANT_HEAD' && enemy.powers.some(power => power.id === 'SLOW' && power.stacks > 0)) enemy.aiState = { ...enemy.aiState, slow: Number(enemy.aiState?.slow ?? 0) + 1 }
     if (enemy.specId && enemy.hp > 0) ENEMIES[enemy.specId]?.onPlayerCardPlayed?.(engine, enemy, cardType)
 }
 export function onCardEffectsResolved(engine: Engine, enemy: EnemyState): void {

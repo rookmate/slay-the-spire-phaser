@@ -1,3 +1,11 @@
+import { ChestScene } from './scenes/Chest'
+import { InventoryScene } from './scenes/Inventory'
+import { SettingsScene } from './scenes/Settings'
+import { RunHistoryScene } from './scenes/RunHistory'
+import { StartingDeckScene } from './scenes/StartingDeck'
+import { BlightChestScene } from './scenes/BlightChest'
+import { CustomModifiersScene } from './scenes/CustomModifiers'
+import { RelicAcquisitionScene } from './scenes/RelicAcquisition'
 import Phaser from 'phaser'
 import { BootScene } from './scenes/Boot'
 import { CombatScene } from './scenes/Combat'
@@ -18,6 +26,7 @@ const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
   width: 800,
   height: 450,
+  dom: { createContainer: true },
   parent: 'app',
   backgroundColor: '#1a1a1a',
   scale: {
@@ -32,7 +41,7 @@ const config: Phaser.Types.Core.GameConfig = {
       height: 1080
     }
   },
-  scene: [BootScene, MainMenuScene, NeowScene, MapScene, CombatScene, EventScene, CampfireScene, ShopScene, RewardsScene, BossRelicScene, RunSummaryScene, DeckBuilderScene],
+  scene: [BootScene, ChestScene, InventoryScene, SettingsScene, RunHistoryScene, StartingDeckScene, BlightChestScene, CustomModifiersScene, RelicAcquisitionScene, MainMenuScene, NeowScene, MapScene, CombatScene, EventScene, CampfireScene, ShopScene, RewardsScene, BossRelicScene, RunSummaryScene, DeckBuilderScene],
 }
 
 export function createGame(): Phaser.Game {

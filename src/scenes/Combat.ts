@@ -1,8 +1,9 @@
+import { recordCombatStats } from '../core/score'
 import { finishBossCombat } from '../core/campaign'
 import { getRunDestination } from '../core/progression'
 import Phaser from 'phaser'
 import { affectsRoomTier } from '../core/ascension'
-import { applyCombatVictory, createCombatEngine } from '../core/combat'
+import { applyCombatEscape, applyCombatVictory, createCombatEngine } from '../core/combat'
 import type { Engine } from '../core/engine'
 import { loadMeta } from '../core/meta'
 import type { RunState } from '../core/run'
@@ -67,8 +68,7 @@ export class CombatScene extends Phaser.Scene {
         this.ui.onUsePotion((potionIndex, targets) => {
             const potionId = this.run.potions[potionIndex]
             if (!potionId) return
-            const events = this.engine.usePotion(potionId, targets)
-            this.run.potions.splice(potionIndex, 1)
+            const events = this.engine.usePotionAtIndex(potionIndex, targets)
             this.ui.apply(events)
             this.ui.refreshRunData(this.run)
             this.checkOutcome()
@@ -87,11 +87,18 @@ export class CombatScene extends Phaser.Scene {
     }
 
     private handleVictory(): void {
+        if (this.engine.state.escaped) {
+            applyCombatEscape(this.run, this.engine.state.player, this.roomKind)
+            saveRun(this.run); this.scene.start('Map', { run: this.run }); return
+        }
+        recordCombatStats(this.run, this.engine, this.roomKind)
         applyCombatVictory(this.run, this.engine.state.player)
         this.run.pendingRoom = undefined
         if (this.run.eventCombat) {
             const rewards = this.run.eventCombat.rewards
-            this.run.eventCombat = undefined; this.run.eventState = undefined
+            if (this.run.eventCombat.resumeEvent) this.run.rewardReturnRoom = { scene: 'Event' }
+            else this.run.eventState = undefined
+            this.run.eventCombat = undefined
             this.run.pendingRoom = { scene: 'Rewards', rewards }; saveRun(this.run)
             this.scene.start('Rewards', { run: this.run, rewards }); return
         }
@@ -115,6 +122,7 @@ export class CombatScene extends Phaser.Scene {
     }
 
     private handleDefeat(): void {
+        recordCombatStats(this.run, this.engine, this.roomKind)
         this.run.player.hp = 0
         this.scene.start('RunSummary', { run: this.run, result: 'defeat' as const })
     }

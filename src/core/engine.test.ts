@@ -36,7 +36,7 @@ function playAndResolve(engine: Engine, card: CardInstance, targets: string[]): 
 
 describe('deferred card systems', () => {
     it('creates new runs with instance ids and upgrade levels', () => {
-        const run = createNewRun('run-seed')
+        const run = createNewRun({ seed: 'run-seed' })
 
         expect(run.deck).toHaveLength(10)
         expect(run.deck.every(card => typeof card.instanceId === 'string' && card.upgradeLevel === 0)).toBe(true)
@@ -46,7 +46,7 @@ describe('deferred card systems', () => {
     })
 
     it('creates ascension runs with lowered maximum and current HP at a14+', () => {
-        const run = createNewRun('a14-seed', 14)
+        const run = createNewRun({ seed: 'a14-seed', ascension: 14 })
 
         expect(run.asc).toBe(14)
         expect(run.player.maxHp).toBe(75)
@@ -69,31 +69,32 @@ describe('deferred card systems', () => {
         const meta = { bestAscensionUnlocked: 0, totalWins: 0, totalRuns: 0, ironcladUnlockTier: 0, unlockedCardIds: [], unlockedRelicIds: [] }
 
         expect(getEffectiveUnlockedCardIds(meta).has('CLEAVE')).toBe(true)
-        expect(getEffectiveUnlockedCardIds(meta).has('ARMAMENTS')).toBe(false)
+        expect(getEffectiveUnlockedCardIds(meta).has('LIMIT_BREAK')).toBe(false)
         expect(getEffectiveUnlockedRelicIds(meta).has('ANCHOR')).toBe(true)
-        expect(getEffectiveUnlockedRelicIds(meta).has('STRAWBERRY')).toBe(false)
+        expect(getEffectiveUnlockedRelicIds(meta).has('OMAMORI')).toBe(false)
 
         const bundle = grantNextIroncladUnlock(meta)
         expect(bundle?.tier).toBe(1)
         expect(meta.ironcladUnlockTier).toBe(1)
-        expect(getEffectiveUnlockedCardIds(meta).has('ARMAMENTS')).toBe(true)
-        expect(getEffectiveUnlockedRelicIds(meta).has('STRAWBERRY')).toBe(true)
+        expect(getEffectiveUnlockedCardIds(meta).has('LIMIT_BREAK')).toBe(true)
+        expect(getEffectiveUnlockedRelicIds(meta).has('OMAMORI')).toBe(false)
     })
 
-    it('extends the ironclad unlock track to ten tiers and grants tier seven after six wins', () => {
+    it('completes the five original Ironclad unlock tiers', () => {
         const meta = { bestAscensionUnlocked: 0, totalWins: 0, totalRuns: 0, ironcladUnlockTier: 0, unlockedCardIds: [], unlockedRelicIds: [] }
 
-        for (let i = 0; i < 6; i++) grantNextIroncladUnlock(meta)
+        for (let i = 0; i < 4; i++) grantNextIroncladUnlock(meta)
         const bundle = grantNextIroncladUnlock(meta)
 
-        expect(bundle?.tier).toBe(7)
-        expect(meta.ironcladUnlockTier).toBe(7)
+        expect(bundle?.tier).toBe(5)
+        expect(meta.ironcladUnlockTier).toBe(5)
+        expect(grantNextIroncladUnlock(meta)).toBeUndefined()
         expect(getEffectiveUnlockedCardIds(meta).has('DISARM')).toBe(true)
         expect(getEffectiveUnlockedRelicIds(meta).has('HAPPY_FLOWER')).toBe(true)
     })
 
     it('rolls deterministic neow options and applies rewards', () => {
-        const run = createNewRun('neow-seed')
+        const run = createNewRun({ seed: 'neow-seed' })
         const meta = {
             bestAscensionUnlocked: 0,
             totalWins: 0,
@@ -332,7 +333,7 @@ describe('deferred card systems', () => {
     })
 
     it('new relic hooks and boss relic rules work in combat and campfire helpers', () => {
-        const run = createNewRun('new-relics-seed')
+        const run = createNewRun({ seed: 'new-relics-seed' })
         run.relics = ['HAPPY_FLOWER', 'PAPER_FROG', 'MERCURY_HOURGLASS', 'CHARONS_ASHES', 'MARK_OF_PAIN', 'PHILOSOPHERS_STONE', 'COFFEE_DRIPPER']
         run.relicState = {}
         const player = createPlayerWithHand(['SECOND_WIND', 'DEFEND', 'STRIKE'])
@@ -417,7 +418,7 @@ describe('deferred card systems', () => {
     })
 
     it('omamori blocks the next two curses, including parasite max hp loss', () => {
-        const run = createNewRun('omamori-seed')
+        const run = createNewRun({ seed: 'omamori-seed' })
         applyRelicAcquisition(run, 'OMAMORI')
 
         const beforeMaxHp = run.player.maxHp
@@ -433,7 +434,7 @@ describe('deferred card systems', () => {
     })
 
     it('akabeko buffs the first attack card across repeated hits and bag of marbles applies vulnerable at combat start', () => {
-        const run = createNewRun('akabeko-seed')
+        const run = createNewRun({ seed: 'akabeko-seed' })
         run.relics = ['AKABEKO', 'BAG_OF_MARBLES']
         run.relicState = {}
         const player = createPlayerWithHand(['WHIRLWIND'])
@@ -451,7 +452,7 @@ describe('deferred card systems', () => {
     })
 
     it('orichalcum, centennial puzzle, and horn cleat trigger from relic hooks', () => {
-        const run = createNewRun('hook-relics')
+        const run = createNewRun({ seed: 'hook-relics' })
         run.relics = ['ORICHALCUM', 'CENTENNIAL_PUZZLE', 'HORN_CLEAT']
         run.relicState = {}
         const player = createPlayerWithHand([])
@@ -736,7 +737,7 @@ describe('deferred card systems', () => {
     })
 
     it('applies ascension hallway gold, shop, and map modifiers', () => {
-        const ascRun = createNewRun('asc-run', 16)
+        const ascRun = createNewRun({ seed: 'asc-run', ascension: 16 })
         const meta = {
             bestAscensionUnlocked: 0,
             totalWins: 0,
@@ -763,7 +764,7 @@ describe('deferred card systems', () => {
     })
 
     it('applies boss relic hooks and boss reward generation', () => {
-        const run = createNewRun('boss-relic-seed')
+        const run = createNewRun({ seed: 'boss-relic-seed' })
         applyRelicAcquisition(run, 'BLACK_BLOOD')
 
         expect(run.relics).not.toContain('BURNING_BLOOD')
@@ -824,7 +825,7 @@ describe('deferred card systems', () => {
     })
 
     it('resolves seeded act one events with curse and economy effects', () => {
-        const run = createNewRun('event-seed')
+        const run = createNewRun({ seed: 'event-seed' })
         const eventId = generateEvent(1, `${run.seed}-event-floor`)
 
         expect(getEventPool(1)).toContain(eventId)
@@ -844,14 +845,14 @@ describe('deferred card systems', () => {
         resolveEventChoice(run, meta, 'GOLDEN_IDOL', 'IDOL_INJURY', 'idol-seed')
         expect(run.deck.some(card => card.defId === 'INJURY')).toBe(true)
 
-        const secondRun = createNewRun('event-seed-2')
+        const secondRun = createNewRun({ seed: 'event-seed-2' })
         resolveEventChoice(secondRun, meta, 'BIG_FISH', 'BIG_FISH_BOX', 'fish-seed')
         expect(secondRun.relics.length).toBeGreaterThan(1)
         expect(secondRun.deck.some(card => card.defId === 'REGRET')).toBe(true)
     })
 
     it('supports transform events deterministically and act two event pools', () => {
-        const run = createNewRun('transform-seed')
+        const run = createNewRun({ seed: 'transform-seed' })
         const meta = {
             bestAscensionUnlocked: 0,
             totalWins: 0,

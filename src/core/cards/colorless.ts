@@ -1,9 +1,11 @@
+import { ADDITIONAL_COLORLESS } from './colorlessAdditional'
 import { canUpgradeCard, resolveCard } from '../cards'
 import type { CardDef } from '../state'
 import { attackAmount } from './helpers'
 
 const upgraded = (level: number, base: number, plus: number) => level > 0 ? plus : base
 export const COLORLESS_CARDS: Record<string, CardDef> = {
+    ...ADDITIONAL_COLORLESS,
     FINESSE: {
         id: 'FINESSE', name: 'Finesse', cost: 0, type: 'skill', rarity: 'uncommon', baseBlock: 2, upgrade: { baseBlock: 4 },
         description: () => 'Draw 1.', onPlay: ({ engine, source, card }) => {

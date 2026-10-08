@@ -28,6 +28,7 @@ function slime(id: string, name: string, hp: readonly [number, number], highHp: 
             const children = [0, 1].map(i => {
                 const child = createEnemyState(key, `${enemy.id}-${i}`, enemy.asc, engine.rng)
                 child.maxHp = child.hp = enemy.hp
+                child.aiState = { ...child.aiState, inheritedHp: true }
                 return child
             })
             engine.removeEnemy(enemy.id); engine.spawnEnemies(children)
@@ -126,6 +127,7 @@ export const ACT_ONE_ENEMIES: Record<string, EnemySpec> = {
             const children = ['ACID_SLIME_L', 'SPIKE_SLIME_L'].map((id, index) => {
                 const child = createEnemyState(id, `${enemy.id}-${index}`, enemy.asc, engine.rng)
                 child.maxHp = child.hp = enemy.hp
+                child.aiState = { ...child.aiState, inheritedHp: true }
                 return child
             })
             engine.removeEnemy(enemy.id); engine.spawnEnemies(children)

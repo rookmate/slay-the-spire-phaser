@@ -1,9 +1,13 @@
+import { selectCombatCardPool } from '../contentPools'
+import { IRONCLAD_ATTACKS } from './ironcladAttacks'
+import { IRONCLAD_SKILLS } from './ironcladSkills'
+import { POWER_CARDS } from './power'
 import type { CardDef } from '../state'
-import { CARD_DEFS, resolveCard } from '../cards'
+import { resolveCard } from '../cards'
 import { attackAmount } from './helpers'
 
 /** The remaining Ironclad cards; callbacks resolve against the shared combat engine. */
-export const REMAINING_IRONCLAD_CARDS: Record<string, CardDef> = {
+const ADDITIONAL_CARDS: Record<string, CardDef> = {
     BLOOD_FOR_BLOOD: {
         id: 'BLOOD_FOR_BLOOD', name: 'Blood for Blood', type: 'attack', rarity: 'uncommon', cost: 4,
         baseDamage: 18, upgrade: { cost: 3, baseDamage: 22 }, targeting: { type: 'single_enemy', required: true },
@@ -20,8 +24,8 @@ export const REMAINING_IRONCLAD_CARDS: Record<string, CardDef> = {
         id: 'INFERNAL_BLADE', name: 'Infernal Blade', type: 'skill', rarity: 'uncommon', cost: 1,
         upgrade: { cost: 0 }, exhaust: true,
         onPlay: ({ engine }) => {
-            const attacks = Object.values(CARD_DEFS).filter(def => def.color === 'ironclad' && def.type === 'attack' && def.rarity !== 'basic' && def.poolEnabled)
-            const id = attacks[engine.randomInt?.(0, attacks.length - 1) ?? 0].id
+            const attacks = selectCombatCardPool(engine, { source: 'generated', type: 'attack' })
+            const id = attacks[engine.randomInt(0, attacks.length - 1)]
             for (const card of engine.createCardsInDestination?.(id, 'hand') ?? []) card.costForTurn = 0
         },
     },
@@ -42,3 +46,5 @@ export const REMAINING_IRONCLAD_CARDS: Record<string, CardDef> = {
         },
     },
 }
+
+export const IRONCLAD_CARDS: Record<string, CardDef> = { ...ADDITIONAL_CARDS, ...POWER_CARDS, ...IRONCLAD_ATTACKS, ...IRONCLAD_SKILLS }
