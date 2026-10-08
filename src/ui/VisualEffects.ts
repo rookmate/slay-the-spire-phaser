@@ -6,6 +6,7 @@ import { COMBAT_UI_CONFIG } from './CombatUIConfig'
 export class VisualEffects {
     private scene: Phaser.Scene
     private damageNumbers: Phaser.GameObjects.Text[] = []
+    private impacts = new Set<Phaser.GameObjects.Graphics>()
     private damageNumberPool: Phaser.GameObjects.Text[] = []
 
     constructor(scene: Phaser.Scene) {
@@ -15,6 +16,7 @@ export class VisualEffects {
     showDamageNumber(amount: number, x: number, y: number, isHealing = false): void {
         playCue(isHealing ? 'heal' : 'damage')
         const reducedMotion = loadSettings().reducedMotion
+        if (this.damageNumbers.length >= 20) return
         // Get or create a damage number text object
         let damageText = this.damageNumberPool.pop()
         if (!damageText) {
@@ -58,12 +60,29 @@ export class VisualEffects {
         })
     }
 
+    showImpact(x: number, y: number, kind: 'hit' | 'block' | 'power' | 'orb' | 'stance', color = 0xe3c698): void {
+        if (loadSettings().reducedMotion || this.impacts.size >= 20) return
+        const mark = this.scene.add.graphics({ x, y }).setDepth(90)
+        this.impacts.add(mark)
+        mark.lineStyle(kind === 'hit' ? 4 : 2, color, 0.9)
+        if (kind === 'hit') {
+            mark.lineBetween(-22, 20, 22, -20); mark.lineBetween(-8, 26, 25, -8)
+        } else if (kind === 'block') {
+            mark.strokePoints([{ x: -20, y: -20 }, { x: 20, y: -20 }, { x: 18, y: 10 }, { x: 0, y: 25 }, { x: -18, y: 10 }], true)
+        } else {
+            mark.strokeCircle(0, 0, kind === 'stance' ? 38 : 22)
+            for (let i = 0; i < 4; i++) { const angle = i * Math.PI / 2; mark.lineBetween(Math.cos(angle) * 28, Math.sin(angle) * 28, Math.cos(angle) * 35, Math.sin(angle) * 35) }
+        }
+        this.scene.tweens.add({ targets: mark, alpha: 0, scale: kind === 'hit' ? 1.15 : 1.4, duration: 240, onComplete: () => { this.impacts.delete(mark); mark.destroy() } })
+    }
+
     screenShake(intensity: number = 1, duration: number = COMBAT_UI_CONFIG.animations.screenShakeDuration): void {
         if (loadSettings().reducedMotion) return
         this.scene.cameras.main.shake(duration, intensity * COMBAT_UI_CONFIG.animations.screenShakeIntensity)
     }
 
     flashText(text: Phaser.GameObjects.Text, color: number = 0xff4444, duration: number = 60): void {
+        if (loadSettings().reducedMotion) return
         this.scene.tweens.add({
             targets: text,
             tint: color,
@@ -75,6 +94,9 @@ export class VisualEffects {
     }
 
     destroy(): void {
+        for (const mark of this.impacts) { this.scene.tweens.killTweensOf(mark); mark.destroy() }
+        this.impacts.clear()
+        for (const text of this.damageNumbers) this.scene.tweens.killTweensOf(text)
         // Clean up all active damage numbers
         this.damageNumbers.forEach(text => text.destroy())
         this.damageNumberPool.forEach(text => text.destroy())

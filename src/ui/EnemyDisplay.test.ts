@@ -19,6 +19,7 @@ class View {
         this.texture = texture
     }
     setScale() { return this }
+    setDisplaySize() { return this }
     setInteractive() { return this }
     setOrigin() { return this }
     setAlpha() { return this }
@@ -33,6 +34,7 @@ function displayFor(specId: 'GREMLIN_LEADER' | 'SLIME_BOSS') {
     const scene = {
         cameras: { main: { width: 800, height: 450 } },
         add: {
+            rectangle: (x: number, y: number) => new View(x, y, ''),
             image: (x: number, y: number, texture: string) => new View(x, y, texture),
             text: (x: number, y: number, text: string) => new View(x, y, text),
         },

@@ -1,3 +1,5 @@
+import { drawBattlefield } from '../ui/Battlefield'
+import { playCue } from '../ui/sound'
 import { finishCombat } from '../core/rooms'
 import { getRunDestination } from '../core/progression'
 import Phaser from 'phaser'
@@ -22,6 +24,7 @@ export class CombatScene extends Phaser.Scene {
 
     create(data: { run: RunState; roomKind?: RoomKind }): void {
         this.run = data.run
+        drawBattlefield(this, this.run.act)
         this.roomKind = data.roomKind ?? 'monster'
         this.meta = loadMeta()
         this.engine = createCombatEngine(this.run, this.roomKind)
@@ -79,6 +82,7 @@ export class CombatScene extends Phaser.Scene {
     }
 
     private handleOutcome(): void {
+        playCue(this.engine.state.defeat ? 'defeat' : 'victory')
         const result = finishCombat(this.run, this.engine, this.roomKind, this.meta)
         saveRun(this.run)
         if (result) this.scene.start('RunSummary', { run: this.run, result })

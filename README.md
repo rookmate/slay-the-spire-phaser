@@ -101,3 +101,7 @@ Rules were checked against original-game references for
 [events](https://slaythespire.wiki.gg/wiki/Events),
 [potions](https://slaythespire.wiki.gg/wiki/Potions), and
 [custom modes](https://slaythespire.wiki.gg/wiki/Custom_Mode).
+
+Presentation uses original SVG portraits for all four characters and all 68 enemy IDs. Each act has its own combat backdrop and synthesized musical theme. Settings control master, music, and effects volume separately; reduced motion disables shakes, flashes, and impact motion. Audio starts after a click or keypress and pauses in hidden tabs.
+
+Hover a card, tap its `?`, or press Alt+1–0 in combat to read its complete rules. Escape closes hand inspection. The inspection button also works on locked cards and inside card-choice dialogs.
