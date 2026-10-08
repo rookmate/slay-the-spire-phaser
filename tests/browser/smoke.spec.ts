@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { createNewRun } from '../../src/core/run'
 import { createCardInstance } from '../../src/core/cards'
-import { boot, clickCard, clickPoint, clickText, dragCard, expectScene, inspect, reloadRun } from './driver'
+import { boot, clickCard, clickPoint, clickText, dragCard, expectScene, inspect, readSavedProgress, reloadRun } from './driver'
 
 test('draws the whole hand, plays by dragging, ends a turn, and resumes combat', async ({ page }) => {
     const run = createNewRun({ seed: 'browser-combat' })
@@ -86,13 +86,13 @@ test('defeat clears the save and records the result only once across reload', as
     for (let turn = 0; turn < 5 && (await inspect(page)).scene === 'Combat'; turn++) await clickText(page, 'End Turn')
     await expectScene(page, 'RunSummary')
     expect((await inspect(page)).texts.some(t => t.text === 'Ironclad · DEFEAT')).toBe(true)
-    const before = await page.evaluate(() => ({ run: localStorage.getItem('sts_run_v7'), meta: JSON.parse(localStorage.getItem('sts_meta_v2')!) }))
+    const before = await readSavedProgress(page)
     expect(before.run).toBeNull()
     expect(before.meta.totalRuns).toBe(1)
     expect(before.meta.totalWins).toBe(0)
     await page.reload()
     await page.waitForFunction(() => window.__testGame?.scene.isActive('MainMenu'))
-    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('sts_meta_v2')!))).toEqual(before.meta)
+    expect(await readSavedProgress(page)).toEqual(before)
     expect(errors).toEqual([])
 })
 

@@ -7,6 +7,7 @@ import type { Card } from '../../src/ui/Card'
 import type { NeowOption } from '../../src/core/neow'
 import type { RewardBundle } from '../../src/core/rewards'
 import type { ShopInventory } from '../../src/core/progression'
+import type { MetaState } from '../../src/core/meta'
 
 type SceneView = Phaser.Scene & {
     engine?: Engine
@@ -100,6 +101,14 @@ export async function dragCard(page: Page, id: string, enemyIndex?: number) {
 
 export async function expectScene(page: Page, name: string) {
     await expect.poll(async () => (await inspect(page)).scene).toBe(name)
+}
+
+export async function readSavedProgress(page: Page) {
+    return page.evaluate(() => {
+        // Displaying a notice drains its queue independently of saved progression.
+        const { notifications: _notifications, ...meta } = JSON.parse(localStorage.getItem('sts_meta_v2')!) as MetaState
+        return { run: localStorage.getItem('sts_run_v7'), meta }
+    })
 }
 
 export async function boot(page: Page, run?: RunState) {
