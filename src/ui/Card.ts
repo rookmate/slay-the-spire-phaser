@@ -1,9 +1,12 @@
+import { cardDescription } from '../core/cardText'
+import type { Engine } from '../core/engine'
 import Phaser from 'phaser'
 import { resolveCard } from '../core/cards'
 import type { CardInstance } from '../core/state'
 import { CARD_SIZE } from './layout'
 
 export interface CardOptions {
+    engine?: Engine
     x: number
     y: number
     scale?: number
@@ -68,16 +71,10 @@ export class Card extends Phaser.GameObjects.Container {
             wordWrap: { width: w - 16 },
         })
 
-        const stats: string[] = []
-        if (def.baseDamage) stats.push(`DMG ${def.baseDamage}`)
-        if (def.baseBlock) stats.push(`BLK ${def.baseBlock}`)
-        if (def.ethereal) stats.push('ETH')
-        if (def.exhaust) stats.push('EXH')
-        this.stats = scene.add.text(8, 96, stats.join('\n'), {
-            fontFamily: 'monospace',
-            fontSize: '12px',
-            color: '#ddd'
+        this.stats = scene.add.text(8, 80, cardDescription(card, opts.engine), {
+            fontFamily: 'monospace', fontSize: '10px', color: '#ddd', wordWrap: { width: w - 16 },
         })
+        this.fitDescription()
 
         if (locked) {
             this.stateBadge = scene.add.text(8, h - 44, 'LOCKED', {
@@ -136,6 +133,16 @@ export class Card extends Phaser.GameObjects.Container {
 
     setSelected(selected: boolean): void {
         this.selectionArea.setStrokeStyle(selected ? 4 : 2, selected ? 0xffeb3b : 0xffffff)
+    }
+
+    setCombatPreview(engine: Engine, targetId?: string): void {
+        this.stats.setText(cardDescription(this.card, engine, targetId))
+        this.fitDescription()
+    }
+
+    private fitDescription(): void {
+        this.stats.setFontSize(10)
+        if (this.stats.height > 92) this.stats.setFontSize(9)
     }
 
     getCardInstance(): CardInstance {

@@ -27,7 +27,7 @@ export const POTION_DEFS: Record<PotionId, PotionDef> = {
         use: (engine, targets) => {
             const target = targets[0]
             if (!target) return
-            engine.enqueue({ kind: 'DealDamage', source: engine.state.player.id, target, amount: 20 })
+            engine.enqueue({ kind: 'DealDamage', source: engine.state.player.id, target, amount: 20, damageType: 'effect' })
         },
     },
     BLOCK_POTION: {
@@ -84,7 +84,7 @@ export const POTION_DEFS: Record<PotionId, PotionDef> = {
         description: 'Deal 10 damage to all enemies.',
         use: (engine) => {
             for (const enemy of engine.state.enemies) {
-                if (enemy.hp > 0) engine.enqueue({ kind: 'DealDamage', source: engine.state.player.id, target: enemy.id, amount: 10 })
+                if (enemy.hp > 0) engine.enqueue({ kind: 'DealDamage', source: engine.state.player.id, target: enemy.id, amount: 10, damageType: 'effect' })
             }
         },
     },

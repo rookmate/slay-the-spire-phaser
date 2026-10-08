@@ -90,6 +90,8 @@ export class DragSystem {
     }
 
     updateDrag(pointer: Phaser.Input.Pointer): void {
+        const target = this.getEnemyAtPoint?.(pointer.worldX, pointer.worldY) ?? -1
+        this.dragCard?.setCombatPreview(this.engine, this.engine.state.enemies[target]?.id)
         if (!this.isDragging || !this.dragCard) return
 
         // Update original card position to follow cursor

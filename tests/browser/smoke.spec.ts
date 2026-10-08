@@ -107,6 +107,17 @@ test('five enemies and multiple effects stay above the hand; hover shows every e
     const errors = await boot(page, run)
     const ui = await inspect(page)
     expect(ui.enemies).toHaveLength(5)
+    const controls = ui.texts.filter(text => text.enabled && (text.text.endsWith('Potion') || ['Discard', 'Exhaust', 'End Turn'].includes(text.text)))
+    expect(controls).toHaveLength(6)
+    for (const [index, a] of controls.entries()) {
+        for (const b of controls.slice(index + 1)) {
+            const overlaps = a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y
+            expect(overlaps, `${a.text} overlaps ${b.text}`).toBe(false)
+        }
+    }
+    await clickText(page, 'Exhaust')
+    expect((await inspect(page)).texts.some(text => text.text === 'Exhaust Pile')).toBe(true)
+    await clickText(page, 'Close')
     for (const [index, enemy] of ui.enemies.entries()) {
         expect(enemy.bounds.x).toBeGreaterThan(240)
         expect(enemy.bounds.x + enemy.bounds.width).toBeLessThan(800)

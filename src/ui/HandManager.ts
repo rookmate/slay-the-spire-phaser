@@ -43,7 +43,7 @@ export class HandManager {
         this.handCards.forEach(card => this.scene.tweens.killTweensOf(card))
         this.handContainer.removeAll(true)
         this.handCards = this.engine.state.player.hand.map(instance => {
-            const card = new Card(this.scene, instance, { x: 0, y: 0 })
+            const card = new Card(this.scene, instance, { x: 0, y: 0, engine: this.engine })
             this.handContainer.add(card)
             return card
         })

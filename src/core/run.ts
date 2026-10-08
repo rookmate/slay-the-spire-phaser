@@ -115,10 +115,6 @@ export function obtainCurse(run: RunState, curseId: string): CardInstance {
     }
     const card = obtainCard(run, curseId)
     run.cursesObtained = (run.cursesObtained ?? 0) + 1
-    if (curseId === 'PARASITE') {
-        run.player.maxHp = Math.max(1, run.player.maxHp - 3)
-        run.player.hp = Math.min(run.player.hp, run.player.maxHp)
-    }
     return card
 }
 
@@ -127,6 +123,10 @@ export function removeCardByInstanceId(run: RunState, instanceId: string): CardI
     if (index < 0) return undefined
     const [removed] = run.deck.splice(index, 1)
     run.cardsRemoved = (run.cardsRemoved ?? 0) + 1
+    if (removed.defId === 'PARASITE') {
+        run.player.maxHp = Math.max(1, run.player.maxHp - 3)
+        run.player.hp = Math.min(run.player.hp, run.player.maxHp)
+    }
     return removed
 }
 
