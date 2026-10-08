@@ -1,3 +1,4 @@
+import { roomBackdrop } from '../ui/theme'
 import Phaser from 'phaser'
 import { CHARACTERS } from '../core/characters'
 import { getCharacterProgress, loadMeta, saveMeta } from '../core/meta'
@@ -9,6 +10,7 @@ import { menuButton, menuText } from '../ui/menu'
 export class RunSummaryScene extends Phaser.Scene {
     constructor() { super('RunSummary') }
     create(data: { run: RunState; result: 'victory' | 'defeat' }): void {
+        roomBackdrop(this)
         const meta = loadMeta(), run = data.run
         const result = recordRunResult(meta, run, data.result), progress = getCharacterProgress(meta, run.character)
         saveMeta(meta); clearSavedRun()

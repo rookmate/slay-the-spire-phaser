@@ -1,7 +1,11 @@
 import type Phaser from 'phaser'
-export const menuText = { fontFamily: 'monospace', fontSize: '16px', color: '#ddd' }
-export function menuButton(scene: Phaser.Scene, x: number, y: number, label: string, action: () => void, enabled = true): Phaser.GameObjects.Text {
-    const button = scene.add.text(x, y, label, { ...menuText, backgroundColor: '#333333', padding: { x: 10, y: 8 } }).setAlpha(enabled ? 1 : 0.4)
+import { bodyText, palette } from './theme'
+export const menuText = bodyText
+export function menuButton(scene: Phaser.Scene, x: number, y: number, label: string, action: () => void, enabled = true, options: { primary?: boolean; width?: number; quiet?: boolean } = {}): Phaser.GameObjects.Text {
+    const background = options.quiet ? '#151512' : options.primary ? '#a8643c' : '#353126'
+    const button = scene.add.text(x, y, label, { ...menuText, fontStyle: 'bold', backgroundColor: background, fixedWidth: options.width ?? 0, align: options.width ? 'center' : 'left', padding: { x: 12, y: 8 } }).setAlpha(enabled ? 1 : 0.38).setResolution(2)
     if (enabled) button.setInteractive({ useHandCursor: true }).on('pointerdown', action)
+        .on('pointerover', () => button.setBackgroundColor(options.primary ? '#c37d4d' : '#4b4130').setColor(palette.text))
+        .on('pointerout', () => button.setBackgroundColor(background).setColor(palette.text))
     return button
 }

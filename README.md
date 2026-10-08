@@ -86,10 +86,9 @@ master. Failed checks upload screenshots, traces, and an HTML report.
 
 ## Remaining differences
 
-The original artwork, animations, music, achievement system, official daily
-leaderboards, platform integrations, and cloud saves are not reproduced. Some
-enemies share portraits or use generated placeholders; character art and sound
-cues are simplified. Scores, rare event eligibility, and modifier combinations
+The original artwork and audio, official daily leaderboards, platform
+integrations, and cloud saves are not reproduced. Enemy portraits are simplified,
+and cards share a small illustration atlas. Scores, rare event eligibility, and modifier combinations
 still need broader comparison with the original. The test suite covers many
 interactions, not every possible card/relic/enemy combination.
 
@@ -102,7 +101,9 @@ Rules were checked against original-game references for
 [potions](https://slaythespire.wiki.gg/wiki/Potions), and
 [custom modes](https://slaythespire.wiki.gg/wiki/Custom_Mode).
 
-Presentation uses original SVG portraits for all four characters and all 68 enemy IDs. Each act has its own combat backdrop and synthesized musical theme. Settings control master, music, and effects volume separately; reduced motion disables shakes, flashes, and impact motion. Audio starts after a click or keypress and pauses in hidden tabs.
+Presentation uses painted backgrounds, character portraits, and shared card illustrations, with SVG portraits for all 68 enemy IDs. The map uses room symbols and a scrollable route. Barlow fonts ship locally under the SIL Open Font License in `public/fonts/OFL.txt`; generated artwork and its prompts are recorded in [`public/art/sources.json`](public/art/sources.json). Each act has a synthesized musical theme. Settings control master, music, and effects volume separately. Audio starts after a click or keypress and pauses in hidden tabs.
+
+Targeted cards stay lifted in the hand while a curved arrow marks the selected enemy. Keyboard selection uses the same aiming display. Release over an enemy to play, or press Escape to cancel. Untargeted cards follow your drag and show when they are ready to play. Reduced motion removes card travel, shakes, flashes, and impact motion.
 
 Hover a card, tap its `?`, or press Alt+1–0 in combat to read its complete rules. Escape closes hand inspection. The inspection button also works on locked cards and inside card-choice dialogs.
 

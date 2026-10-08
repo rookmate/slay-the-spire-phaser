@@ -1,3 +1,4 @@
+import { UI_FONT, roomBackdrop } from '../ui/theme'
 import { addRunMenu } from '../ui/runMenu'
 import { flipEventCard } from '../core/events/additionalResolution'
 import { CARD_DEFS } from '../core/cards'
@@ -25,31 +26,31 @@ export class EventScene extends Phaser.Scene {
     }
     private render(): void {
         this.children.removeAll(true)
+        roomBackdrop(this)
         addRunMenu(this, this.run)
         const event = EVENT_DEFS[this.eventId]
-        this.add.rectangle(0, 0, this.scale.width, this.scale.height, 0x171717).setOrigin(0)
-        this.add.text(24, 18, event.title, { fontFamily: 'monospace', fontSize: '26px', color: '#fff' })
-        this.add.text(24, 57, event.body, { fontFamily: 'monospace', fontSize: '17px', color: '#ccc', wordWrap: { width: 750 } })
-        this.add.text(24, 92, `${this.run.player.hp}/${this.run.player.maxHp} HP    ${this.run.gold} Gold`, { fontFamily: 'monospace', fontSize: '16px', color: '#aaa' })
+        this.add.text(24, 18, event.title, { resolution: 2, fontFamily: UI_FONT, fontSize: '26px', color: '#fff' })
+        this.add.text(24, 57, event.body, { resolution: 2, fontFamily: UI_FONT, fontSize: '17px', color: '#d0c5ae', wordWrap: { width: 750 } })
+        this.add.text(24, 92, `${this.run.player.hp}/${this.run.player.maxHp} HP    ${this.run.gold} Gold`, { resolution: 2, fontFamily: UI_FONT, fontSize: '16px', color: '#b4aa94' })
         if (this.run.eventState?.matching) this.renderMatchingGame()
         getEventChoices(this.run).forEach((choice, i) => {
             const disabled = choice.disabled?.(this.run) ?? false
             const y = 132 + i * 65
-            const text = this.add.text(24, y, choice.label, { fontFamily: 'monospace', fontSize: '19px', color: disabled ? '#777' : '#fff', backgroundColor: '#2d2d2d', padding: { x: 10, y: 8 } })
+            const text = this.add.text(24, y, choice.label, { resolution: 2, fontFamily: UI_FONT, fontSize: '19px', color: disabled ? '#777' : '#fff', backgroundColor: '#353126', padding: { x: 10, y: 8 } })
             if (!disabled) text.setInteractive({ useHandCursor: true }).on('pointerdown', () => this.handleChoice(choice))
-            this.add.text(24, y + 40, choice.description ?? '', { fontFamily: 'monospace', fontSize: '14px', color: '#bbb', wordWrap: { width: 744 } })
+            this.add.text(24, y + 40, choice.description ?? '', { resolution: 2, fontFamily: UI_FONT, fontSize: '14px', color: '#bdb29d', wordWrap: { width: 744 } })
         })
-        this.add.text(24, 345, this.run.eventState?.notes?.join(' ') ?? '', { fontFamily: 'monospace', fontSize: '15px', color: '#dbc5a3', wordWrap: { width: 750 } })
-        if (this.run.eventState?.resolved) this.add.text(24, 399, 'Continue', { fontFamily: 'monospace', fontSize: '18px', color: '#fff', backgroundColor: '#333', padding: { x: 12, y: 8 } })
+        this.add.text(24, 345, this.run.eventState?.notes?.join(' ') ?? '', { resolution: 2, fontFamily: UI_FONT, fontSize: '15px', color: '#dbc5a3', wordWrap: { width: 750 } })
+        if (this.run.eventState?.resolved) this.add.text(24, 399, 'Continue', { resolution: 2, fontFamily: UI_FONT, fontSize: '18px', color: '#fff', backgroundColor: '#353126', padding: { x: 12, y: 8 } })
             .setInteractive({ useHandCursor: true }).on('pointerdown', () => this.leave())
     }
     private renderMatchingGame(): void {
         const board = this.run.eventState!.matching!
-        this.add.text(24, 119, `${board.attempts} attempts left`, { fontFamily: 'monospace', fontSize: '14px', color: '#ccc' })
+        this.add.text(24, 119, `${board.attempts} attempts left`, { resolution: 2, fontFamily: UI_FONT, fontSize: '14px', color: '#d0c5ae' })
         board.cards.forEach((id, index) => {
             const shown = board.matched.includes(index) || board.revealed.includes(index)
             const x = 24 + index % 6 * 125, y = 148 + Math.floor(index / 6) * 89
-            const tile = this.add.text(x, y, shown ? CARD_DEFS[id].name : '?', { fontFamily: 'monospace', fontSize: '13px', color: '#fff', backgroundColor: board.matched.includes(index) ? '#385132' : '#343434', fixedWidth: 115, fixedHeight: 77, padding: { x: 8, y: 8 }, wordWrap: { width: 99 } })
+            const tile = this.add.text(x, y, shown ? CARD_DEFS[id].name : '?', { resolution: 2, fontFamily: UI_FONT, fontSize: '13px', color: '#fff', backgroundColor: board.matched.includes(index) ? '#385132' : '#343434', fixedWidth: 115, fixedHeight: 77, padding: { x: 8, y: 8 }, wordWrap: { width: 99 } })
             if (!this.run.eventState!.resolved && !board.matched.includes(index)) tile.setInteractive({ useHandCursor: true }).on('pointerdown', () => { if (flipEventCard(this.run, index)) { saveRun(this.run); this.render() } })
         })
     }

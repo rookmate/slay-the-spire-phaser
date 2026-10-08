@@ -1,3 +1,4 @@
+import { roomBackdrop } from '../ui/theme'
 import Phaser from 'phaser'
 import { BLIGHTS, takeBlight } from '../core/modes/endless'
 import { advanceAct } from '../core/campaign'
@@ -8,6 +9,7 @@ export class BlightChestScene extends Phaser.Scene {
     run!: RunState
     constructor() { super('BlightChest') }
     create(data: { run: RunState }): void {
+        roomBackdrop(this)
         this.run = data.run
         this.add.text(24, 24, 'Choose a blight', { ...menuText, fontSize: '26px' })
         ;(this.run.pendingBlights ?? []).forEach((id, i) => {

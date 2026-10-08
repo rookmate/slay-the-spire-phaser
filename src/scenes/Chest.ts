@@ -1,3 +1,4 @@
+import { roomBackdrop } from '../ui/theme'
 import Phaser from 'phaser'
 import { loadMeta } from '../core/meta'
 import { openChest } from '../core/rooms'
@@ -10,6 +11,7 @@ export class ChestScene extends Phaser.Scene {
     run!: RunState
     constructor() { super('Chest') }
     create(data: { run: RunState }): void {
+        roomBackdrop(this)
         this.run = data.run
         this.add.text(24, 24, 'Treasure', { ...menuText, fontSize: '26px' })
         this.add.text(24, 120, this.run.relics.includes('CURSED_KEY') ? 'Cursed Key: opening this chest also gives you a Curse.' : 'A sealed chest waits in the room.', menuText)

@@ -1,6 +1,8 @@
 import type Phaser from 'phaser'
+import { CHARACTER_IDS } from '../core/characters'
 /** Original vector portraits for all four characters. */
 export function loadCharacterPortraits(scene: Phaser.Scene): void {
+    scene.load.image('art:characters', '/art/characters.webp')
     const frame = (body: string) => `<svg xmlns="http://www.w3.org/2000/svg" width="160" height="190" viewBox="0 0 160 190">${body}</svg>`
     const portraits = {
         ironclad: frame('<path d="m43 175 9-75 53-2 20 77-22 4-16-46-8 47-20-2-1-40-4 38Z" fill="#754c42" stroke="#c6ab85" stroke-width="3"/><path d="m48 86-25 18 2 26 30-17m48-27 20 18-3 27-27-18" fill="#ae7158" stroke="#29212a" stroke-width="3"/><path d="m51 85 29 17 25-19 6 41-31 13-31-15Z" fill="#965342"/><path d="m54 43 24-23 29 19-8 44-39 2Z" fill="#dfceb0" stroke="#322a2d" stroke-width="3"/><path d="m53 41-15-23 22 10m44 12 16-23-24 12" fill="#d6b778"/><path d="m59 53 17 6-15 7m22-8 17-7-1 14" fill="#39252a"/><path d="m69 75 21-1-11 17Z" fill="#39252a"/><path d="m25 105-7-67-7 67 10 12Z" fill="#bcc2bb" stroke="#29212a" stroke-width="3"/><path d="m6 116 33-2m-17 0 2 31" stroke="#c6a25e" stroke-width="6"/>'),
@@ -9,4 +11,18 @@ export function loadCharacterPortraits(scene: Phaser.Scene): void {
         watcher: frame('<path d="m38 178 18-82 51-2 23 99Z" fill="#675376" stroke="#c5aacd" stroke-width="3"/><path d="m54 43 23-21 30 19-7 44-42-2Z" fill="#d3af90"/><path d="m53 39 4-12 48-1 8 21-13-6-36 2Z" fill="#292531"/><path d="m58 51 45-2-2 15-41 2Z" fill="#837093"/><path d="m53 107-27 31 12 13 37-31m26-18 20 20 25-26 6 11-24 38-38-22" fill="#a98baf"/><path d="m40 175 32-55 24 7 27 48" fill="#b39ac0"/><path d="m141 32-2 150" stroke="#d0b67d" stroke-width="6"/><circle cx="141" cy="32" r="12" fill="none" stroke="#d0b67d" stroke-width="5"/>'),
     }
     for (const [id, svg] of Object.entries(portraits)) scene.load.svg(`player:${id}`, `data:image/svg+xml;base64,${btoa(svg)}`)
+}
+
+/** Keep the vector portraits as a fallback if the painted atlas cannot load. */
+export function installCharacterPortraits(scene: Phaser.Scene): void {
+    if (!scene.textures.exists('art:characters')) return
+    const atlas = scene.textures.get('art:characters').getSourceImage() as HTMLImageElement
+    const width = Math.floor(atlas.width / 2), height = Math.floor(atlas.height / 2)
+    CHARACTER_IDS.forEach((id, i) => {
+        const key = `player:${id}`
+        scene.textures.remove(key)
+        const texture = scene.textures.createCanvas(key, width, height)!
+        texture.context.drawImage(atlas, i % 2 * width, Math.floor(i / 2) * height, width, height, 0, 0, width, height)
+        texture.refresh()
+    })
 }

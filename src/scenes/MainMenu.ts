@@ -7,6 +7,7 @@ import { getRunDestination } from '../core/progression'
 import { CHARACTERS, CHARACTER_IDS, type CharacterId, type RunMode } from '../core/characters'
 import { createProfileRun, dailyConfiguration } from '../core/modes/setup'
 import { menuButton, menuText } from '../ui/menu'
+import { DISPLAY_FONT, palette } from '../ui/theme'
 import type { ModifierId } from '../core/modes/modifiers'
 
 export class MainMenuScene extends Phaser.Scene {
@@ -30,56 +31,74 @@ export class MainMenuScene extends Phaser.Scene {
     private render(): void {
         this.seedInput?.destroy(); this.seedInput = undefined
         this.children.removeAll(true)
-        const meta = loadMeta(), saved = loadRun(), progress = getCharacterProgress(meta, this.character)
-        this.add.text(24, 18, 'Slay the Spire', { ...menuText, fontSize: '28px', color: '#eee' })
-        this.add.text(24, 53, 'A Phaser fan recreation', { ...menuText, fontSize: '13px', color: '#aaa' })
-        menuButton(this, 615, 22, 'Continue', () => { if (saved) { const next = getRunDestination(saved); this.scene.start(next.scene, next.data) } }, !!saved)
+        const meta = loadMeta(), saved = loadRun(), progress = getCharacterProgress(meta, this.character), character = CHARACTERS[this.character]
+        if (this.textures.exists('art:spire')) this.add.image(400, 225, 'art:spire').setDisplaySize(800, 450)
+        this.add.rectangle(0, 0, 465, 410, palette.ink, 0.52).setOrigin(0)
+        this.add.text(32, 14, 'SLAY THE SPIRE', { resolution: 2, fontFamily: DISPLAY_FONT, fontSize: '51px', color: '#f5e7c9' }).setResolution(2)
+        this.add.text(35, 76, 'Choose your character. Begin the climb.', { ...menuText, fontSize: '13px', color: palette.muted }).setResolution(2)
+        this.add.rectangle(34, 100, 401, 1, palette.line).setOrigin(0)
+
         CHARACTER_IDS.forEach((id, i) => {
-            const unlocked = getCharacterProgress(meta, id).unlocked || this.mode === 'daily'
-            const button = menuButton(this, 24 + i * 190, 93, `${id === this.character ? '> ' : ''}${CHARACTERS[id].name}${unlocked ? '' : ' [locked]'}`, () => {
+            const unlocked = getCharacterProgress(meta, id).unlocked || this.mode === 'daily', selected = id === this.character
+            const x = 34 + i * 104
+            this.add.rectangle(x, 113, 94, 71, selected ? 0x443527 : 0x191a16, 0.92).setOrigin(0).setStrokeStyle(1, selected ? palette.copper : palette.line, selected ? 1 : 0.5)
+            this.add.image(x + 47, 136, `player:${id}`).setDisplaySize(37, 44).setAlpha(unlocked ? 1 : 0.28)
+            const button = this.add.text(x, 114, CHARACTERS[id].name, { ...menuText, fontSize: '13px', fontStyle: 'bold', align: 'center', fixedWidth: 94, fixedHeight: 69, padding: { top: 45 }, color: unlocked ? palette.text : '#958b76' }).setResolution(2)
+            button.setData('character', id)
+            if (unlocked && this.mode !== 'daily') button.setInteractive({ useHandCursor: true }).on('pointerdown', () => {
                 this.character = id; this.ascension = 0; this.replaceConfirmed = false; this.render()
-            }, unlocked && this.mode !== 'daily')
-            if (id === this.character) button.setColor(`#${CHARACTERS[id].color.toString(16).padStart(6, '0')}`)
+            }).on('pointerover', () => button.setColor(palette.gold)).on('pointerout', () => button.setColor(palette.text))
+            if (!unlocked) this.add.text(x + 76, 117, '×', { ...menuText, fontSize: '13px', color: '#9c917b' })
         })
-        this.add.text(24, 142, CHARACTERS[this.character].description, menuText)
-        this.add.text(24, 169, `HP ${CHARACTERS[this.character].maxHp}   Unlocks ${progress.unlockTier}/5${UNLOCK_XP[progress.unlockTier] ? `   XP ${progress.xp}/${UNLOCK_XP[progress.unlockTier]}` : ''}`, { ...menuText, fontSize: '14px' })
-        ;(['standard', 'seeded', 'daily', 'custom'] as const).forEach((mode, i) => menuButton(this, 24 + i * 190, 204, `${this.mode === mode ? '> ' : ''}${mode[0].toUpperCase() + mode.slice(1)}`, () => {
-            this.mode = mode; this.replaceConfirmed = false
-            if (mode === 'daily') { this.character = dailyConfiguration().character; this.ascension = 0 }
-            else if (!getCharacterProgress(meta, this.character).unlocked) this.character = 'ironclad'
-            this.render()
-        }, mode !== 'custom' || !!meta.customUnlocked))
+        this.add.text(34, 196, character.name, { resolution: 2, fontFamily: DISPLAY_FONT, fontSize: '29px', color: palette.text }).setResolution(2)
+        this.add.text(434, 204, `${character.maxHp} HP  ·  Unlocks ${progress.unlockTier}/5`, { ...menuText, fontSize: '13px', color: palette.gold }).setOrigin(1, 0).setResolution(2)
+        this.add.text(34, 234, character.description, { ...menuText, fontSize: '14px', color: '#c7bca5', wordWrap: { width: 405 } }).setResolution(2)
+        ;(['standard', 'seeded', 'daily', 'custom'] as const).forEach((mode, i) => {
+            const x = 34 + i * 104, selected = this.mode === mode
+            menuButton(this, x, 272, mode[0].toUpperCase() + mode.slice(1), () => {
+                this.mode = mode; this.replaceConfirmed = false
+                if (mode === 'daily') { this.character = dailyConfiguration().character; this.ascension = 0 }
+                else if (!getCharacterProgress(meta, this.character).unlocked) this.character = 'ironclad'
+                this.render()
+            }, mode !== 'custom' || !!meta.customUnlocked, { width: 94, quiet: true }).setFontSize(14)
+            if (selected) this.add.rectangle(x + 12, 306, 70, 2, palette.copper).setOrigin(0)
+        })
         if (this.mode === 'daily') {
             const daily = dailyConfiguration()
-            this.add.text(24, 256, `${daily.seed}\nLocal daily challenge. Scores are saved on this device.`, { ...menuText, lineSpacing: 7 })
+            this.add.text(34, 318, `${daily.seed}\nLocal challenge · scores saved on this device`, { ...menuText, fontSize: '13px', color: palette.muted, lineSpacing: 3 }).setResolution(2)
         } else {
             this.ascension = Math.min(this.ascension, this.mode === 'custom' ? 20 : progress.ascension)
-            this.add.text(24, 262, `Ascension: ${this.ascension}`, menuText)
-            menuButton(this, 198, 250, '-', () => { this.ascension = Math.max(0, this.ascension - 1); this.render() })
-            menuButton(this, 245, 250, '+', () => { this.ascension = Math.min(this.mode === 'custom' ? 20 : progress.ascension, this.ascension + 1); this.render() })
+            this.add.text(34, 323, `Ascension ${this.ascension}`, { ...menuText, fontSize: '14px' }).setResolution(2)
+            menuButton(this, 142, 314, '-', () => { this.ascension = Math.max(0, this.ascension - 1); this.render() })
+            menuButton(this, 181, 314, '+', () => { this.ascension = Math.min(this.mode === 'custom' ? 20 : progress.ascension, this.ascension + 1); this.render() })
             if (this.mode === 'seeded' || this.mode === 'custom') {
-                this.add.text(332, 262, 'Seed', menuText)
                 const input = document.createElement('input')
-                input.type = 'text'; input.value = this.seed; input.placeholder = this.mode === 'custom' ? 'Random' : 'Enter seed'; input.maxLength = 64
-                input.setAttribute('aria-label', 'Run seed'); input.style.cssText = 'width:300px;padding:8px;background:#222;color:#eee;border:1px solid #777;font:16px monospace;'
+                input.type = 'text'; input.value = this.seed; input.placeholder = this.mode === 'custom' ? 'Random seed' : 'Enter seed'; input.maxLength = 64
+                input.setAttribute('aria-label', 'Run seed'); input.style.width = '202px'
                 input.addEventListener('input', () => { this.seed = input.value.trim() })
-                this.seedInput = this.add.dom(396, 252, input).setOrigin(0)
-            }
-            if (this.mode === 'custom') menuButton(this, 24, 302, `Modifiers (${this.modifiers.length})`, () => this.scene.start('CustomModifiers', { modifiers: this.modifiers }))
-            else this.add.text(24, 307, this.mode === 'seeded' ? 'Seeded runs earn XP. Ascension advances in standard runs.' : 'Climb three acts. Unlock new cards as you play.', { ...menuText, fontSize: '14px' })
+                this.seedInput = this.add.dom(234, 315, input).setOrigin(0)
+            } else this.add.text(434, 324, UNLOCK_XP[progress.unlockTier] ? `${progress.xp} / ${UNLOCK_XP[progress.unlockTier]} XP` : 'All card unlocks earned', { ...menuText, fontSize: '13px', color: palette.muted }).setOrigin(1, 0).setResolution(2)
         }
         const label = this.replaceConfirmed ? 'Abandon saved run and start' : 'New Run'
-        menuButton(this, 24, 356, label, () => {
+        menuButton(this, 34, 360, label, () => {
             if (this.mode === 'seeded' && !this.seed) return
             if (saved && !this.replaceConfirmed) { this.replaceConfirmed = true; this.render(); return }
             if (saved) recordRunResult(meta, saved, 'defeat')
             const run = createProfileRun(meta, { character: this.character, mode: this.mode, ascension: this.ascension, seed: this.mode === 'seeded' || this.mode === 'custom' ? this.seed || undefined : undefined, modifiers: this.modifiers })
             saveMeta(meta); saveRun(run)
             const next = getRunDestination(run); this.scene.start(next.scene, next.data)
-        })
-        menuButton(this, 24, 407, 'Card Library', () => this.scene.start('DeckBuilder', { run: saved ?? createNewRun() }))
-        menuButton(this, 225, 407, 'Run History', () => this.scene.start('RunHistory'))
-        menuButton(this, 590, 407, 'Achievements', () => this.scene.start('Achievements'))
-        menuButton(this, 425, 407, 'Settings', () => this.scene.start('Settings'))
+        }, true, { primary: true, width: this.replaceConfirmed ? 402 : 195 })
+        if (!this.replaceConfirmed) {
+            if (this.mode === 'custom') menuButton(this, 241, 360, `Modifiers (${this.modifiers.length})`, () => this.scene.start('CustomModifiers', { modifiers: this.modifiers }), true, { width: 195 })
+            else menuButton(this, 241, 360, 'Continue', () => { if (saved) { const next = getRunDestination(saved); this.scene.start(next.scene, next.data) } }, !!saved, { width: 195 })
+        }
+        if (saved && this.mode === 'custom' && !this.replaceConfirmed) menuButton(this, 660, 20, 'Continue', () => { const next = getRunDestination(saved); this.scene.start(next.scene, next.data) }, true, { quiet: true })
+        this.add.image(609, 267, `player:${this.character}`).setDisplaySize(238, 238)
+        this.add.text(609, 395, this.mode === 'daily' ? 'Daily challenge' : character.name, { resolution: 2, fontFamily: DISPLAY_FONT, fontSize: '20px', color: '#f1dec0' }).setOrigin(0.5).setResolution(2)
+        this.add.rectangle(0, 410, 800, 40, palette.ink, 0.96).setOrigin(0)
+        this.add.rectangle(24, 410, 752, 1, palette.line).setOrigin(0)
+        const links: [string, string][] = [['Card Library', 'DeckBuilder'], ['Run History', 'RunHistory'], ['Achievements', 'Achievements'], ['Settings', 'Settings']]
+        links.forEach(([title, scene], i) => menuButton(this, 24 + i * 150, 414, title, () => this.scene.start(scene, scene === 'DeckBuilder' ? { run: saved ?? createNewRun() } : undefined), true, { quiet: true, width: 136 }).setFontSize(14))
+        this.add.text(775, 428, 'A fan recreation', { ...menuText, fontSize: '11px', color: '#998d77' }).setOrigin(1, 0.5).setResolution(2)
     }
 }

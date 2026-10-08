@@ -1,3 +1,4 @@
+import { UI_FONT, roomBackdrop } from '../ui/theme'
 import { addRunMenu } from '../ui/runMenu'
 import Phaser from 'phaser'
 import { canRemoveCard, createCardInstance } from '../core/cards'
@@ -27,7 +28,7 @@ export class ShopScene extends Phaser.Scene {
         this.events.once('shutdown', () => this.selector.destroy())
     }
     private button(x: number, y: number, label: string, enabled: boolean, action: () => void): void {
-        const text = this.add.text(x, y, label, { fontFamily: 'monospace', fontSize: '14px', color: enabled ? '#fff' : '#888', backgroundColor: '#292929', padding: { x: 6, y: 6 } })
+        const text = this.add.text(x, y, label, { resolution: 2, fontFamily: UI_FONT, fontSize: '14px', color: enabled ? '#fff' : '#888', backgroundColor: '#353126', padding: { x: 6, y: 6 } })
         if (enabled) text.setInteractive({ useHandCursor: true }).on('pointerdown', action)
     }
     private buy(kind: 'cards' | 'relics' | 'potions', index: number): void {
@@ -39,8 +40,9 @@ export class ShopScene extends Phaser.Scene {
     }
     private render(): void {
         this.children.removeAll(true)
+        roomBackdrop(this)
         addRunMenu(this, this.run)
-        this.add.text(18, 16, `Merchant    ${this.run.gold} Gold    A${this.run.asc}`, { fontFamily: 'monospace', fontSize: '22px', color: '#fff' })
+        this.add.text(18, 16, `Merchant    ${this.run.gold} Gold    A${this.run.asc}`, { resolution: 2, fontFamily: UI_FONT, fontSize: '22px', color: '#fff' })
         this.inventory.cards.forEach((id, i) => {
             const x = 18 + i * 109
             this.add.existing(new Card(this, createCardInstance(id), { x, y: 56, scale: 0.70 }))
@@ -52,12 +54,12 @@ export class ShopScene extends Phaser.Scene {
             const def = RELIC_DEFS[id]
             const price = shopPrice(this.run, this.inventory.relicPrices![i])
             this.button(x, 235, `${def.name} · ${price} G`, this.run.gold >= price, () => this.buy('relics', i))
-            this.add.text(x, 270, def.description, { fontFamily: 'monospace', fontSize: '12px', color: '#bbb', wordWrap: { width: 236 } })
+            this.add.text(x, 270, def.description, { resolution: 2, fontFamily: UI_FONT, fontSize: '12px', color: '#bdb29d', wordWrap: { width: 236 } })
         })
         this.inventory.potions.forEach((id, i) => {
             const price = shopPrice(this.run, this.inventory.potionPrices![i])
             this.button(18 + i * 256, 325, `${POTION_DEFS[id].name} · ${price} G`, this.run.gold >= price && canObtainPotion(this.run), () => this.buy('potions', i))
-            this.add.text(18 + i * 256, 359, POTION_DEFS[id].description, { fontFamily: 'monospace', fontSize: '12px', color: '#bbb', wordWrap: { width: 236 } })
+            this.add.text(18 + i * 256, 359, POTION_DEFS[id].description, { resolution: 2, fontFamily: UI_FONT, fontSize: '12px', color: '#bdb29d', wordWrap: { width: 236 } })
         })
         const cost = removalPrice(this.run)
         this.button(18, 401, this.inventory.removalUsed ? 'Card removal used' : `Remove a card · ${cost} G`, !this.inventory.removalUsed && this.run.gold >= cost && this.run.deck.some(canRemoveCard), () => this.selector.open({

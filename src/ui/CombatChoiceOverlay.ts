@@ -1,3 +1,4 @@
+import { UI_FONT } from './theme'
 import Phaser from 'phaser'
 import type { Engine } from '../core/engine'
 import type { CardInstance, PendingChoiceView } from '../core/state'
@@ -49,13 +50,13 @@ export class CombatChoiceOverlay {
         overlay.add(bg)
 
         overlay.add(this.scene.add.text(24, 20, choice.prompt, {
-            fontFamily: 'monospace',
+            resolution: 2, fontFamily: UI_FONT,
             fontSize: '20px',
             color: '#f0f0f0',
         }))
 
         overlay.add(this.scene.add.text(24, 52, `Zone: ${choice.zone}   Pick ${choice.minSelections}-${choice.maxSelections}`, {
-            fontFamily: 'monospace',
+            resolution: 2, fontFamily: UI_FONT,
             fontSize: '13px',
             color: '#adadad',
         }))
@@ -68,7 +69,7 @@ export class CombatChoiceOverlay {
         )
         const footerY = this.scene.scale.height - 52
         const confirm = this.scene.add.text(this.scene.scale.width - 24, footerY, 'Confirm', {
-            fontFamily: 'monospace',
+            resolution: 2, fontFamily: UI_FONT,
             fontSize: '16px',
             color: '#f0f0f0',
             backgroundColor: '#2c2c2c',
@@ -83,7 +84,7 @@ export class CombatChoiceOverlay {
 
         if (choice.canSkip) {
             const skip = this.scene.add.text(this.scene.scale.width - 122, footerY, 'Skip', {
-                fontFamily: 'monospace',
+                resolution: 2, fontFamily: UI_FONT,
                 fontSize: '16px',
                 color: '#f0f0f0',
                 backgroundColor: '#1d1d1d',

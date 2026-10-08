@@ -1,3 +1,4 @@
+import { UI_FONT, roomBackdrop } from '../ui/theme'
 import { getRunDestination } from '../core/progression'
 import { advanceAct } from '../core/campaign'
 import Phaser from 'phaser'
@@ -13,8 +14,9 @@ export class BossRelicScene extends Phaser.Scene {
     }
 
     create(data: { run: RunState }): void {
+        roomBackdrop(this)
         this.run = data.run
-        const style = { fontFamily: 'monospace', fontSize: '18px', color: '#ffffff' }
+        const style = { resolution: 2, fontFamily: UI_FONT, fontSize: '18px', color: '#ffffff' }
         const pending = this.run.bossRelicChoicePending
         const choices = pending?.choices ?? []
 
@@ -35,21 +37,21 @@ export class BossRelicScene extends Phaser.Scene {
         const y = 108
         const bg = this.add.rectangle(x, y, 220, 160, 0x252525, 1).setOrigin(0, 0).setStrokeStyle(1, 0x555555)
         const title = this.add.text(x + 12, y + 12, def.name, {
-            fontFamily: 'monospace',
+            resolution: 2, fontFamily: UI_FONT,
             fontSize: '18px',
             color: '#ffffff',
         })
         const description = this.add.text(x + 12, y + 44, def.description, {
-            fontFamily: 'monospace',
+            resolution: 2, fontFamily: UI_FONT,
             fontSize: '13px',
             color: '#c7c7c7',
             wordWrap: { width: 196 },
         })
         const select = this.add.text(x + 12, y + 122, 'Take Relic', {
-            fontFamily: 'monospace',
+            resolution: 2, fontFamily: UI_FONT,
             fontSize: '15px',
             color: '#ffffff',
-            backgroundColor: '#333333',
+            backgroundColor: '#353126',
             padding: { x: 8, y: 6 },
         }).setInteractive({ useHandCursor: true })
 

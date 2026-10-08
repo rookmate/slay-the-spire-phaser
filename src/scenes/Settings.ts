@@ -1,3 +1,4 @@
+import { roomBackdrop } from '../ui/theme'
 import Phaser from 'phaser'
 import { loadSettings, saveSettings } from '../core/settings'
 import { menuButton, menuText } from '../ui/menu'
@@ -7,6 +8,7 @@ export class SettingsScene extends Phaser.Scene {
     create(): void { this.render() }
     private render(): void {
         this.children.removeAll(true)
+        roomBackdrop(this)
         const settings = loadSettings()
         const change = (action: () => void) => { action(); saveSettings(settings); playCue('card'); this.render() }
         this.add.text(24, 24, 'Settings', { ...menuText, fontSize: '26px' })

@@ -1,22 +1,30 @@
-import { relicAllowsUnplayable } from '../core/combat/relicRules'
 import Phaser from 'phaser'
 import type { Engine } from '../core/engine'
-import type { CardInstance, CardDef } from '../core/state'
-import { Card } from './Card'
+import type { CardInstance } from '../core/state'
 import { resolveCard } from '../core/cards'
+import { Card } from './Card'
 import { COMBAT_UI_CONFIG } from './CombatUIConfig'
+import { UI_FONT } from './theme'
+
+type Point = { x: number; y: number }
+type Selection = {
+    view: Card
+    card: CardInstance
+    mode: 'drag' | 'keyboard'
+    aimed: boolean
+    start: Point
+    grab: Point
+    previewTarget?: string
+}
 
 export class DragSystem {
     private scene: Phaser.Scene
     private engine: Engine
-    private isDragging = false
-    private dragCard?: Card
-    private dragCardId?: string
-    private validTargets: Phaser.GameObjects.GameObject[] = []
-    private originalCardPosition?: { x: number, y: number, rotation: number, depth: number }
-    private dragStartPosition?: { x: number, y: number }
-
-    private onCardPlay?: (card: CardInstance, targets: string[]) => void
+    private selection?: Selection
+    private aim: Phaser.GameObjects.Graphics
+    private hint: Phaser.GameObjects.Text
+    private onCardPlay?: (view: Card, targets: string[]) => void
+    private onSelectionChange?: (view?: Card) => void
     private getEnemyAtPoint?: (x: number, y: number) => number
     private getEnemySprites?: () => Phaser.GameObjects.Image[]
     private getPlayerSprite?: () => Phaser.GameObjects.Image | undefined
@@ -24,274 +32,163 @@ export class DragSystem {
     constructor(scene: Phaser.Scene, engine: Engine) {
         this.scene = scene
         this.engine = engine
+        this.aim = scene.add.graphics().setDepth(COMBAT_UI_CONFIG.depths.dragPreview).setName('card-targeting')
+        this.hint = scene.add.text(scene.scale.width / 2, 24, '', {
+            resolution: 2, fontFamily: UI_FONT, fontSize: '14px', color: '#f4d58a',
+            backgroundColor: '#211e18', padding: { x: 12, y: 6 },
+        }).setOrigin(0.5).setDepth(COMBAT_UI_CONFIG.depths.dragPreview).setVisible(false)
+        scene.events.on(Phaser.Scenes.Events.UPDATE, this.drawAim, this)
     }
 
-    setOnCardPlay(callback: (card: CardInstance, targets: string[]) => void): void {
-        this.onCardPlay = callback
+    setOnCardPlay(callback: (view: Card, targets: string[]) => void): void { this.onCardPlay = callback }
+    setOnSelectionChange(callback: (view?: Card) => void): void { this.onSelectionChange = callback }
+    setGetEnemyAtPoint(callback: (x: number, y: number) => number): void { this.getEnemyAtPoint = callback }
+    setGetEnemySprites(callback: () => Phaser.GameObjects.Image[]): void { this.getEnemySprites = callback }
+    setGetPlayerSprite(callback: () => Phaser.GameObjects.Image | undefined): void { this.getPlayerSprite = callback }
+
+    startDrag(view: Card, _cardIndex: number, pointer: Phaser.Input.Pointer): void {
+        this.begin(view, 'drag', pointer)
     }
 
-    setGetEnemyAtPoint(callback: (x: number, y: number) => number): void {
-        this.getEnemyAtPoint = callback
-    }
+    selectCard(view: Card): void { this.begin(view, 'keyboard', this.scene.input.activePointer) }
 
-    setGetEnemySprites(callback: () => Phaser.GameObjects.Image[]): void {
-        this.getEnemySprites = callback
-    }
-
-    setGetPlayerSprite(callback: () => Phaser.GameObjects.Image | undefined): void {
-        this.getPlayerSprite = callback
-    }
-
-    startDrag(card: Card, _cardIndex: number, pointer: Phaser.Input.Pointer): void {
-        if (this.isDragging || !this.engine.canAcceptInput()) return
-
-        const cardInstance = this.engine.state.player.hand.find(c => c.instanceId === card.getCardInstance().instanceId)
-        if (!cardInstance) return
-        const cardDef = resolveCard(cardInstance)
-        if (!cardDef || (cardDef.unplayable && !relicAllowsUnplayable(this.engine, cardInstance))) return
-
-        // Mirror engine cost modifiers so drag availability matches actual playability.
-        const effectiveCost = this.engine.getCardCost(cardInstance)
-        if (this.engine.state.player.energy < effectiveCost) {
-            return // Can't afford, don't start drag
-        }
-        if (cardDef.canPlay) {
-            const canPlay = cardDef.canPlay({
-                engine: this.engine,
-                source: this.engine.state.player.id,
-                targets: [],
-                card: cardInstance,
-            })
-            if (!canPlay) return
-        }
-
-        this.isDragging = true
-        this.dragCard = card
-        this.dragCardId = cardInstance.instanceId
-
-        // Store original position and starting position for upward drag detection
-        this.originalCardPosition = {
-            x: card.x,
-            y: card.y,
-            rotation: card.rotation,
-            depth: card.depth
-        }
-
-        // Store starting position for upward drag detection
-        this.dragStartPosition = {
-            x: pointer.worldX,
-            y: pointer.worldY
-        }
-
-        // Highlight legal drop targets.
-        this.highlightValidTargets(cardDef)
-
-        // Move original card to follow cursor
-        card.setDepth(COMBAT_UI_CONFIG.depths.dragCard)
+    private begin(view: Card, mode: Selection['mode'], pointer: Phaser.Input.Pointer): void {
+        if (this.isCurrentlyDragging()) return
+        this.cancelDrag()
+        const card = view.getCardInstance(), targeting = resolveCard(card).targeting?.type
+        const aimed = targeting === 'single_enemy' || targeting === 'any'
+        const candidates = aimed ? this.engine.state.enemies.filter(enemy => enemy.hp > 0).map(enemy => [enemy.id]) : [this.automaticTargets(card)]
+        if (!candidates.some(targets => this.engine.canPlayCard(card, targets))) return
+        this.selection = { view, card, mode, aimed,
+            start: { x: pointer.worldX, y: pointer.worldY }, grab: { x: pointer.worldX - view.x, y: pointer.worldY - view.y } }
+        this.onSelectionChange?.(view)
+        this.drawAim()
     }
 
     updateDrag(pointer: Phaser.Input.Pointer): void {
-        const target = this.getEnemyAtPoint?.(pointer.worldX, pointer.worldY) ?? -1
-        this.dragCard?.setCombatPreview(this.engine, this.engine.state.enemies[target]?.id)
-        if (!this.isDragging || !this.dragCard) return
+        const selection = this.selection
+        if (!selection) return
+        // Attacks stay lifted in the hand so neither the card nor the pointer hides the target.
+        if (selection.mode === 'drag' && !selection.aimed) {
+            this.scene.tweens.killTweensOf(selection.view)
+            selection.view.setPosition(
+                Phaser.Math.Clamp(pointer.worldX - selection.grab.x, 16, this.scene.scale.width - Card.CARD_WIDTH - 16),
+                Phaser.Math.Clamp(pointer.worldY - selection.grab.y, 52, this.scene.scale.height - Card.CARD_HEIGHT - 56))
+        }
+        this.drawAim()
+    }
 
-        // Update original card position to follow cursor
-        this.dragCard.setPosition(pointer.worldX - Card.CARD_WIDTH / 2, pointer.worldY - 30)
-        this.dragCard.setRotation(0)
+    private automaticTargets(card: CardInstance): string[] {
+        const targeting = resolveCard(card).targeting?.type
+        if (targeting === 'all_enemies') return this.engine.state.enemies.filter(enemy => enemy.hp > 0).map(enemy => enemy.id)
+        if (targeting === 'player') return [this.engine.state.player.id]
+        return []
+    }
+
+    private dropTargets(pointer: Phaser.Input.Pointer): string[] | undefined {
+        const selection = this.selection
+        if (!selection) return
+        let targets: string[]
+        if (selection.aimed) {
+            const index = this.getEnemyAtPoint?.(pointer.worldX, pointer.worldY) ?? -1
+            const enemy = this.engine.state.enemies[index]
+            if (!enemy || enemy.hp <= 0) return
+            targets = [enemy.id]
+        } else {
+            if (selection.start.y - pointer.worldY < 50) return
+            targets = this.automaticTargets(selection.card)
+        }
+        return this.engine.canPlayCard(selection.card, targets) ? targets : undefined
     }
 
     endDrag(pointer: Phaser.Input.Pointer): boolean {
-        if (!this.isDragging) return false
-
-        const cardInstance = this.engine.state.player.hand.find(c => c.instanceId === this.dragCardId)
-        if (!cardInstance) {
-            this.cleanupDrag()
-            return false
-        }
-        const cardDef = resolveCard(cardInstance)
-        let targets: string[] | undefined
-        if (this.isUpwardDrag(pointer) && this.canAutoPlay(cardDef)) {
-            targets = this.getAutoPlayTargets(cardInstance)
-        } else if (cardDef.targeting?.type === 'single_enemy' || cardDef.targeting?.type === 'any') {
-            const targetEnemy = this.getEnemyAtPoint?.(pointer.worldX, pointer.worldY) ?? -1
-            if (targetEnemy !== -1) targets = [this.engine.state.enemies[targetEnemy].id]
-        }
-
-        // Playing can rebuild the hand or end combat, destroying this card.
-        this.cleanupDrag()
-        if (targets) this.onCardPlay?.(cardInstance, targets)
+        if (!this.isCurrentlyDragging()) return false
+        const targets = this.dropTargets(pointer)
+        if (targets) this.commit(targets)
+        else this.cancelDrag()
         return targets !== undefined
     }
 
-    private isUpwardDrag(pointer: Phaser.Input.Pointer): boolean {
-        if (!this.dragStartPosition) return false
-
-        // Check if dragged upward by at least 50 pixels
-        const upwardDistance = this.dragStartPosition.y - pointer.worldY
-        return upwardDistance >= 50
+    selectEnemy(index: number): boolean {
+        const selection = this.selection, enemy = this.engine.state.enemies[index]
+        if (selection?.mode !== 'keyboard' || !enemy || !this.engine.canPlayCard(selection.card, [enemy.id])) return false
+        this.commit([enemy.id])
+        return true
     }
 
-    private canAutoPlay(cardDef: CardDef): boolean {
-        return cardDef.targeting?.type === 'none' ||
-            (cardDef.targeting?.type === 'all_enemies' && this.engine.state.enemies.some(e => e.hp > 0))
+    private commit(targets: string[]): void {
+        const view = this.selection!.view
+        this.cancelDrag()
+        this.onCardPlay?.(view, targets)
     }
 
-
-    private getAutoPlayTargets(cardInstance: CardInstance): string[] {
-        const cardDef = resolveCard(cardInstance)
-
-        switch (cardDef.targeting?.type) {
-            case 'none':
-                return []
-            case 'all_enemies':
-                return this.engine.state.enemies
-                    .filter(enemy => enemy.hp > 0)
-                    .map(enemy => enemy.id)
-            default:
-                return []
+    private drawAim(): void {
+        this.aim.clear()
+        const selection = this.selection
+        if (!selection) return
+        const pointer = this.scene.input.activePointer, targets = this.dropTargets(pointer)
+        const color = targets ? 0xf4d58a : 0xb8aa8d
+        const sprites = this.getEnemySprites?.() ?? []
+        const targetId = selection.aimed ? targets?.[0] : undefined
+        if (targetId !== selection.previewTarget) {
+            selection.previewTarget = targetId
+            selection.view.setCombatPreview(this.engine, targetId)
         }
-    }
-
-    private highlightValidTargets(cardDef: CardDef): void {
-        // Clear existing highlights
-        this.clearTargetHighlights()
-
-        switch (cardDef.targeting?.type) {
-            case 'single_enemy':
-                this.highlightEnemies()
-                break
-            case 'all_enemies':
-                this.highlightUpwardDragZone()
-                break
-            case 'none':
-                this.highlightUpwardDragZone()
-                break
-            case 'player':
-                this.highlightPlayer()
-                break
-            case 'any':
-                this.highlightAllTargets()
-                break
-        }
-    }
-
-    private highlightEnemies(): void {
-        // Highlight individual enemies for single targeting using actual enemy positions
-        if (!this.getEnemySprites) return
-
-        const enemySprites = this.getEnemySprites()
-        this.engine.state.enemies.forEach((enemy, index) => {
-            if (enemy.hp > 0 && enemySprites[index]) {
-                const enemySprite = enemySprites[index]
-                const bounds = enemySprite.getBounds()
-
-                // Create highlight that matches the enemy sprite size and position
-                const highlight = this.scene.add.rectangle(
-                    enemySprite.x,
-                    enemySprite.y,
-                    bounds.width * 1.2, // Slightly larger than enemy
-                    bounds.height * 1.2,
-                    COMBAT_UI_CONFIG.colors.targetHighlight,
-                    COMBAT_UI_CONFIG.colors.targetHighlightAlpha
-                )
-                highlight.setDepth(COMBAT_UI_CONFIG.depths.targetHighlight)
-                this.validTargets.push(highlight)
+        sprites.forEach((sprite, index) => {
+            const enemy = this.engine.state.enemies[index]
+            if (!enemy || enemy.hp <= 0) return
+            if (!selection.aimed && resolveCard(selection.card).targeting?.type !== 'all_enemies') return
+            const chosen = targets?.includes(enemy.id), bounds = sprite.getBounds()
+            this.aim.lineStyle(chosen ? 2 : 1, chosen ? 0xf4d58a : 0xb8aa8d, chosen ? 1 : 0.45)
+            this.aim.strokeEllipse(sprite.x, bounds.bottom + 4, bounds.width + 16, 10)
+            if (chosen) {
+                const x = bounds.left - 5, y = bounds.top - 5, right = bounds.right + 5, bottom = bounds.bottom + 5
+                for (const [cx, cy, dx, dy] of [[x, y, 1, 1], [right, y, -1, 1], [x, bottom, 1, -1], [right, bottom, -1, -1]]) {
+                    this.aim.lineBetween(cx, cy, cx + dx * 10, cy)
+                    this.aim.lineBetween(cx, cy, cx, cy + dy * 10)
+                }
             }
         })
-    }
-
-
-    private highlightPlayer(): void {
-        // Highlight player for self-targeting using actual player position
-        if (!this.getPlayerSprite) return
-
-        const playerSprite = this.getPlayerSprite()
-        if (playerSprite) {
-            const bounds = playerSprite.getBounds()
-
-            // Create highlight that matches the player sprite size and position
-            const highlight = this.scene.add.rectangle(
-                playerSprite.x,
-                playerSprite.y,
-                bounds.width * 1.2, // Slightly larger than player
-                bounds.height * 1.2,
-                COMBAT_UI_CONFIG.colors.targetHighlight,
-                COMBAT_UI_CONFIG.colors.targetHighlightAlpha
-            )
-            highlight.setDepth(COMBAT_UI_CONFIG.depths.targetHighlight)
-            this.validTargets.push(highlight)
-        }
-    }
-
-    private highlightUpwardDragZone(): void {
-        // Highlight the upward drag zone for auto-play cards
-        const screenHeight = this.scene.cameras.main.height
-        const highlight = this.scene.add.rectangle(
-            this.scene.cameras.main.width / 2,
-            screenHeight * 0.3, // Upper third of screen
-            this.scene.cameras.main.width * 0.8,
-            screenHeight * 0.4,
-            COMBAT_UI_CONFIG.colors.targetHighlight,
-            COMBAT_UI_CONFIG.colors.targetHighlightAlpha
-        )
-        highlight.setDepth(COMBAT_UI_CONFIG.depths.targetHighlight)
-
-        // Add text indicator
-        const text = this.scene.add.text(
-            this.scene.cameras.main.width / 2,
-            screenHeight * 0.3,
-            'Drag upward to play',
-            {
-                fontFamily: 'monospace',
-                fontSize: '16px',
-                color: '#ffffff',
-                align: 'center'
+        if (selection.aimed) {
+            const sprite = sprites[this.engine.state.enemies.findIndex(enemy => enemy.id === targetId)]
+            const start = new Phaser.Math.Vector2(selection.view.x + Card.CARD_WIDTH / 2, selection.view.y - 7)
+            const end = new Phaser.Math.Vector2(sprite?.x ?? pointer.worldX, sprite?.y ?? pointer.worldY)
+            if (Phaser.Math.Distance.BetweenPoints(start, end) > 24) {
+                const curve = new Phaser.Curves.CubicBezier(start, new Phaser.Math.Vector2(start.x, start.y - 85), new Phaser.Math.Vector2(end.x, end.y + 45), end)
+                this.aim.lineStyle(6, 0x171610, 0.8).strokePoints(curve.getPoints(32))
+                this.aim.lineStyle(2, color, 1).strokePoints(curve.getPoints(32))
+                const angle = curve.getTangent(1).angle(), size = 10
+                this.aim.fillStyle(color).fillTriangle(end.x, end.y,
+                    end.x - Math.cos(angle - 0.45) * size, end.y - Math.sin(angle - 0.45) * size,
+                    end.x - Math.cos(angle + 0.45) * size, end.y - Math.sin(angle + 0.45) * size)
             }
-        )
-        text.setOrigin(0.5, 0.5)
-        text.setDepth(COMBAT_UI_CONFIG.depths.targetHighlight + 1)
-
-        this.validTargets.push(highlight)
-        this.validTargets.push(text)
-    }
-
-    private highlightAllTargets(): void {
-        // Highlight all possible targets
-        this.highlightEnemies()
-        this.highlightPlayer()
-    }
-
-    private clearTargetHighlights(): void {
-        this.validTargets.forEach(target => target.destroy())
-        this.validTargets = []
-    }
-
-    private cleanupDrag(): void {
-        this.isDragging = false
-
-        // Restore original card position
-        if (this.dragCard && this.originalCardPosition) {
-            this.dragCard.setPosition(this.originalCardPosition.x, this.originalCardPosition.y)
-            this.dragCard.setRotation(this.originalCardPosition.rotation)
-            this.dragCard.setDepth(this.originalCardPosition.depth)
+        } else if (targets && resolveCard(selection.card).targeting?.type !== 'all_enemies') {
+            const player = this.getPlayerSprite?.()
+            if (player) this.aim.lineStyle(2, color).strokeEllipse(player.x, player.getBounds().bottom + 3, 80, 12)
         }
-
-        // Clear target highlights
-        this.clearTargetHighlights()
-
-        // Reset drag state
-        this.dragCard = undefined
-        this.dragCardId = undefined
-        this.originalCardPosition = undefined
+        const enemy = this.engine.state.enemies.find(enemy => enemy.id === targetId)
+        const instruction = selection.aimed
+            ? enemy ? `${selection.mode === 'drag' ? 'Release' : 'Click'} to play on ${enemy.name}` : 'Aim at an enemy'
+            : targets ? 'Release to play' : 'Drag upward to play'
+        this.hint.setText(`${instruction}  ·  Esc to cancel`).setColor(targets ? '#f4d58a' : '#c3b69c').setVisible(true)
     }
 
-    cancelDrag(): void { if (this.isDragging) this.cleanupDrag() }
-
-    isCurrentlyDragging(): boolean {
-        return this.isDragging
+    cancelDrag(): void {
+        if (!this.selection) return
+        this.selection.view.setCombatPreview(this.engine)
+        this.selection = undefined
+        this.aim.clear()
+        this.hint.setVisible(false)
+        this.onSelectionChange?.()
     }
+
+    isCurrentlyDragging(): boolean { return this.selection?.mode === 'drag' }
+    isTargeting(): boolean { return !!this.selection }
 
     destroy(): void {
-        this.cleanupDrag()
+        this.cancelDrag()
+        this.scene.events.off(Phaser.Scenes.Events.UPDATE, this.drawAim, this)
+        this.aim.destroy()
+        this.hint.destroy()
     }
 }

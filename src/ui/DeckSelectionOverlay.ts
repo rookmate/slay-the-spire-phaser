@@ -1,3 +1,4 @@
+import { UI_FONT } from './theme'
 import Phaser from 'phaser'
 import type { CardInstance } from '../core/state'
 import { CardGrid } from './CardGrid'
@@ -28,16 +29,16 @@ export class DeckSelectionOverlay {
         overlay.add(bg)
 
         overlay.add(this.scene.add.text(24, 20, opts.title, {
-            fontFamily: 'monospace',
+            resolution: 2, fontFamily: UI_FONT,
             fontSize: '20px',
             color: '#ffffff',
         }))
 
         const close = this.scene.add.text(this.scene.scale.width - 24, 20, 'Close', {
-            fontFamily: 'monospace',
+            resolution: 2, fontFamily: UI_FONT,
             fontSize: '16px',
             color: '#ffffff',
-            backgroundColor: '#444',
+            backgroundColor: '#493c29',
             padding: { x: 8, y: 6 },
         }).setOrigin(1, 0).setInteractive({ useHandCursor: true })
         close.on('pointerdown', () => this.close())

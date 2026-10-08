@@ -1,3 +1,4 @@
+import { UI_FONT } from './theme'
 import { resolveCard } from '../core/cards'
 import { playCue } from './sound'
 import Phaser from 'phaser'
@@ -13,6 +14,7 @@ import { DragSystem } from './DragSystem'
 import { OverlayManager } from './OverlayManager'
 import { VisualEffects } from './VisualEffects'
 import { CombatChoiceOverlay } from './CombatChoiceOverlay'
+import type { Card } from './Card'
 
 export class CombatUI {
     private scene: Phaser.Scene
@@ -25,7 +27,6 @@ export class CombatUI {
     private overlayManager: OverlayManager
     private visualEffects: VisualEffects
     private choiceOverlay: CombatChoiceOverlay
-    private selectedCard?: CardInstance
     private keyHandler?: (event: KeyboardEvent) => void
     private pendingPotionIndex: number | null = null
     private pendingText?: Phaser.GameObjects.Text
@@ -38,6 +39,7 @@ export class CombatUI {
     private pointerMoveHandler?: (pointer: Phaser.Input.Pointer) => void
     private pointerUpHandler?: (pointer: Phaser.Input.Pointer) => void
     private resizeHandler?: () => void
+    private cancelDragHandler = () => this.dragSystem.cancelDrag()
 
     constructor(scene: Phaser.Scene, engine: Engine, run: RunState) {
         this.scene = scene
@@ -112,6 +114,7 @@ export class CombatUI {
     }
 
     update(): void {
+        this.dragSystem.cancelDrag()
         this.handManager.rebuildHand()
         this.enemyDisplay.update()
         this.playerDisplay.update()
@@ -123,22 +126,34 @@ export class CombatUI {
         if (this.keyHandler) this.scene.input.keyboard?.off('keydown', this.keyHandler)
         if (this.pointerMoveHandler) this.scene.input.off('pointermove', this.pointerMoveHandler)
         if (this.pointerUpHandler) this.scene.input.off('pointerup', this.pointerUpHandler)
+        this.scene.input.off('pointerupoutside', this.cancelDragHandler)
+        this.scene.game.events.off(Phaser.Core.Events.BLUR, this.cancelDragHandler)
         if (this.resizeHandler) this.scene.scale.off('resize', this.resizeHandler)
         this.pendingText?.destroy()
+        this.dragSystem.destroy()
         this.handManager.destroy()
         this.enemyDisplay.destroy()
         this.playerDisplay.destroy()
-        this.dragSystem.destroy()
         this.overlayManager.destroy()
         this.visualEffects.destroy()
         this.choiceOverlay.destroy()
     }
 
     private clearTargeting(): void {
-        this.selectedCard = undefined
+        this.dragSystem.cancelDrag()
         this.pendingPotionIndex = null
         this.pendingText?.destroy()
         this.pendingText = undefined
+    }
+
+    private playCard(view: Card, targets: string[]): void {
+        const card = view.getCardInstance()
+        if (!this.engine.canPlayCard(card, targets)) return
+        const targetIndex = this.engine.state.enemies.findIndex(enemy => enemy.id === targets[0])
+        const target = targetIndex >= 0 ? this.enemyDisplay.getEnemySprites()[targetIndex] : this.playerDisplay.getPlayerSprite()
+        this.handManager.detachCard(view)
+        this.visualEffects.playCard(view, target?.x ?? 400, target?.y ?? 110)
+        this.onPlay?.(card, targets)
     }
 
     private setupEventHandlers(): void {
@@ -147,7 +162,7 @@ export class CombatUI {
             if (event.key === 'Escape') {
                 this.handManager.inspectCard(-1)
                 this.clearTargeting()
-                this.dragSystem.cancelDrag(); this.playerDisplay.closePotionMenu(); this.overlayManager.close(); return
+                this.playerDisplay.closePotionMenu(); this.overlayManager.close(); return
             }
             if (this.dragSystem.isCurrentlyDragging() || !this.engine.canAcceptInput() || this.overlayManager.isOpen() || this.playerDisplay.isPotionMenuOpen()) return
             if (event.key.toLowerCase() === 'e') { this.clearTargeting(); this.onEnd?.(); return }
@@ -157,10 +172,10 @@ export class CombatUI {
             if (event.altKey) { this.handManager.inspectCard(index); return }
             this.clearTargeting()
             const def = resolveCard(card)
+            const view = this.handManager.getHandCards()[index]
             if (def.targeting?.type === 'single_enemy' || def.targeting?.type === 'any') {
-                this.selectedCard = card; this.pendingPotionIndex = null; this.pendingText?.destroy()
-                this.pendingText = this.scene.add.text(400, 24, `${def.name}: select an enemy`, { fontFamily: 'monospace', fontSize: '16px', color: '#fff', backgroundColor: '#333' }).setOrigin(0.5).setDepth(6000)
-            } else this.onPlay?.(card, def.targeting?.type === 'all_enemies' ? this.engine.state.enemies.filter(e => e.hp > 0).map(e => e.id) : def.targeting?.type === 'player' ? [this.engine.state.player.id] : [])
+                this.dragSystem.selectCard(view)
+            } else this.playCard(view, def.targeting?.type === 'all_enemies' ? this.engine.state.enemies.filter(e => e.hp > 0).map(e => e.id) : def.targeting?.type === 'player' ? [this.engine.state.player.id] : [])
         }
         this.scene.input.keyboard?.on('keydown', this.keyHandler)
 
@@ -170,21 +185,15 @@ export class CombatUI {
             this.dragSystem.startDrag(card, cardIndex, pointer)
         })
 
-        this.dragSystem.setOnCardPlay((card, targets) => {
-            if (this.engine.getPendingChoice()) return
-            this.onPlay?.(card, targets)
-            this.update()
-        })
+        this.dragSystem.setOnCardPlay((view, targets) => this.playCard(view, targets))
+        this.dragSystem.setOnSelectionChange(view => this.handManager.focusCard(view))
         this.dragSystem.setGetEnemyAtPoint((x, y) => this.enemyDisplay.getEnemyAtPoint(x, y))
         this.dragSystem.setGetEnemySprites(() => this.enemyDisplay.getEnemySprites())
         this.dragSystem.setGetPlayerSprite(() => this.playerDisplay.getPlayerSprite())
 
         this.enemyDisplay.setOnEnemyClick((enemyIndex) => {
             if (this.engine.getPendingChoice()) return
-            if (this.selectedCard) {
-                const card = this.selectedCard; this.selectedCard = undefined; this.pendingText?.destroy(); this.pendingText = undefined
-                this.onPlay?.(card, [this.engine.state.enemies[enemyIndex].id]); return
-            }
+            if (this.dragSystem.selectEnemy(enemyIndex)) return
             if (this.pendingPotionIndex === null) return
             const potionId = this.run.potions[this.pendingPotionIndex]
             if (!potionId) return
@@ -206,10 +215,10 @@ export class CombatUI {
                 this.pendingPotionIndex = potionIndex
                 this.pendingText?.destroy()
                 this.pendingText = this.scene.add.text(this.scene.scale.width / 2, 24, 'Select an enemy for potion', {
-                    fontFamily: 'monospace',
+                    resolution: 2, fontFamily: UI_FONT,
                     fontSize: '16px',
                     color: '#ffffff',
-                    backgroundColor: '#333333',
+                    backgroundColor: '#353126',
                     padding: { x: 8, y: 6 },
                 }).setOrigin(0.5, 0)
                 return
@@ -219,27 +228,29 @@ export class CombatUI {
         })
 
         this.playerDisplay.setOnEndTurn(() => {
-            if (this.pendingPotionIndex !== null || this.engine.getPendingChoice()) return
-            this.selectedCard = undefined; this.pendingText?.destroy(); this.pendingText = undefined
+            if (this.pendingPotionIndex !== null || this.engine.getPendingChoice() || this.dragSystem.isCurrentlyDragging()) return
+            this.clearTargeting()
             this.onEnd?.()
-            this.update()
         })
+        this.overlayManager.setOnOpen(() => { this.clearTargeting(); this.handManager.inspectCard(-1) })
         this.playerDisplay.setOnOpenDeck(() => this.overlayManager.openDeckOverlay())
         this.choiceOverlay.setOnSubmit((instanceIds) => this.onSubmitChoice?.(instanceIds))
         this.choiceOverlay.setOnCancel(() => this.onCancelChoice?.())
 
         this.pointerMoveHandler = (pointer: Phaser.Input.Pointer) => {
-            if (this.dragSystem.isCurrentlyDragging()) this.dragSystem.updateDrag(pointer)
+            if (this.dragSystem.isTargeting()) this.dragSystem.updateDrag(pointer)
         }
         this.pointerUpHandler = (pointer: Phaser.Input.Pointer) => {
             if (!this.dragSystem.isCurrentlyDragging()) return
-            const played = this.dragSystem.endDrag(pointer)
-            if (played) this.handManager.rebuildHand()
+            this.dragSystem.endDrag(pointer)
         }
         this.scene.input.on('pointermove', this.pointerMoveHandler)
         this.scene.input.on('pointerup', this.pointerUpHandler)
+        this.scene.input.on('pointerupoutside', this.cancelDragHandler)
+        this.scene.game.events.on(Phaser.Core.Events.BLUR, this.cancelDragHandler)
 
         this.resizeHandler = () => {
+            this.dragSystem.cancelDrag()
             this.enemyDisplay.handleScreenResize()
             this.handManager.rebuildHand()
             this.playerDisplay.update()

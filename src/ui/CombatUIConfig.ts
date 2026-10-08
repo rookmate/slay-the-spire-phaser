@@ -1,3 +1,4 @@
+import { UI_FONT } from './theme'
 export const COMBAT_UI_CONFIG = {
     layout: {
         cardSpacing: 70,
@@ -11,7 +12,7 @@ export const COMBAT_UI_CONFIG = {
         hoverLift: 50
     },
     styles: {
-        fontFamily: 'monospace',
+        resolution: 2, fontFamily: UI_FONT,
         fontSize: '16px',
         color: '#ffffff',
         hpFontSize: '14px',
@@ -36,13 +37,11 @@ export const COMBAT_UI_CONFIG = {
         background: 0x000000,
         overlay: 0x000000,
         overlayAlpha: 0.8,
-        energyBg: '#222222',
-        endTurnBg: '#550000',
-        discardBg: '#333333',
+        energyBg: '#151512',
+        endTurnBg: '#a8643c',
+        discardBg: '#353126',
         damage: 0xff4444,
         healing: 0x00ff00,
-        targetHighlight: 0x00ff00,
-        targetHighlightAlpha: 0.3
     },
     overlay: {
         cardScale: 0.5,

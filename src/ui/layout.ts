@@ -1,6 +1,12 @@
 export const CARD_SIZE = { width: 120, height: 180 } as const
 export const HAND_HOVER_LIFT = 18
 
+export function mapLayout(width: number, columns: number) {
+    const viewport = { x: 246, y: 80, width: width - 270, height: 318, right: width - 24, bottom: 398,
+        contains: (x: number, y: number) => x >= 246 && x <= width - 24 && y >= 80 && y <= 398 }
+    return { viewport, cellHeight: 64, nodeX: (column: number) => viewport.x + 35 + column * (viewport.width - 70) / Math.max(1, columns - 1) }
+}
+
 export function combatLayout(width: number, height: number) {
     const footerTop = height - 46
     const handTop = footerTop - CARD_SIZE.height - 10

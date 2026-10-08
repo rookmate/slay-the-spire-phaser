@@ -1,3 +1,4 @@
+import { roomBackdrop } from '../ui/theme'
 import Phaser from 'phaser'
 import { backupProfile, exportProfile, importProfile, MAX_PROFILE_BYTES, parseProfile, JOURNAL_KEY } from '../core/profile/storage'
 import type { Profile } from '../core/profile/schema'
@@ -26,6 +27,7 @@ export class ProfileScene extends Phaser.Scene {
     private render(): void {
         this.fileInput?.destroy(); this.fileInput = undefined
         this.children.removeAll(true)
+        roomBackdrop(this)
         this.add.text(24, 20, 'Profile backup', { ...menuText, fontSize: '26px' })
         this.add.text(24, 65, 'Export progress, achievements, settings, and your saved run.\nCombat resumes from the start of its room.', { ...menuText, lineSpacing: 8 })
         menuButton(this, 24, 130, 'Export profile', () => this.attempt(() => {
@@ -35,7 +37,7 @@ export class ProfileScene extends Phaser.Scene {
             this.message = 'Profile exported.'
         }), !this.reading)
         const input = document.createElement('input'); input.type = 'file'; input.accept = '.json,application/json'; input.setAttribute('aria-label', 'Import profile file')
-        input.style.cssText = 'width:340px;color:#ddd;font:14px monospace;'
+        input.style.cssText = 'width:340px;font-size:14px;'
         input.disabled = this.reading
         input.addEventListener('change', async () => {
             const file = input.files?.[0]; if (!file) return

@@ -1,3 +1,4 @@
+import { UI_FONT, roomBackdrop } from '../ui/theme'
 import { addRunMenu } from '../ui/runMenu'
 import Phaser from 'phaser'
 import { canUseCampfire, useCampfire, type CampfireAction } from '../core/campfire'
@@ -11,10 +12,11 @@ export class CampfireScene extends Phaser.Scene {
     private selector!: DeckSelectionOverlay
     constructor() { super('Campfire') }
     create(data: { run: RunState }): void {
+        roomBackdrop(this)
         this.run = data.run
         addRunMenu(this, this.run)
         this.selector = new DeckSelectionOverlay(this)
-        const style = { fontFamily: 'monospace', fontSize: '18px', color: '#fff' }
+        const style = { resolution: 2, fontFamily: UI_FONT, fontSize: '18px', color: '#fff' }
         this.add.text(24, 20, `Campfire    ${this.run.player.hp}/${this.run.player.maxHp} HP`, { ...style, fontSize: '24px' })
         const actions: [CampfireAction, string][] = [
             ['rest', `Rest · heal 30% max HP${this.run.relics.includes('REGAL_PILLOW') ? ' + 15 HP' : ''}`],
@@ -26,7 +28,7 @@ export class CampfireScene extends Phaser.Scene {
         actions.push(['skip', 'Skip'])
         actions.forEach(([action, label], i) => {
             const enabled = canUseCampfire(this.run, action)
-            const button = this.add.text(24, 70 + i * 49, label, { ...style, color: enabled ? '#fff' : '#888', backgroundColor: '#333', padding: { x: 10, y: 8 } })
+            const button = this.add.text(24, 70 + i * 49, label, { ...style, color: enabled ? '#fff' : '#888', backgroundColor: '#353126', padding: { x: 10, y: 8 } })
             if (enabled) button.setInteractive({ useHandCursor: true }).on('pointerdown', () => {
                 if (action === 'smith') this.selector.open({ title: 'Choose a card to upgrade', cards: this.run.deck, filter: canUpgradeCard, onSelect: card => this.choose(action, card.instanceId) })
                 else this.choose(action)

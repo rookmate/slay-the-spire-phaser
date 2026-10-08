@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test'
 import { createNewRun } from '../../src/core/run'
 import { canUpgradeCard } from '../../src/core/cards'
 import { RELIC_DEFS } from '../../src/core/relics'
-import { boot, clickCard, clickPoint, clickText, dragCard, expectScene, inspect, readSavedProgress, reloadRun } from './driver'
+import { boot, clickMapNode, clickCard, clickPoint, clickText, dragCard, expectScene, inspect, readSavedProgress, reloadRun } from './driver'
 import { cardPriority, choosePlay, chooseRoute } from '../support/policy'
 import { bossRelicPick, eventPick, neowPick, rewardPick, shopPick } from '../support/strategy'
 
@@ -37,18 +37,7 @@ test('plays a seeded starter-deck run through all three acts and records victory
                 const node = chooseRoute(ui.map!, ui.run!.mapProgress?.currentNodeId)
                 history.push(`Act ${ui.run!.act} floor ${ui.run!.floor}: ${node.kind} ${node.id}, HP ${ui.run!.player.hp}, gold ${ui.run!.gold}`)
                 console.log(history.at(-1))
-                for (let scroll = 0; scroll < 10; scroll++) {
-                    const current = await inspect(page)
-                    const target = current.texts.find(t => t.enabled && Math.abs(t.x - (20 + node.col * 90)) < 10)
-                    expect(target).toBeDefined()
-                    if (target!.y >= 0 && target!.y + target!.height < 430) {
-                        await clickPoint(page, target!.x + target!.width / 2, target!.y + target!.height / 2)
-                        break
-                    }
-                    await page.mouse.move(current.canvas.x + 400 * current.canvas.scaleX, current.canvas.y + 300 * current.canvas.scaleY)
-                    await page.mouse.wheel(0, target!.y > 400 ? 180 : -180)
-                    await page.waitForTimeout(60)
-                }
+                await clickMapNode(page, node.id)
             } else if (ui.scene === 'Combat') {
                 const combatKey = `${ui.run!.act}:${ui.run!.floor}`
                 if (lastCombat !== combatKey) {

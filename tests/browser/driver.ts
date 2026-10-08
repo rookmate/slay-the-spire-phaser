@@ -25,14 +25,19 @@ export async function inspect(page: Page) {
         const rect = game.canvas.getBoundingClientRect()
         const texts: Array<{ text: string; x: number; y: number; width: number; height: number; enabled: boolean; depth: number }> = []
         const cards: Array<{ id: string; defId: string; x: number; y: number; width: number; height: number; enabled: boolean; depth: number }> = []
+        const mapNodes: Array<{ id: string; x: number; y: number; width: number; height: number; enabled: boolean }> = []
+        let mapViewport: { x: number; y: number; width: number; height: number } | undefined
         function visit(objects: Phaser.GameObjects.GameObject[], depth = 0) {
             for (const object of objects) {
+                if (object.name === 'played-card') continue
                 const view = object as Phaser.GameObjects.Container
                 if (!view.visible || view.alpha === 0) continue
                 const currentDepth = Math.max(depth, view.depth)
                 const bounds = view.getBounds?.()
                 if (!bounds) continue
                 const position = { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height }
+                if (object.getData('mapNodeId')) mapNodes.push({ ...position, id: object.getData('mapNodeId'), enabled: !!object.input?.enabled })
+                if (object.getData('mapViewport')) mapViewport = position
                 if ('getCardInstance' in object) {
                     const card = (object as Card).getCardInstance()
                     cards.push({ ...position, id: card.instanceId, defId: card.defId, enabled: !!object.input?.enabled, depth: currentDepth })
@@ -54,7 +59,7 @@ export async function inspect(page: Page) {
             options: scene.options,
             rewards: scene.rewards,
             inventory: scene.inventory,
-            texts, cards,
+            texts, cards, mapNodes, mapViewport,
             enemies: sprites.filter(sprite => sprite.texture.key.startsWith('enemy:')).map(sprite => ({ x: sprite.x, y: sprite.y, bounds: sprite.getBounds() })),
             canvas: { x: rect.x, y: rect.y, scaleX: rect.width / game.scale.width, scaleY: rect.height / game.scale.height },
         }
@@ -72,6 +77,22 @@ export async function clickText(page: Page, text: string) {
     const target = ui.texts.filter(t => t.enabled && t.text === text).sort((a, b) => b.depth - a.depth)[0]
     expect(target, `interactive text ${JSON.stringify(text)} in ${ui.scene}`).toBeDefined()
     await clickPoint(page, target.x + target.width / 2, target.y + target.height / 2)
+}
+
+export async function clickMapNode(page: Page, id: string) {
+    for (let attempt = 0; attempt < 20; attempt++) {
+        const ui = await inspect(page), node = ui.mapNodes.find(node => node.id === id), viewport = ui.mapViewport!
+        expect(node, `Map node ${id}`).toBeDefined()
+        expect(node!.enabled).toBe(true)
+        if (node!.y >= viewport.y && node!.y + node!.height < viewport.y + viewport.height) {
+            await clickPoint(page, node!.x + node!.width / 2, node!.y + node!.height / 2)
+            return
+        }
+        await page.mouse.move(ui.canvas.x + (viewport.x + viewport.width / 2) * ui.canvas.scaleX, ui.canvas.y + (viewport.y + viewport.height / 2) * ui.canvas.scaleY)
+        await page.mouse.wheel(0, node!.y + node!.height >= viewport.y + viewport.height ? 180 : -180)
+        await page.waitForTimeout(60)
+    }
+    throw new Error(`Map node ${id} did not scroll into view`)
 }
 
 export async function clickCard(page: Page, id: string) {
