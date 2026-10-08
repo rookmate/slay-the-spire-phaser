@@ -17,6 +17,7 @@ import type { RunState } from './run'
 import type { PlayerState } from './state'
 
 export function createCombatEngine(run: RunState, roomKind: RoomKind): Engine {
+    if (run.act === 1 && roomKind === 'boss') (run.runFlags ??= {}).reachedFirstBoss = true
     const { seed, act } = run
     const combatIndex = run.combatCount ?? 0
     const tier = affectsRoomTier(roomKind)
@@ -55,6 +56,7 @@ export function createCombatEngine(run: RunState, roomKind: RoomKind): Engine {
     })
     engine.configurePlayerCombatBonuses({ baseEnergyPerTurn: Math.max(0, 3 + getRelicEnergyBonus(run) - blightStacks(run, 'VOID_ESSENCE')) })
     engine.initializeCombat()
+    engine.enqueue({ kind: 'OrbPassives', phase: 'start' })
     initializeModifiedCombat(engine)
     startModifiedTurn(engine)
     engine.enqueue({ kind: 'DrawCards', count: Math.max(5 - blightStacks(run, 'SCATTERBRAIN'), player.deck.filter(card => resolveCard(card).innate).length) })

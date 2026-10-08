@@ -1,3 +1,4 @@
+import { recordPlayerHpLoss } from './cardCosts'
 import { hasMuzzle } from '../modes/endless'
 import { combatHealingAmount } from '../health'
 import { CARD_DEFS } from '../cards'
@@ -46,7 +47,7 @@ export function resolveCombatEffect(engine: Engine, action: CombatEffect, evts: 
                 target.hp = Math.max(0, target.hp - actualDamage)
                 if (target === engine.state.player) {
                     if (source !== engine.state.player) engine.state.enemyDamageTaken = (engine.state.enemyDamageTaken ?? 0) + actualDamage
-                    engine.state.hpLossCount = (engine.state.hpLossCount ?? 0) + 1
+                    recordPlayerHpLoss(engine)
                     if (action.fromCard) triggerRupture(engine)
                     if ((action.damageType ?? 'attack') === 'attack' && powerAmount(target, 'PLATED_ARMOR') > 0)
                         engine.setPowerStacks(target, 'PLATED_ARMOR', powerAmount(target, 'PLATED_ARMOR') - 1)
@@ -152,7 +153,7 @@ export function resolveCombatEffect(engine: Engine, action: CombatEffect, evts: 
             const lost = hpLossAmount(engine, target, action.amount)
             target.hp = Math.max(0, target.hp - lost)
             if (target === engine.state.player && lost > 0) {
-                engine.state.hpLossCount = (engine.state.hpLossCount ?? 0) + 1
+                recordPlayerHpLoss(engine)
                 if (action.fromCard !== false) triggerRupture(engine)
             }
             recordHeartDamage(target, lost)

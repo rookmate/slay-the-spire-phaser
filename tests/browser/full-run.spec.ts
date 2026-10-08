@@ -3,8 +3,8 @@ import { createNewRun } from '../../src/core/run'
 import { canUpgradeCard } from '../../src/core/cards'
 import { RELIC_DEFS } from '../../src/core/relics'
 import { boot, clickCard, clickPoint, clickText, dragCard, expectScene, inspect, reloadRun } from './driver'
-import { cardPriority, choosePlay, chooseRoute } from './policy'
-import { bossRelicPick, eventPick, neowPick, rewardPick, shopPick } from './strategy'
+import { cardPriority, choosePlay, chooseRoute } from '../support/policy'
+import { bossRelicPick, eventPick, neowPick, rewardPick, shopPick } from '../support/strategy'
 
 async function selectFromPages(page: Page, id: string) {
     for (let attempt = 0; attempt < 20; attempt++) {
@@ -17,7 +17,7 @@ async function selectFromPages(page: Page, id: string) {
 
 test('plays a seeded starter-deck run through all three acts and records victory', async ({ page }, testInfo) => {
     test.setTimeout(process.env.CI ? 900_000 : 300_000)
-    const errors = await boot(page, createNewRun({ seed: process.env.PLAYTHROUGH_SEED ?? 'stage3-1506' }))
+    const errors = await boot(page, createNewRun({ seed: process.env.PLAYTHROUGH_SEED ?? 'fidelity-ironclad-377' }))
     await expectScene(page, 'Neow')
     const history: string[] = []
     let lastCombat = ''
@@ -61,7 +61,7 @@ test('plays a seeded starter-deck run through all three acts and records victory
                     continue
                 }
                 const state = ui.state!
-                const play = choosePlay(state)
+                const play = choosePlay(state, ui.legalPlays!)
                 if (play) {
                     await dragCard(page, play.card.instanceId, play.enemyIndex)
                     await expect.poll(async () => {

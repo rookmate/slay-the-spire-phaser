@@ -1,3 +1,5 @@
+import { gainGold } from './health'
+import { dynamicCostOffset } from './combat/cardCosts'
 import { blightStacks, endlessAttackMultiplier, modifyEndlessEnemy } from './modes/endless'
 import { startModifiedTurn, endModifiedTurn } from './modes/combat'
 import { relicAllowsUnplayable, relicCardDamage, syncConditionalRelics, refillEmptyHand } from './combat/relicRules'
@@ -37,6 +39,7 @@ import type {
     CardInstance,
     ChoiceZone,
     CombatState,
+    CombatCardRuntime,
     EnemyState,
     LimboCardState,
     PendingChoice,
@@ -205,7 +208,7 @@ export class Engine {
 
     exhaustCardsInHand(predicate: (card: CardInstance) => boolean): CardInstance[] { return piles.exhaustCardsInHand(this, predicate) }
 
-    getCombatCardRuntime(instanceId: string): { bonusDamage?: number; bonusBlock?: number; triggered?: boolean } {
+    getCombatCardRuntime(instanceId: string): CombatCardRuntime {
         this.state.cardRuntime[instanceId] ??= {}
         return this.state.cardRuntime[instanceId]
     }
@@ -251,7 +254,8 @@ export class Engine {
     changeGold(amount: number): number {
         if (!this.run) return 0
         const previous = this.run.gold
-        this.run.gold = Math.max(0, previous + amount)
+        if (amount > 0) gainGold(this.run, amount, heal => this.enqueue({ kind: 'Heal', target: this.state.player.id, amount: heal }))
+        else this.run.gold = Math.max(0, previous + amount)
         return this.run.gold - previous
     }
     gainCurse(id: string): void { if (this.run) obtainCurse(this.run, id) }
@@ -486,26 +490,38 @@ export class Engine {
         if (def.type === 'skill' && powerAmount(this.state.player, 'CORRUPTION') > 0) return 0
         if (def.type === 'attack' && powerAmount(this.state.player, 'FREE_ATTACK') > 0 && !def.xCost) return 0
         if (def.xCost) return this.state.player.energy
-        return card.costForTurn ?? card.costUntilPlayed ?? card.costForCombat ?? card.confusedCost ?? (card.defId === 'BLOOD_FOR_BLOOD' ? Math.max(0, def.cost - (this.state.hpLossCount ?? 0)) : def.dynamicCost?.({ engine: this, card, cost: def.cost }) ?? def.cost)
+        const offset = dynamicCostOffset(this, card)
+        const cost = card.confusedCost === undefined ? def.cost + offset
+            : card.confusedCost + offset - (this.getCombatCardRuntime(card.instanceId).confusedCostOffset ?? 0)
+        return Math.max(0, card.costForTurn ?? card.costUntilPlayed ?? card.costForCombat ?? cost)
+    }
+
+    getPlayableCards(): { card: CardInstance; targets: EntityId[]; cost: number }[] {
+        return this.state.player.hand.flatMap(card => {
+            const targeting = resolveCard(card).targeting?.type
+            const living = this.state.enemies.filter(enemy => enemy.hp > 0).map(enemy => enemy.id)
+            const candidates = targeting === 'single_enemy' ? living.map(id => [id])
+                : [targeting === 'all_enemies' ? living : targeting === 'player' ? [this.state.player.id] : []]
+            return candidates.filter(targets => this.canPlayCard(card, targets)).map(targets => ({ card, targets, cost: this.getCardCost(card) }))
+        })
+    }
+
+    canPlayCard(card: CardInstance, targetIds: EntityId[]): boolean {
+        const def = CARD_DEFS[card.defId]
+        if (!def || !this.canAcceptInput()) return false
+        const resolved = resolveCard(card)
+        if (resolved.type === 'attack' && powerAmount(this.state.player, 'ENTANGLED') > 0) return false
+        if (this.playLimitReached(card) || (resolved.unplayable && !relicAllowsUnplayable(this, card)) || !this.validateTargets(card, targetIds)) return false
+        if (this.state.player.energy < this.getCardCost(card)) return false
+        if (def.canPlay && !def.canPlay({ engine: this, source: this.state.player.id, targets: targetIds, card })) return false
+        return this.state.player.hand.some(entry => entry.instanceId === card.instanceId)
     }
 
     playCard(card: CardInstance, targetIds: EntityId[]): EmittedEvent[] {
-        const def = CARD_DEFS[card.defId]
-        if (!def || !this.canAcceptInput()) return []
+        if (!this.canPlayCard(card, targetIds)) return []
         const resolved = resolveCard(card)
-        if (resolved.type === 'attack' && powerAmount(this.state.player, 'ENTANGLED') > 0) return []
-        if (this.playLimitReached(card) || (resolved.unplayable && !relicAllowsUnplayable(this, card)) || !this.validateTargets(card, targetIds)) return []
-
         const effectiveCost = this.getCardCost(card)
-        if (this.state.player.energy < effectiveCost) return []
-
-        if (def.canPlay) {
-            const canPlay = def.canPlay({ engine: this, source: this.state.player.id, targets: targetIds, card })
-            if (!canPlay) return []
-        }
-
         const handIndex = this.state.player.hand.findIndex(entry => entry.instanceId === card.instanceId)
-        if (handIndex < 0) return []
 
         const freeAttack = resolved.type === 'attack' && powerAmount(this.state.player, 'FREE_ATTACK') > 0
         if (freeAttack) this.setPowerStacks(this.state.player, 'FREE_ATTACK', powerAmount(this.state.player, 'FREE_ATTACK') - 1)

@@ -66,11 +66,11 @@ export function createProfileRun(meta: MetaState, options: NewRunOptions & { mod
         const colorless = selectCardPool({ character, source: 'colorless' })
         for (let i = 0; i < 5; i++) obtainCard(run, random(colorless))
     }
-    if (hasModifier(run, 'MY_TRUE_FORM')) for (const id of ['DEMON_FORM', 'WRAITH_FORM', 'ECHO_FORM', 'DEVA_FORM']) obtainCard(run, id)
+    if (hasModifier(run, 'MY_TRUE_FORM')) run.deck.push(...['DEMON_FORM', 'WRAITH_FORM', 'ECHO_FORM', 'DEVA_FORM'].map(id => createCardInstance(id)))
     if (hasModifier(run, 'CURSED_RUN')) run.relics = ['CURSED_KEY', 'DARKSTONE_PERIAPT', 'DU_VU_DOLL']
-    if (hasModifier(run, 'CONTROLLED_CHAOS')) run.relics = ['FROZEN_EYE']
     if (hasModifier(run, 'INCEPTION')) run.relics = ['UNCEASING_TOP']
     if (hasModifier(run, 'PRAISE_SNECKO')) run.relics = ['SNECKO_EYE']
+    if (hasModifier(run, 'CONTROLLED_CHAOS')) applyRelicAcquisition(run, 'FROZEN_EYE')
     if (hasModifier(run, 'HEIRLOOM')) applyRelicAcquisition(run, drawRelic(rng, meta, run, 'rare'))
     if (hasModifier(run, 'STARTER_DECK')) {
         applyRelicAcquisition(run, 'BUSTED_CROWN'); if (!hasModifier(run, 'BINARY')) run.modifiers.push('BINARY')

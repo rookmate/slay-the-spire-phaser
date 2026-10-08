@@ -1,3 +1,4 @@
+import { dynamicCostOffset } from './cardCosts'
 import { triggerRelicDiscard, triggerRelicShuffle } from '../relics'
 import { createCombatCard } from './cardCreation'
 import type { Engine } from '../engine'
@@ -106,7 +107,10 @@ export function drawOne(engine: Engine): boolean {
         if (!card) return false
         player.hand.push(card)
         engine.state.lastDrawnCard = card
-        if (powerAmount(player, 'CONFUSION') > 0 && !resolveCard(card).unplayable && !resolveCard(card).xCost) card.confusedCost = engine.rng.int(0, 3)
+        if (powerAmount(player, 'CONFUSION') > 0 && !resolveCard(card).unplayable && !resolveCard(card).xCost) {
+            card.confusedCost = engine.rng.int(0, 3)
+            engine.getCombatCardRuntime(card.instanceId).confusedCostOffset = dynamicCostOffset(engine, card)
+        }
         onCardDrawn(engine, card)
         return true
     }

@@ -1,11 +1,11 @@
 import { addRunMenu } from '../ui/runMenu'
 import { loadSettings } from '../core/settings'
-import { canEnterMapNode, enterMapNode } from '../core/relics/campaignRules'
+import { canEnterMapNode } from '../core/relics/campaignRules'
 import Phaser from 'phaser'
 import { getAscensionLabel } from '../core/ascension'
 import type { RunState } from '../core/run'
 import { saveRun } from '../core/run'
-import { RNG } from '../core/rng'
+import { enterRoom } from '../core/rooms'
 import { getRunMap, type GeneratedMap, type MapNode } from '../core/map'
 import { getRelicDisplayName } from '../core/relics'
 import { getRunDestination } from '../core/progression'
@@ -73,24 +73,7 @@ export class MapScene extends Phaser.Scene {
     }
 
     private enterNode(node: MapNode): void {
-        if (!this.isSelectable(node)) return
-        const rng = new RNG(`${this.run.seed}-unknown-${this.run.floor}`)
-        const kind = enterMapNode(this.run, this.gmap, node, rng)
-        this.run.burningEliteActive = Boolean(this.run.keysEnabled !== false && node.burning && !this.run.keys.emerald)
-        if (kind === 'monster' || kind === 'elite' || kind === 'boss') {
-            this.run.pendingRoom = { scene: 'Combat', roomKind: kind }
-        } else if (kind === 'rest') {
-            this.run.pendingRoom = { scene: 'Campfire' }
-        } else if (kind === 'shop') {
-            this.run.pendingRoom = { scene: 'Shop' }
-        } else if (kind === 'chest') {
-            const rewardKind = node.kind === 'unknown' ? 'unknown-chest' : 'chest'
-            this.run.pendingRoom = {
-                scene: 'Chest', rewardSeed: `${this.run.seed}-reward-${node.id}-${rewardKind}`,
-            }
-        } else {
-            this.run.pendingRoom = { scene: 'Event' }
-        }
+        if (!enterRoom(this.run, node)) return
         saveRun(this.run)
         const destination = getRunDestination(this.run)
         this.scene.start(destination.scene, destination.data)

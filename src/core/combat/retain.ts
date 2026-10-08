@@ -26,6 +26,7 @@ export function discardEndTurnHand(engine: Engine): void {
         } else if (!pyramid) engine.discardCards([card.instanceId], 'end_turn')
     }
     for (const card of [...player.hand, ...player.drawPile, ...player.discardPile, ...player.exhaustPile]) {
+        if (resolveCard(card).dynamicCostScope === 'turn') engine.getCombatCardRuntime(card.instanceId).confusedCostOffset = 0
         card.costForTurn = undefined
         card.retained = false
     }

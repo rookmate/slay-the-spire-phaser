@@ -54,6 +54,14 @@ export interface PowerInstance {
     fresh?: boolean
 }
 
+export interface CombatCardRuntime {
+    bonusDamage?: number
+    bonusBlock?: number
+    triggered?: boolean
+    hpLossCount?: number
+    confusedCostOffset?: number
+}
+
 export interface CardInstance {
     instanceId: string
     defId: string
@@ -164,6 +172,7 @@ export interface CardDef {
         card: CardInstance
         spentEnergy: number
     }) => void
+    dynamicCostScope?: 'turn'
     dynamicCost?: (ctx: { engine: CardEngineApi; card: CardInstance; cost: number }) => number
     onDraw?: (ctx: { engine: CardEngineApi; card: CardInstance }) => void
     resolveDestination?: CardDestination
@@ -254,7 +263,7 @@ export interface CombatState {
     victory: boolean
     defeat: boolean
     limbo: LimboCardState[]
-    cardRuntime: Record<string, { bonusDamage?: number; bonusBlock?: number; triggered?: boolean }>
+    cardRuntime: Record<string, CombatCardRuntime>
     facingEnemyId?: string
     hpLossCount?: number
     enemyDamageTaken?: number

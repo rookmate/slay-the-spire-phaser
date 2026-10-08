@@ -15,11 +15,11 @@ export function changeMaxHp(run: RunState, amount: number): void {
     if (amount > 0) healRun(run, amount)
     run.player.hp = Math.min(run.player.hp, run.player.maxHp)
 }
-export function gainGold(run: RunState, amount: number): void {
+export function gainGold(run: RunState, amount: number, heal: (amount: number) => void = amount => { healRun(run, amount) }): void {
     if (run.relics.includes('ECTOPLASM')) return
     run.gold += Math.max(0, Math.floor(amount))
     run.stats ??= {}; run.stats.goldEarned = (run.stats.goldEarned ?? 0) + Math.max(0, Math.floor(amount))
-    if (amount > 0 && run.relics.includes('BLOODY_IDOL')) healRun(run, 5)
+    if (amount > 0 && run.relics.includes('BLOODY_IDOL')) heal(5)
 }
 
 export function combatHealingAmount(run: Pick<RunState, 'relics'> & Partial<Pick<RunState, 'endlessLoop'>> | undefined, amount: number): number {

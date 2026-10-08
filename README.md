@@ -54,6 +54,16 @@ from the commercial game will produce a different run. Daily challenges use a
 UTC date and save scores on this device. Saves and profiles use browser local
 storage; clearing browser data removes them.
 
+## Campaign regression checks
+
+Core tests replay fixed three-act victories for Ironclad, Silent, Defect, and
+Watcher from their normal starter decks and Neow options. The player acquires
+cards, relics, and potions through game actions. Room entry, chest opening,
+combat outcomes, and reward claims use the same core functions as the scenes.
+Every room checkpoint is serialized and restored; tests check legal actions,
+unique card ownership, score statistics, and finite progress. The strategies
+live in `tests/support` and are deliberately limited test players.
+
 ## Browser checks
 
 ```bash

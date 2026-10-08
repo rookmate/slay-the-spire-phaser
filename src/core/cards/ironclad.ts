@@ -9,6 +9,7 @@ import { attackAmount } from './helpers'
 /** The remaining Ironclad cards; callbacks resolve against the shared combat engine. */
 const ADDITIONAL_CARDS: Record<string, CardDef> = {
     BLOOD_FOR_BLOOD: {
+        dynamicCost: ({ engine, cost }) => cost - (engine.state.hpLossCount ?? 0),
         id: 'BLOOD_FOR_BLOOD', name: 'Blood for Blood', type: 'attack', rarity: 'uncommon', cost: 4,
         baseDamage: 18, upgrade: { cost: 3, baseDamage: 22 }, targeting: { type: 'single_enemy', required: true },
     },
