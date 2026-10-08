@@ -1,3 +1,5 @@
+import { COLORLESS_CARDS } from './cards/colorless'
+import { REMAINING_IRONCLAD_CARDS } from './cards/ironclad'
 import { attackAmount, chooseOneCard, isUpgraded } from './cards/helpers'
 import { STATUS_CARDS } from './cards/status'
 import { POWER_CARDS } from './cards/power'
@@ -63,6 +65,8 @@ export interface ResolvedCardDef extends CardDef {
 }
 
 export const CARD_DEFS: Record<string, CardDef> = {
+    ...REMAINING_IRONCLAD_CARDS,
+    ...COLORLESS_CARDS,
     ...STATUS_CARDS,
     ...POWER_CARDS,
     STRIKE: {
@@ -999,6 +1003,7 @@ export const CARD_DEFS: Record<string, CardDef> = {
 }
 
 for (const def of Object.values(CARD_DEFS)) {
+    def.color ??= def.type === 'status' || def.type === 'curse' ? 'colorless' : 'ironclad'
     def.implemented ??= true
     def.poolEnabled ??= def.type !== 'status' && def.type !== 'curse'
 }
@@ -1027,6 +1032,7 @@ export function resolveCard(card: CardInstance): ResolvedCardDef {
 
     return {
         ...def,
+        targeting: def.targeting ?? { type: 'none' },
         name,
         cost,
         exhaust,
@@ -1053,7 +1059,7 @@ export function getUnlockedCollectibleCards(meta: MetaState, rarity?: 'basic' | 
     const unlocked = getEffectiveUnlockedCardIds(meta)
     return Object.values(CARD_DEFS)
         .filter(card => isCollectibleCard(card.id))
-        .filter(card => unlocked.has(card.id))
+        .filter(card => card.color === 'ironclad' && unlocked.has(card.id))
         .filter(card => !rarity || card.rarity === rarity)
         .map(card => card.id)
 }

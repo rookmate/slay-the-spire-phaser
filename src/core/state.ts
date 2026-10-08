@@ -5,6 +5,9 @@ export type ChoiceZone = 'hand' | 'discard' | 'exhaust'
 export type CardDestination = 'hand' | 'drawPile' | 'drawPileTop' | 'discardPile' | 'exhaustPile'
 
 export type PowerId =
+    | 'CONSTRICTED' | 'INVINCIBLE'
+    | 'RITUAL' | 'CONFUSION' | 'HEX' | 'ENTANGLED' | 'DRAW_REDUCTION'
+    | 'PLATED_ARMOR' | 'REGENERATE' | 'INTANGIBLE' | 'RUPTURE' | 'CURL_UP'
     | 'FRAIL'
     | 'ARTIFACT'
     | 'NO_DRAW'
@@ -39,6 +42,9 @@ export interface CardInstance {
     instanceId: string
     defId: string
     upgradeLevel: number
+    costForCombat?: number
+    costForTurn?: number
+    confusedCost?: number
 }
 
 export interface PendingChoiceView {
@@ -68,6 +74,7 @@ export interface CardChoiceRequest extends PendingChoiceView {
 export interface CardEngineApi {
     state: CombatState
     enqueue: (a: Action) => void
+    playTopCard?: () => void
     setDoubleTapCharges?: (charges: number) => void
     modifyOutgoingAttackDamageFromPlayer?: (base: number, cardInstanceId?: string) => number
     handleExhaustFromHand?: (card: CardInstance) => void
@@ -99,7 +106,10 @@ export interface EnemyEngineApi {
     applyPowerToPlayer: (powerId: PowerId, stacks: number) => void
 }
 
+export type CardColor = 'ironclad' | 'silent' | 'defect' | 'watcher' | 'colorless'
+
 export interface CardDef {
+    color?: CardColor
     id: string
     name: string
     type: CardType
@@ -170,6 +180,25 @@ export interface PlayerState {
     powers: PowerInstance[]
 }
 
+export type EnemyEffect =
+    | { kind: 'power'; target: 'self' | 'player' | 'allies'; id: PowerId; amount: number }
+    | { kind: 'block'; target: 'self' | 'allies' | 'ally'; amount: number }
+    | { kind: 'cards'; id: string; destination: 'drawPile' | 'discardPile' | 'drawPileTop'; count: number; upgradeLevel?: number }
+    | { kind: 'heal'; amount: number; target: 'self' | 'allies' }
+    | { kind: 'cleanse' }
+    | { kind: 'steal'; amount: number }
+    | { kind: 'escape' }
+
+export type EnemyIntent = (
+    | { kind: 'attack'; amount: number }
+    | { kind: 'multi_attack'; amount: number; hits: number }
+    | { kind: 'block'; amount: number }
+    | { kind: 'buff'; desc?: string }
+    | { kind: 'debuff'; debuff: PowerId; stacks: number }
+    | { kind: 'status'; createdDefId: string; destination: 'discardPile' | 'drawPile'; count: number }
+    | { kind: 'summon'; desc?: string }
+) & { effects?: EnemyEffect[]; move?: string }
+
 export interface EnemyState {
     id: EntityId
     name: string
@@ -177,14 +206,11 @@ export interface EnemyState {
     hp: number
     block: number
     powers: PowerInstance[]
-    intent?:
-    | { kind: 'attack'; amount: number }
-    | { kind: 'multi_attack'; amount: number; hits: number }
-    | { kind: 'block'; amount: number }
-    | { kind: 'buff'; desc?: string }
-    | { kind: 'debuff'; debuff: 'WEAK' | 'VULNERABLE'; stacks: number }
-    | { kind: 'status'; createdDefId: 'DAZED' | 'SLIMED'; destination: 'discardPile'; count: number }
-    | { kind: 'summon'; desc?: string }
+    intent?: EnemyIntent
+    asc?: number
+    escaped?: boolean
+    halfDead?: boolean
+    stasisCard?: CardInstance
     // Optional spec reference to drive intent generation
     specId?: string
     aiState?: Record<string, number | boolean | string>
@@ -199,4 +225,8 @@ export interface CombatState {
     defeat: boolean
     limbo: LimboCardState[]
     cardRuntime: Record<string, { bonusDamage?: number; triggered?: boolean }>
+    facingEnemyId?: string
+    hpLossCount?: number
+    cardsPlayed?: number
+    turnNumber?: number
 }

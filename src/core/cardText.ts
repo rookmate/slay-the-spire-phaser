@@ -5,6 +5,14 @@ import type { CardInstance } from './state'
 
 /** Extra instructions accompany the ordinary damage/block line, in every card view. */
 const instructions: Record<string, (upgraded: boolean) => string> = {
+    BLOOD_FOR_BLOOD: () => 'Costs 1 less each time you lose HP this combat.',
+    HAVOC: () => 'Play the top card of your draw pile, then Exhaust it.',
+    INFERNAL_BLADE: () => 'Add a random Attack to hand. It costs 0 this turn.',
+    INFLAME: u => `Gain ${u ? 3 : 2} Strength.`,
+    RUPTURE: u => `When a card causes you to lose HP, gain ${u ? 2 : 1} Strength.`,
+    SEVER_SOUL: () => 'Exhaust all non-Attacks in hand.',
+    VOID: () => 'When drawn, lose 1 Energy.',
+    ASCENDERS_BANE: () => 'Cannot be removed from your deck.',
     BASH: u => `Apply ${u ? 3 : 2} Vulnerable.`,
     BARRICADE: () => 'Keep Block between turns.',
     METALLICIZE: u => `At turn end, gain ${u ? 4 : 3} Block.`,

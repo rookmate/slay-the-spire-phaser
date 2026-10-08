@@ -11,6 +11,7 @@ export class EnemyDisplay {
     private enemySprites: Phaser.GameObjects.Image[] = []
     private enemyTexts: Phaser.GameObjects.Text[] = []
     private enemyHpTexts: Phaser.GameObjects.Text[] = []
+    private enemyTitleTexts: Phaser.GameObjects.Text[] = []
     private enemyNameTexts: Phaser.GameObjects.Text[] = []
     private enemyPowerTexts: Phaser.GameObjects.Text[] = []
     private enemyIds: string[] = []
@@ -47,6 +48,8 @@ export class EnemyDisplay {
             this.enemySprites.push(sprite)
 
             const labelStyle = { ...style, fontSize: '11px', align: 'center', wordWrap: { width: slot.width } }
+            const nameLength = Math.max(5, Math.floor(slot.width / 5.5))
+            this.enemyTitleTexts.push(this.scene.add.text(slot.x, slot.y + 19, enemy.name.length <= nameLength ? enemy.name : `${enemy.name.slice(0, nameLength - 1)}…`, { ...labelStyle, fontSize: '9px', color: '#bcbcbc' }).setOrigin(0.5, 0))
             const intent = this.scene.add.text(slot.x, slot.y, this.getEnemyText(enemy), labelStyle).setOrigin(0.5, 0)
             const hp = this.scene.add.text(slot.x, slot.y + 100, this.getEnemyHpLabel(enemy), labelStyle).setOrigin(0.5, 0)
             const name = this.scene.add.text(Math.min(this.scene.cameras.main.width - 110, slot.x), slot.y, this.getEnemyDetails(enemy), {
@@ -70,6 +73,8 @@ export class EnemyDisplay {
         this.enemySprites.forEach(item => item.destroy())
         this.enemyTexts.forEach(item => item.destroy())
         this.enemyHpTexts.forEach(item => item.destroy())
+        this.enemyTitleTexts.forEach(item => item.destroy())
+        this.enemyTitleTexts = []
         this.enemyNameTexts.forEach(item => item.destroy())
         this.enemyPowerTexts.forEach(item => item.destroy())
         this.enemySprites = []
@@ -97,9 +102,14 @@ export class EnemyDisplay {
     private getEnemyPowers(enemy: EnemyState): string[] {
         const parts = enemy.powers.map(power => `${power.id}:${power.stacks}`)
         if (enemy.specId === 'BYRD') {
-            if (enemy.aiState?.flying) parts.push(`FLYING:${Math.max(0, 3 - Number(enemy.aiState?.hitsTaken ?? 0))}`)
+            if (enemy.aiState?.flying) parts.push(`FLYING:${Math.max(0, ((enemy.asc ?? 0) >= 17 ? 4 : 3) - Number(enemy.aiState?.hitsTaken ?? 0))}`)
             if (enemy.aiState?.downed) parts.push('DOWNED')
         }
+        if (enemy.specId === 'TIME_EATER') parts.unshift(`TIME WARP:${enemy.aiState?.cards ?? 0}/12`)
+        if (enemy.specId === 'CORRUPT_HEART') parts.unshift(`INVINCIBLE:${Math.max(0, ((enemy.asc ?? 0) >= 19 ? 200 : 300) - Number(enemy.aiState?.damageThisTurn ?? 0))}`, `BEAT:${((enemy.asc ?? 0) >= 19 ? 2 : 1) + (Number(enemy.aiState?.buffs ?? 0) >= 2 ? 1 : 0)}`)
+        if (enemy.specId === 'GIANT_HEAD') parts.unshift(`SLOW:${enemy.aiState?.slow ?? 0}`)
+        if (this.engine.state.enemies.filter(e => e.hp > 0 && ['SPIRE_SHIELD', 'SPIRE_SPEAR'].includes(e.specId ?? '')).length === 2) parts.unshift(enemy.id === (this.engine.state.facingEnemyId ?? this.engine.state.enemies[0].id) ? 'FACING' : 'BEHIND:+50%')
+        if (enemy.halfDead) parts.unshift('REVIVING')
         return parts
     }
 

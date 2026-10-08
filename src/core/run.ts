@@ -1,6 +1,8 @@
+import type { EventCheckpoint, EventCombat } from './events/model'
+import type { Act } from './acts'
 import { RNG } from './rng'
 import { CARD_DEFS, createCardInstance, createStarterDeck } from './cards'
-import { clampAscension as clampAscensionLevel } from './ascension'
+import { clampAscension as clampAscensionLevel, getAscensionStartingMaxHp } from './ascension'
 import { tryPreventCurse } from './relics'
 import type { CardInstance } from './state'
 import type { PotionId } from './potions'
@@ -8,6 +10,9 @@ import type { UnknownWeights } from './map'
 import type { PendingRoom } from './progression'
 
 export type RelicId =
+    | 'MANGO' | 'OLD_COIN' | 'THREAD_AND_NEEDLE'
+    | 'CIRCLET' | 'MEMBERSHIP_CARD' | 'SMILING_MASK' | 'COURIER' | 'ORRERY'
+    | 'GOLDEN_IDOL' | 'BLOODY_IDOL' | 'MARK_OF_THE_BLOOM' | 'RED_MASK' | 'NEOWS_LAMENT'
     | 'BURNING_BLOOD'
     | 'BLACK_BLOOD'
     | 'SOZU'
@@ -39,8 +44,17 @@ export interface RelicStateEntry {
 }
 
 export interface RunState {
+    runId?: string
+    rareCardOffset?: number
+    potionChance?: number
+    elapsedSeconds?: number
+    keys: { ruby: boolean; emerald: boolean; sapphire: boolean }
+    burningEliteActive?: boolean
+    secondBoss?: boolean
+    hallwayCount?: number
+    mapRows?: number
     seed: string
-    act: 1 | 2
+    act: Act
     floor: number
     gold: number
     player: { maxHp: number; hp: number }
@@ -49,6 +63,7 @@ export interface RunState {
     maxPotionSlots: number
     merchantRemoveCost: number
     deck: CardInstance[]
+    neowFull?: boolean
     neowCompleted: boolean
     neowSeed: string
     neowChoiceId?: string
@@ -58,33 +73,43 @@ export interface RunState {
     cursesObtained?: number
     cardsRemoved?: number
     relicState?: Partial<Record<RelicId, RelicStateEntry>>
+    eventState?: EventCheckpoint
+    eventCombat?: EventCombat
     eventHistory?: Partial<Record<string, boolean>>
     runFlags?: Record<string, boolean>
     asc: number
     mapProgress?: { currentNodeId?: string }
     unknownWeights?: UnknownWeights
+    rewardReturnRoom?: PendingRoom
     pendingRoom?: PendingRoom
     combatCount?: number
 }
 
-export function createNewRun(seed?: string, asc = 0): RunState {
+export function createNewRun(seed?: string, asc = 0, previousRunReachedBoss = false): RunState {
     const s = seed ?? Math.random().toString(36).slice(2)
     const rng = new RNG(s)
     const deck: CardInstance[] = createStarterDeck()
     rng.shuffleInPlace(deck)
     const normalizedAsc = clampAscensionLevel(asc)
-    const startingMaxHp = normalizedAsc >= 5 ? 75 : 80
+    const startingMaxHp = getAscensionStartingMaxHp(normalizedAsc, 80)
+    if (normalizedAsc >= 10) deck.push(createCardInstance('ASCENDERS_BANE'))
     return {
+        runId: crypto.randomUUID(),
+        elapsedSeconds: 0,
+        keys: { ruby: false, emerald: false, sapphire: false },
+        hallwayCount: 0,
+        mapRows: 16,
         seed: s,
         act: 1,
         floor: 1,
         gold: 99,
-        player: { maxHp: startingMaxHp, hp: startingMaxHp },
+        player: { maxHp: startingMaxHp, hp: normalizedAsc >= 6 ? Math.round(startingMaxHp * 0.9) : startingMaxHp },
         relics: ['BURNING_BLOOD'],
         potions: [],
-        maxPotionSlots: 3,
-        merchantRemoveCost: normalizedAsc >= 8 ? 100 : 75,
+        maxPotionSlots: normalizedAsc >= 11 ? 2 : 3,
+        merchantRemoveCost: 75,
         deck,
+        neowFull: seed !== undefined || previousRunReachedBoss,
         neowCompleted: false,
         neowSeed: `${s}-neow`,
         neowChoiceId: undefined,
@@ -120,7 +145,7 @@ export function obtainCurse(run: RunState, curseId: string): CardInstance {
 
 export function removeCardByInstanceId(run: RunState, instanceId: string): CardInstance | undefined {
     const index = run.deck.findIndex(card => card.instanceId === instanceId)
-    if (index < 0) return undefined
+    if (index < 0 || run.deck[index].defId === 'ASCENDERS_BANE') return undefined
     const [removed] = run.deck.splice(index, 1)
     run.cardsRemoved = (run.cardsRemoved ?? 0) + 1
     if (removed.defId === 'PARASITE') {
@@ -142,7 +167,18 @@ export function loadRun(): RunState | undefined {
     const s = localStorage.getItem(STORAGE_KEY)
     if (!s) return undefined
     try {
-        return JSON.parse(s) as RunState
+        const parsed: unknown = JSON.parse(s)
+        if (!parsed || typeof parsed !== 'object') return undefined
+        const run = parsed as RunState
+        if (typeof run.seed !== 'string' || ![1, 2, 3, 4].includes(run.act) || !Number.isFinite(run.gold)
+            || !run.player || !Number.isFinite(run.player.hp) || !Number.isFinite(run.player.maxHp)
+            || !Array.isArray(run.deck) || run.deck.some(card => !card || !CARD_DEFS[card.defId] || typeof card.instanceId !== 'string')
+            || !Array.isArray(run.relics) || !Array.isArray(run.potions)) return undefined
+        run.keys ??= { ruby: false, emerald: false, sapphire: false }
+        run.mapRows ??= 15
+        run.asc = clampAscensionLevel(run.asc)
+        run.hallwayCount ??= run.combatCount ?? 0
+        return run
     } catch {
         return undefined
     }

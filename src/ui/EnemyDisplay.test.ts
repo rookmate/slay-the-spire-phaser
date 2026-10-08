@@ -71,9 +71,11 @@ describe('enemy roster display', () => {
         engine.enqueue({ kind: 'DealDamage', source: 'player', target: 'enemy', amount: 80 })
         engine.runUntilIdle()
         display.update()
+        expect(original.destroyed).toBe(false)
+        engine.enqueue({ kind: 'EndTurn' }); engine.runUntilIdle(); display.update()
         expect(original.destroyed).toBe(true)
         expect((display.getEnemySprites() as unknown as View[]).map(view => view.texture))
-            .toEqual(['enemy:ACID_SLIME_M', 'enemy:SPIKE_SLIME_M'])
+            .toEqual(['enemy:ACID_SLIME_L', 'enemy:SPIKE_SLIME_L'])
         checkTargets(display, clicked)
 
         engine.state.enemies[0].hp = 0

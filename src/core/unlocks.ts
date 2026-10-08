@@ -8,6 +8,7 @@ export interface UnlockBundle {
 }
 
 const BASE_UNLOCKED_CARDS = [
+    'BLOOD_FOR_BLOOD', 'CARNAGE', 'HAVOC', 'INFERNAL_BLADE', 'INFLAME', 'RUPTURE', 'SEVER_SOUL', 'WILD_STRIKE',
     'CLEAVE',
     'POMMEL_STRIKE',
     'SHRUG_IT_OFF',

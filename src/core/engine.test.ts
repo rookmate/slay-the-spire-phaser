@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { getAscensionEnemyDamageMultiplier, getAscensionEnemyHpMultiplier, pickMoreAggressiveIntent } from './ascension'
+import { MAX_ASCENSION, getAscensionStartingMaxHp } from './ascension'
 import { CARD_DEFS, createCardInstance, getUnlockedCollectibleCards, resolveCard } from './cards'
 import type { CardInstance, PlayerState } from './state'
 import { Engine, createDummyEnemy, createSimplePlayer } from './engine'
 import { RNG } from './rng'
-import { createEnemyFromSpec, rollEngineIntentForEnemy } from './enemies'
+import { createEnemyFromSpec } from './enemies'
 import { applyRelicAcquisition, BOSS_RELIC_POOL, blocksPotionGain, canRestAtCampfire, getCardRewardChoiceCount, getCombatRelicBonuses, getMerchantRemoveBaseCost, getPostCombatHeal, getRelicEnergyBonus, getRelicState, getShopPriceMultiplier, getUnlockedRelicPool } from './relics'
 import { generateRewardBundle } from './rewards'
 import { clampAscension, getEffectiveUnlockedCardIds, getEffectiveUnlockedRelicIds, getSelectableAscensions, grantNextIroncladUnlock, unlockNextAscension } from './meta'
 import { createNewRun, obtainCurse } from './run'
-import { applyNeowOption, getNeowRareCardChoices, getRandomNeowRelic, rollNeowOptions } from './neow'
+import { applyNeowOption, rollNeowOptions } from './neow'
 import { generateEncounter } from './encounters'
 import { generateEvent, getEventPool, resolveEventChoice, transformCard } from './events'
 import { generateMap } from './map'
@@ -45,24 +45,24 @@ describe('deferred card systems', () => {
         expect(run.asc).toBe(0)
     })
 
-    it('creates ascension runs with lowered starting hp at a5+', () => {
-        const run = createNewRun('a5-seed', 5)
+    it('creates ascension runs with lowered maximum and current HP at a14+', () => {
+        const run = createNewRun('a14-seed', 14)
 
-        expect(run.asc).toBe(5)
+        expect(run.asc).toBe(14)
         expect(run.player.maxHp).toBe(75)
-        expect(run.player.hp).toBe(75)
+        expect(run.player.hp).toBe(68)
     })
 
-    it('unlocks ascensions sequentially and clamps progression at a10', () => {
+    it('unlocks ascensions sequentially and clamps progression at a20', () => {
         const meta = { bestAscensionUnlocked: 0, totalWins: 0, totalRuns: 0, ironcladUnlockTier: 0, unlockedCardIds: [], unlockedRelicIds: [] }
 
         expect(getSelectableAscensions(meta)).toEqual([0])
         expect(unlockNextAscension(meta, 0)).toBe(true)
         expect(meta.bestAscensionUnlocked).toBe(1)
         expect(unlockNextAscension(meta, 0)).toBe(false)
-        meta.bestAscensionUnlocked = 10
-        expect(unlockNextAscension(meta, 10)).toBe(false)
-        expect(clampAscension(14)).toBe(10)
+        meta.bestAscensionUnlocked = 20
+        expect(unlockNextAscension(meta, 20)).toBe(false)
+        expect(clampAscension(24)).toBe(20)
     })
 
     it('starts with the base unlock pool and grants ironclad tiers sequentially', () => {
@@ -110,24 +110,14 @@ describe('deferred card systems', () => {
         grantNextIroncladUnlock(meta)
         const options = rollNeowOptions(run.neowSeed)
         const rerolled = rollNeowOptions(run.neowSeed)
-        const relicId = getRandomNeowRelic(`${run.neowSeed}-GAIN_COMMON_RELIC_REGRET`, run, meta)
-        const rareChoices = getNeowRareCardChoices(`${run.neowSeed}-GAIN_RARE_CARD_PAIN`, meta)
-
         expect(options.map(option => option.id)).toEqual(rerolled.map(option => option.id))
-        expect(options.filter(option => option.category === 'benefit')).toHaveLength(2)
-        expect(options.filter(option => option.category === 'tradeoff')).toHaveLength(2)
-        expect(rareChoices.every(cardId => getEffectiveUnlockedCardIds(meta).has(cardId))).toBe(true)
-
-        applyNeowOption(run, 'GAIN_COMMON_RELIC_REGRET', { rewardRelicId: relicId })
-        expect(run.relics).toContain(relicId)
-        expect(run.deck.some(card => card.defId === 'REGRET')).toBe(true)
+        expect(options.map(option => option.category)).toEqual(['card', 'blessing', 'tradeoff', 'swap'])
+        expect(applyNeowOption(run, meta, options[3])).toBe(true)
+        expect(run.relics).not.toContain('BURNING_BLOOD')
+        expect(run.relics).not.toContain('BLACK_BLOOD')
+        expect(run.relics.some(id => BOSS_RELIC_POOL.includes(id))).toBe(true)
         expect(run.neowCompleted).toBe(true)
-        expect(run.neowChoiceId).toBe('GAIN_COMMON_RELIC_REGRET')
-
-        const secondRun = createNewRun('neow-seed-2')
-        applyNeowOption(secondRun, 'GAIN_RARE_CARD_PAIN', { rewardCardId: rareChoices[0] })
-        expect(secondRun.deck.some(card => card.defId === rareChoices[0])).toBe(true)
-        expect(secondRun.deck.some(card => card.defId === 'PAIN')).toBe(true)
+        expect(applyNeowOption(run, meta, options[3])).toBe(false)
     })
 
     it('resolves upgrade levels and searing blow scaling', () => {
@@ -560,8 +550,9 @@ describe('deferred card systems', () => {
         const enemy = createEnemyFromSpec(new RNG('nob-seed'), 'GREMLIN_NOB', 'e1')
         const engine = new Engine('nob-engine-seed', player, [enemy])
 
-        engine.playCard(player.hand[0], [])
-
+        engine.enqueue({ kind: 'EndTurn' }); engine.runUntilIdle()
+        player.hand = [createCardInstance('DEFEND')]
+        playAndResolve(engine, player.hand[0], [])
         expect(engine.state.enemies[0].powers.find(power => power.id === 'STRENGTH')?.stacks).toBe(2)
     })
 
@@ -599,11 +590,11 @@ describe('deferred card systems', () => {
         engine.enqueue({ kind: 'DealDamage', source: player.id, target: enemy.id, amount: 35 })
         engine.runUntilIdle()
 
-        expect(engine.state.enemies[0].aiState?.mode).toBe('defense')
+        expect(engine.state.enemies[0].aiState?.defensive).toBe(true)
         expect(engine.state.enemies[0].block).toBeGreaterThanOrEqual(20)
     })
 
-    it('slime boss splits into two medium slimes exactly once', () => {
+    it('slime boss waits until its turn to split into two large slimes', () => {
         const player = createPlayerWithHand([])
         const enemy = createEnemyFromSpec(new RNG('slime-boss'), 'SLIME_BOSS', 'e1')
         const engine = new Engine('slime-boss-engine', player, [enemy])
@@ -611,8 +602,11 @@ describe('deferred card systems', () => {
         engine.enqueue({ kind: 'DealDamage', source: player.id, target: enemy.id, amount: 80 })
         engine.runUntilIdle()
 
+        expect(engine.state.enemies).toHaveLength(1)
+        expect(enemy.intent?.move).toBe('split')
+        engine.enqueue({ kind: 'EndTurn' }); engine.runUntilIdle()
         expect(engine.state.enemies).toHaveLength(2)
-        expect(engine.state.enemies.map(entry => entry.specId).sort()).toEqual(['ACID_SLIME_M', 'SPIKE_SLIME_M'])
+        expect(engine.state.enemies.map(entry => entry.specId).sort()).toEqual(['ACID_SLIME_L', 'SPIKE_SLIME_L'])
 
         const enemyIds = engine.state.enemies.map(entry => entry.id)
         engine.enqueue({ kind: 'DealDamage', source: player.id, target: enemyIds[0], amount: 1 })
@@ -633,9 +627,7 @@ describe('deferred card systems', () => {
         expect(engine.state.enemies[0].aiState?.downed).toBe(true)
         expect(engine.state.enemies[0].aiState?.flying).toBe(false)
 
-        engine.state.enemies[0].intent = rollEngineIntentForEnemy(new RNG('byrd-recover'), engine.state.enemies[0], engine.state)
-        engine.enqueue({ kind: 'EndTurn' })
-        engine.runUntilIdle()
+        for (let turn = 0; turn < 3; turn++) { engine.enqueue({ kind: 'EndTurn' }); engine.runUntilIdle() }
 
         expect(engine.state.enemies[0].aiState?.flying).toBe(true)
     })
@@ -650,14 +642,12 @@ describe('deferred card systems', () => {
         engine.runUntilIdle()
 
         expect(engine.state.enemies.filter(enemy => enemy.hp > 0)).toHaveLength(3)
-        expect(engine.state.enemies.some(enemy => enemy.specId === 'GREMLIN_MINION')).toBe(true)
+        expect(engine.state.enemies.some(enemy => enemy.tags?.includes('minion'))).toBe(true)
     })
 
     it('taskmaster adds wounds to discard pile on lash turns', () => {
         const player = createPlayerWithHand([])
         const taskmaster = createEnemyFromSpec(new RNG('taskmaster-seed'), 'TASKMASTER', 'e1')
-        taskmaster.aiState = { cycle: 1, move: 'lash' }
-        taskmaster.intent = { kind: 'attack', amount: 9 }
         const engine = new Engine('taskmaster-engine', player, [taskmaster])
 
         engine.enqueue({ kind: 'EndTurn' })
@@ -665,10 +655,10 @@ describe('deferred card systems', () => {
 
         const woundCount = [...engine.state.player.hand, ...engine.state.player.discardPile, ...engine.state.player.drawPile]
             .filter(card => card.defId === 'WOUND')
-        expect(woundCount).toHaveLength(2)
+        expect(woundCount).toHaveLength(1)
     })
 
-    it('the collector resummons torch heads and phase shifts below half hp', () => {
+    it('the collector resummons torch heads and applies its fourth-turn debuffs', () => {
         const player = createPlayerWithHand([])
         const collector = createEnemyFromSpec(new RNG('collector-seed'), 'THE_COLLECTOR', 'e1')
         const torchOne = createEnemyFromSpec(new RNG('torch-1'), 'TORCH_HEAD', 'e2')
@@ -683,10 +673,8 @@ describe('deferred card systems', () => {
 
         expect(engine.state.enemies.filter(enemy => enemy.specId === 'TORCH_HEAD' && enemy.hp > 0)).toHaveLength(2)
 
-        engine.enqueue({ kind: 'DealDamage', source: player.id, target: 'e1', amount: 160 })
-        engine.runUntilIdle()
-
-        expect(engine.state.enemies.find(enemy => enemy.id === 'e1')?.aiState?.enraged).toBe(true)
+        for (let turn = 0; turn < 3; turn++) { engine.enqueue({ kind: 'EndTurn' }); engine.runUntilIdle() }
+        expect(player.powers).toEqual(expect.arrayContaining([{ id: 'FRAIL', stacks: 3, fresh: false }]))
     })
 
     it('keeps status cards out of collectible pools and reward bundles', () => {
@@ -748,7 +736,7 @@ describe('deferred card systems', () => {
     })
 
     it('applies ascension hallway gold, shop, and map modifiers', () => {
-        const ascRun = createNewRun('asc-run', 8)
+        const ascRun = createNewRun('asc-run', 16)
         const meta = {
             bestAscensionUnlocked: 0,
             totalWins: 0,
@@ -762,23 +750,16 @@ describe('deferred card systems', () => {
         const eliteCount = map.nodes.filter(node => node.kind === 'elite').length
 
         const goldReward = hallwayRewards.items.find(item => item.kind === 'gold')
-        expect(goldReward && goldReward.kind === 'gold' && goldReward.amount).toBeLessThanOrEqual(16)
+        expect(goldReward && goldReward.kind === 'gold' && goldReward.amount).toBeLessThanOrEqual(20)
         expect(getShopPriceMultiplier(ascRun)).toBe(1.1)
-        expect(getMerchantRemoveBaseCost(ascRun)).toBe(100)
-        expect(eliteCount).toBeGreaterThanOrEqual(3)
+        expect(getMerchantRemoveBaseCost(ascRun)).toBe(75)
+        expect(eliteCount).toBeGreaterThanOrEqual(1)
     })
 
-    it('applies ascension combat scaling helpers and hallway intent upgrades', () => {
-        const boss = createEnemyFromSpec(new RNG('champ-boss'), 'THE_CHAMP', 'e1')
-        const elite = createEnemyFromSpec(new RNG('book-elite'), 'BOOK_OF_STABBING', 'e2')
-        const first = { kind: 'block', amount: 12 } as const
-        const second = { kind: 'attack', amount: 9 } as const
-
-        expect(getAscensionEnemyHpMultiplier(1, 'elite')).toBeCloseTo(1.15)
-        expect(getAscensionEnemyHpMultiplier(3, 'elite')).toBeCloseTo(1.265)
-        expect(getAscensionEnemyDamageMultiplier(2, elite)).toBeCloseTo(1.1)
-        expect(getAscensionEnemyDamageMultiplier(10, boss)).toBeCloseTo(1.265)
-        expect(pickMoreAggressiveIntent(first, second)).toEqual(second)
+    it('uses the official ascension cap and starting max HP threshold', () => {
+        expect(MAX_ASCENSION).toBe(20)
+        expect(getAscensionStartingMaxHp(13, 80)).toBe(80)
+        expect(getAscensionStartingMaxHp(14, 80)).toBe(75)
     })
 
     it('applies boss relic hooks and boss reward generation', () => {
@@ -832,12 +813,13 @@ describe('deferred card systems', () => {
         ]).toContain(hallway[0])
         expect([
             ['BOOK_OF_STABBING'],
-            ['GREMLIN_LEADER'],
-            ['RED_SLAVER', 'BLUE_SLAVER', 'TASKMASTER'],
+            ['GREMLIN_LEADER', 'SNEAKY_GREMLIN', 'FAT_GREMLIN'],
+            ['RED_SLAVER', 'TASKMASTER', 'BLUE_SLAVER'],
         ]).toContainEqual(elite)
         expect([
             ['THE_CHAMP'],
-            ['THE_COLLECTOR', 'TORCH_HEAD', 'TORCH_HEAD'],
+            ['THE_COLLECTOR'],
+            ['BRONZE_AUTOMATON'],
         ]).toContainEqual(boss)
     })
 
@@ -857,7 +839,9 @@ describe('deferred card systems', () => {
         }
 
         resolveEventChoice(run, meta, 'GOLDEN_IDOL', 'GOLDEN_IDOL_TAKE', 'idol-seed')
-        expect(run.gold).toBe(199)
+        expect(run.gold).toBe(99)
+        expect(run.relics).toContain('GOLDEN_IDOL')
+        resolveEventChoice(run, meta, 'GOLDEN_IDOL', 'IDOL_INJURY', 'idol-seed')
         expect(run.deck.some(card => card.defId === 'INJURY')).toBe(true)
 
         const secondRun = createNewRun('event-seed-2')
@@ -885,6 +869,7 @@ describe('deferred card systems', () => {
         expect(CARD_DEFS[transformed!.defId].type).not.toBe('status')
         expect(CARD_DEFS[transformed!.defId].type).not.toBe('curse')
         expect(getEffectiveUnlockedCardIds(meta).has(transformed!.defId)).toBe(true)
-        expect(getEventPool(2)).toEqual(['CLERIC', 'UPGRADE_SHRINE', 'FORGOTTEN_ALTAR', 'THE_MAUSOLEUM', 'BEGGAR'])
+        expect(getEventPool(2)).toEqual(expect.arrayContaining(['THE_JOUST', 'THE_LIBRARY', 'FORGOTTEN_ALTAR', 'THE_MAUSOLEUM', 'BEGGAR']))
+        expect(getEventPool(2)).not.toContain('CLERIC')
     })
 })

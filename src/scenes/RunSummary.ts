@@ -1,10 +1,11 @@
 import Phaser from 'phaser'
 import { getAscensionLabel } from '../core/ascension'
 import { CARD_DEFS } from '../core/cards'
-import { grantNextIroncladUnlock, loadMeta, saveMeta, unlockNextAscension } from '../core/meta'
+import { loadMeta, saveMeta } from '../core/meta'
+import { recordRunResult } from '../core/runResults'
 import { clearSavedRun, type RunState } from '../core/run'
 import { getRelicDisplayName } from '../core/relics'
-import { IRONCLAD_UNLOCK_TRACK, type UnlockBundle } from '../core/unlocks'
+import { IRONCLAD_UNLOCK_TRACK } from '../core/unlocks'
 
 export class RunSummaryScene extends Phaser.Scene {
     constructor() { super('RunSummary') }
@@ -12,14 +13,7 @@ export class RunSummaryScene extends Phaser.Scene {
     create(data: { run: RunState; result: 'victory' | 'defeat' }): void {
         const style = { fontFamily: 'monospace', fontSize: '20px', color: '#ffffff' }
         const meta = loadMeta()
-        let unlockedNext = false
-        let unlockBundle: UnlockBundle | undefined
-        meta.totalRuns += 1
-        if (data.result === 'victory') {
-            meta.totalWins += 1
-            unlockedNext = unlockNextAscension(meta, data.run.asc)
-            unlockBundle = grantNextIroncladUnlock(meta)
-        }
+        const { unlockedNext, unlockBundle } = recordRunResult(meta, data.run, data.result)
         saveMeta(meta)
 
         this.add.text(16, 16, `Run ${data.result.toUpperCase()}!`, style)

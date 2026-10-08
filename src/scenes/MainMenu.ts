@@ -1,6 +1,7 @@
 import Phaser from 'phaser'
 import { createNewRun, loadRun, saveRun, /*type RunState */ } from '../core/run'
-import { /*getDailySeed, */getSelectableAscensions, loadMeta } from '../core/meta'
+import { getSelectableAscensions, loadMeta, saveMeta } from '../core/meta'
+import { reachedFirstBoss } from '../core/runResults'
 import { IRONCLAD_UNLOCK_TRACK } from '../core/unlocks'
 import { getAscensionLabel } from '../core/ascension'
 import { getRunDestination } from '../core/progression'
@@ -33,7 +34,10 @@ export class MainMenuScene extends Phaser.Scene {
         this.add.text(16, 140, 'New Run', { ...style, backgroundColor: '#333', padding: { x: 8, y: 6 } })
             .setInteractive({ useHandCursor: true })
             .on('pointerdown', () => {
-                const run = createNewRun(undefined, ascension)
+                const previous = loadRun()
+                if (previous) meta.previousRunReachedBoss = reachedFirstBoss(previous)
+                saveMeta(meta)
+                const run = createNewRun(undefined, ascension, meta.previousRunReachedBoss)
                 saveRun(run)
                 this.scene.start('Neow', { run })
             })
@@ -65,7 +69,6 @@ export class MainMenuScene extends Phaser.Scene {
             .setInteractive({ useHandCursor: true })
             .on('pointerdown', () => {
                 const run = loadRun() ?? createNewRun()
-                saveRun(run)
                 this.scene.start('DeckBuilder', { run })
             })
     }
