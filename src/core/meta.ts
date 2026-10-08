@@ -19,6 +19,8 @@ export interface RunHistoryEntry {
     deck: { id: string; upgrade: number }[]; relics: RelicId[]
 }
 export interface MetaState {
+    achievements?: Partial<Record<import('./achievements/catalog').AchievementId, string>>
+    notifications?: import('./achievements/catalog').UnlockNotice[]
     customUnlocked?: boolean
     version?: 3
     characters?: Record<CharacterId, CharacterProgress>

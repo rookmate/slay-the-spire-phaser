@@ -22,6 +22,7 @@ export class SettingsScene extends Phaser.Scene {
         level('effectsVolume', 'Effects level', 296, 'FX ')
         menuButton(this, 24, 346, `Reduced motion: ${settings.reducedMotion ? 'on' : 'off'}`, () => change(() => { settings.reducedMotion = !settings.reducedMotion }))
         this.add.text(440, 90, 'Combat controls\n\n1–0: select a card\nAlt + 1–0: inspect a card\nE: end turn\nEscape: cancel\n\nSelect an enemy to confirm.\nDrag a card upward to play it.\nHover or tap ? for full rules.', { ...menuText, fontSize: '14px', lineSpacing: 8 })
+        menuButton(this, 440, 346, 'Profile backup', () => this.scene.start('Profile'))
         menuButton(this, 24, 399, 'Back', () => this.scene.start('MainMenu'))
     }
 }

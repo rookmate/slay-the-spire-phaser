@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { createNewRun } from '../../src/core/run'
 import { createCardInstance } from '../../src/core/cards'
-import { boot, clickCard, clickText, dragCard, expectScene, inspect, reloadRun } from './driver'
+import { boot, clickCard, clickText, dragCard, expectScene, inspect, readSavedProgress, reloadRun } from './driver'
 
 test('plays an untargeted power and colorless skill by dragging', async ({ page }) => {
     const run = createNewRun({ seed: 'untargeted' }); run.neowCompleted = true
@@ -32,11 +32,11 @@ test('records an Act 4 loss once and offers full Neow on ordinary New Run', asyn
     const errors = await boot(page, run)
     for (let i = 0; i < 5 && (await inspect(page)).scene === 'Combat'; i++) await clickText(page, 'End Turn')
     await expectScene(page, 'RunSummary')
-    const meta = await page.evaluate(() => JSON.parse(localStorage.getItem('sts_meta_v2')!))
-    expect(meta).toMatchObject({ bestAscensionUnlocked: 1, totalRuns: 1, totalWins: 0 })
+    const saved = await readSavedProgress(page)
+    expect(saved.meta).toMatchObject({ bestAscensionUnlocked: 1, totalRuns: 1, totalWins: 0 })
     await page.reload()
     await page.waitForFunction(() => window.__testGame?.scene.isActive('MainMenu'))
-    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('sts_meta_v2')!))).toEqual(meta)
+    expect(await readSavedProgress(page)).toEqual(saved)
     await clickText(page, 'Card Library')
     await expectScene(page, 'DeckBuilder')
     expect(await page.evaluate(() => localStorage.getItem('sts_run_v7'))).toBeNull()

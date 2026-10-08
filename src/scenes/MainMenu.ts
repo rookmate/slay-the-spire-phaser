@@ -10,6 +10,7 @@ import { menuButton, menuText } from '../ui/menu'
 import type { ModifierId } from '../core/modes/modifiers'
 
 export class MainMenuScene extends Phaser.Scene {
+    private seedInput?: Phaser.GameObjects.DOMElement
     private character: CharacterId = 'ironclad'
     private mode: RunMode = 'standard'
     private ascension = 0
@@ -18,11 +19,16 @@ export class MainMenuScene extends Phaser.Scene {
     private replaceConfirmed = false
     constructor() { super('MainMenu') }
     create(data: { modifiers?: ModifierId[] } = {}): void {
+        this.events.once('shutdown', () => { this.seedInput?.destroy(); this.seedInput = undefined })
         if (data.modifiers) { this.modifiers = data.modifiers; this.mode = 'custom' }
+        const meta = loadMeta()
+        if (this.mode === 'custom' && !meta.customUnlocked) { this.mode = 'standard'; this.modifiers = [] }
+        if (this.mode !== 'daily' && !getCharacterProgress(meta, this.character).unlocked) this.character = 'ironclad'
         this.replaceConfirmed = false
         this.render()
     }
     private render(): void {
+        this.seedInput?.destroy(); this.seedInput = undefined
         this.children.removeAll(true)
         const meta = loadMeta(), saved = loadRun(), progress = getCharacterProgress(meta, this.character)
         this.add.text(24, 18, 'Slay the Spire', { ...menuText, fontSize: '28px', color: '#eee' })
@@ -57,7 +63,7 @@ export class MainMenuScene extends Phaser.Scene {
                 input.type = 'text'; input.value = this.seed; input.placeholder = this.mode === 'custom' ? 'Random' : 'Enter seed'; input.maxLength = 64
                 input.setAttribute('aria-label', 'Run seed'); input.style.cssText = 'width:300px;padding:8px;background:#222;color:#eee;border:1px solid #777;font:16px monospace;'
                 input.addEventListener('input', () => { this.seed = input.value.trim() })
-                this.add.dom(396, 252, input).setOrigin(0)
+                this.seedInput = this.add.dom(396, 252, input).setOrigin(0)
             }
             if (this.mode === 'custom') menuButton(this, 24, 302, `Modifiers (${this.modifiers.length})`, () => this.scene.start('CustomModifiers', { modifiers: this.modifiers }))
             else this.add.text(24, 307, this.mode === 'seeded' ? 'Seeded runs earn XP. Ascension advances in standard runs.' : 'Climb three acts. Unlock new cards as you play.', { ...menuText, fontSize: '14px' })
@@ -73,6 +79,7 @@ export class MainMenuScene extends Phaser.Scene {
         })
         menuButton(this, 24, 407, 'Card Library', () => this.scene.start('DeckBuilder', { run: saved ?? createNewRun() }))
         menuButton(this, 225, 407, 'Run History', () => this.scene.start('RunHistory'))
+        menuButton(this, 590, 407, 'Achievements', () => this.scene.start('Achievements'))
         menuButton(this, 425, 407, 'Settings', () => this.scene.start('Settings'))
     }
 }

@@ -1,3 +1,4 @@
+import { achievementCardPlayed, achievementExhausted, achievementKilled, achievementOrbChanneled, achievementTurnStarted, checkCombatAchievements } from './achievements/progress'
 import { gainGold } from './health'
 import { dynamicCostOffset } from './combat/cardCosts'
 import { blightStacks, endlessAttackMultiplier, modifyEndlessEnemy } from './modes/endless'
@@ -306,6 +307,7 @@ export class Engine {
         const evts: EmittedEvent[] = []
         const action = this.queue.shift()
         if (!action) return evts
+        const victim = 'target' in action ? this.state.enemies.find(enemy => enemy.id === action.target && enemy.hp > 0) : undefined
         // Consequences of this action resolve before the previously queued actions.
         const remainingActions = this.queue
         this.queue = []
@@ -315,7 +317,7 @@ export class Engine {
             case 'CardEffect': action.resolve(); break
             case 'OrbPassives': triggerOrbPassives(this, action.phase); break
             case 'ChannelOrb':
-                if (this.state.player.orbSlots > 0) { channelOrb(this, action.orbType, action.storedDamage); evts.push({ kind: 'OrbChanneled', orbType: action.orbType }) }
+                if (this.state.player.orbSlots > 0) { channelOrb(this, action.orbType, action.storedDamage); evts.push({ kind: 'OrbChanneled', orbType: action.orbType }); achievementOrbChanneled(this, action.orbType) }
                 break
             case 'EvokeOrb': evokeOrb(this, action.repeats, action.remove); break
             case 'ChangeOrbSlots': changeOrbSlots(this, action.amount); break
@@ -420,12 +422,15 @@ export class Engine {
 
         }
 
+        if (victim && ['DealDamage', 'LoseHp', 'SetHp'].includes(action.kind)) achievementKilled(this, victim, action.kind === 'LoseHp' && action.origin === 'poison')
         this.queue.push(...remainingActions)
         this.checkWinLose(evts)
+        checkCombatAchievements(this)
         return evts
     }
 
     private startPlayerTurn(evts: EmittedEvent[], extra = false): void {
+        achievementTurnStarted(this)
         this.setPowerStacks(this.state.player, 'WAVE_OF_THE_HAND', 0)
         if (!extra) {
             finishRoundPowers(this)
@@ -565,6 +570,7 @@ export class Engine {
     }
 
     handleExhaust(card: CardInstance): void {
+        achievementExhausted(this)
         this.state.player.exhaustPile.push(card)
         CARD_DEFS[card.defId]?.onExhaust?.({ engine: this, card })
         const feelNoPain = this.state.player.powers.find(power => power.id === 'FEEL_NO_PAIN')?.stacks ?? 0
@@ -622,6 +628,7 @@ export class Engine {
             this.state.previousCardType = this.state.lastCardType
             this.state.lastCardType = resolveCard(limbo.card).type
             this.state.cardsPlayed = (this.state.cardsPlayed ?? 0) + 1
+            achievementCardPlayed(this, limbo.card)
             if (this.state.cardsPlayed >= 20) this.state.scoreCombo = true
             const def = CARD_DEFS[limbo.card.defId]
             const resolved = resolveCard(limbo.card)
@@ -664,6 +671,7 @@ export class Engine {
             if (resolved.type === 'attack') this.setPowerStacks(this.state.player, 'WREATH_OF_FLAME', 0)
             for (const enemy of this.state.enemies) onPlayerCardPlayed(this, enemy, resolved.type)
             this.resolvingCardInstanceId = undefined
+            checkCombatAchievements(this)
 
             return
         }

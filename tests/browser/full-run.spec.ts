@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test'
 import { createNewRun } from '../../src/core/run'
 import { canUpgradeCard } from '../../src/core/cards'
 import { RELIC_DEFS } from '../../src/core/relics'
-import { boot, clickCard, clickPoint, clickText, dragCard, expectScene, inspect, reloadRun } from './driver'
+import { boot, clickCard, clickPoint, clickText, dragCard, expectScene, inspect, readSavedProgress, reloadRun } from './driver'
 import { cardPriority, choosePlay, chooseRoute } from '../support/policy'
 import { bossRelicPick, eventPick, neowPick, rewardPick, shopPick } from '../support/strategy'
 
@@ -139,12 +139,12 @@ test('plays a seeded starter-deck run through all three acts and records victory
         expect(summary.texts.some(t => t.text === 'Ironclad · VICTORY'), history.join('\n')).toBe(true)
         expect(history.some(line => line.startsWith('Act 3'))).toBe(true)
         expect(reloadedReward && reloadedBossRelic && reloadedActTwo).toBe(true)
-        const saved = await page.evaluate(() => ({ run: localStorage.getItem('sts_run_v7'), meta: JSON.parse(localStorage.getItem('sts_meta_v2')!) }))
+        const saved = await readSavedProgress(page)
         expect(saved.run).toBeNull()
         expect(saved.meta).toMatchObject({ totalRuns: 1, totalWins: 1, bestAscensionUnlocked: 0, ironcladUnlockTier: 1 })
         await page.reload()
         await page.waitForFunction(() => window.__testGame?.scene.isActive('MainMenu'))
-        expect(await page.evaluate(() => JSON.parse(localStorage.getItem('sts_meta_v2')!))).toEqual(saved.meta)
+        expect(await readSavedProgress(page)).toEqual(saved)
         expect(errors).toEqual([])
     } finally {
         await testInfo.attach('playthrough-log', { body: history.join('\n'), contentType: 'text/plain' })
