@@ -1,3 +1,4 @@
+import { prepareAcquisition, chooseAcquisition } from './relics/acquisitions'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createCardInstance, resolveCard } from './cards'
 import { Engine, createDummyEnemy, createSimplePlayer } from './engine'
@@ -50,32 +51,36 @@ describe('campaign review regressions', () => {
         expect(player.block).toBe(frail ? 3 : 4)
     })
     it('applies Busted Crown to all five Orrery choices', () => {
-        const run = createNewRun('crown'); run.gold = 1000; run.relics.push('BUSTED_CROWN')
+        const run = createNewRun({ seed: 'crown' }); run.gold = 1000; run.relics.push('BUSTED_CROWN')
         const meta = loadMeta(); const shop = generateShop(run, meta)
         shop.relics = ['ORRERY']; shop.relicPrices = [150]
         purchaseShopItem(run, meta, shop, 'relics', 0)
-        expect(run.pendingRoom?.scene).toBe('Rewards')
-        if (run.pendingRoom?.scene !== 'Rewards') throw Error('Missing Orrery rewards')
-        expect(run.pendingRoom.rewards.items.map(item => item.kind === 'cards' ? item.choices.length : 0)).toEqual([1, 1, 1, 1, 1])
+        expect(run.pendingAcquisitions).toHaveLength(5)
+        for (let i = 0; i < 5; i++) {
+            const step = prepareAcquisition(run, meta)
+            expect(step?.kind === 'cards' && step.choices).toHaveLength(1)
+            chooseAcquisition(run, meta)
+        }
+        expect(run.pendingAcquisitions).toHaveLength(0)
     })
     it('records an Act 4 defeat once and unlocks the next Ascension', () => {
-        const run = createNewRun('act4'); run.act = 4; run.actsCleared = [1, 2, 3]
+        const run = createNewRun({ seed: 'act4', mode: 'standard' }); run.act = 4; run.actsCleared = [1, 2, 3]
         const meta = loadMeta()
         expect(recordRunResult(meta, run, 'defeat').unlockedNext).toBe(true)
         expect(meta).toMatchObject({ totalRuns: 1, totalWins: 0, bestAscensionUnlocked: 1, previousRunReachedBoss: true })
         recordRunResult(meta, run, 'defeat')
         expect(meta.totalRuns).toBe(1)
-        const next = createNewRun(undefined, 0, meta.previousRunReachedBoss)
+        const next = createNewRun({ seed: undefined, ascension: 0, previousRunReachedBoss: meta.previousRunReachedBoss })
         expect(rollNeowOptions(next.neowSeed, next.neowFull)).toHaveLength(4)
     })
     it('keeps short Neow after an early defeat', () => {
-        const run = createNewRun('early'); const meta = loadMeta()
+        const run = createNewRun({ seed: 'early' }); const meta = loadMeta()
         recordRunResult(meta, run, 'defeat')
-        const next = createNewRun(undefined, 0, meta.previousRunReachedBoss)
+        const next = createNewRun({ seed: undefined, ascension: 0, previousRunReachedBoss: meta.previousRunReachedBoss })
         expect(rollNeowOptions(next.neowSeed, next.neowFull)).toHaveLength(2)
     })
     it('persists active play time and enables Secret Portal at 800 seconds', () => {
-        const run = createNewRun('clock'); run.act = 3
+        const run = createNewRun({ seed: 'clock' }); run.act = 3
         advanceRunClock(run, 799_000)
         expect(EVENT_DEFS.SECRET_PORTAL.eligible!(run)).toBe(false)
         saveRun(run)
@@ -85,7 +90,7 @@ describe('campaign review regressions', () => {
         expect(EVENT_DEFS.SECRET_PORTAL.eligible!(resumed)).toBe(true)
     })
     it('saves elapsed time without replacing the combat-entry inventory', () => {
-        const run = createNewRun('clock-checkpoint'); run.potions = ['BLOCK_POTION']
+        const run = createNewRun({ seed: 'clock-checkpoint' }); run.potions = ['BLOCK_POTION']
         run.relicState = { NEOWS_LAMENT: { charges: 3 } }
         saveRun(run)
         run.potions = []; run.relicState.NEOWS_LAMENT!.charges = 2
@@ -101,7 +106,7 @@ describe('campaign review regressions', () => {
         expect(enemy.hp).toBe(20); expect(enemy.block).toBe(7)
     })
     it('upgrades basic cards without upgrading cards merely named Strike', () => {
-        const run = createNewRun('writing'); run.act = 2
+        const run = createNewRun({ seed: 'writing' }); run.act = 2
         run.deck = ['STRIKE', 'DEFEND', 'POMMEL_STRIKE', 'WILD_STRIKE'].map(id => createCardInstance(id))
         run.eventState = { id: 'ANCIENT_WRITING' }
         resolveEventChoice(run, loadMeta(), 'ANCIENT_WRITING', 'WRITING_UPGRADE', 'writing')

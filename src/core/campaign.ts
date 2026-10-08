@@ -1,3 +1,5 @@
+import { beginEndlessLoop, bossCurses, drawBlights } from './modes/endless'
+import { hasModifier } from './modes/modifiers'
 import { healRun } from './health'
 import { ACT_BOSSES, type EnemyKey } from './encounters'
 import { RNG } from './rng'
@@ -16,7 +18,8 @@ export function hasAllKeys(run: RunState): boolean { return Boolean(run.keys.rub
 export function advanceAct(run: RunState): void {
     if (run.act >= 4) return
     healRun(run, Math.round((run.player.maxHp - run.player.hp) * (run.asc >= 5 ? 0.75 : 1)))
-    run.act = (run.act + 1) as 2 | 3 | 4
+    if (run.act === 3 && hasModifier(run, 'ENDLESS')) beginEndlessLoop(run)
+    else run.act = (run.act + 1) as 2 | 3 | 4
     run.floor += 2
     run.mapRows = 16
     run.mapProgress = {}
@@ -38,8 +41,9 @@ export function finishBossCombat(run: RunState, meta: MetaState): 'Rewards' | 'C
         run.pendingRoom = { scene: 'Combat', roomKind: 'boss' }
         return 'Combat'
     }
+    bossCurses(run)
     run.actsCleared = [...new Set([...(run.actsCleared ?? []), run.act])]
-    if (run.act <= 2) {
+    if (run.act <= 2 || (run.act === 3 && hasModifier(run, 'ENDLESS'))) {
         const rewards = generateRewardBundle(`${run.seed}-boss-rewards-${run.act}`, 'boss', run, meta)
         run.pendingRoom = { scene: 'Rewards', rewards }
         return 'Rewards'
@@ -49,14 +53,19 @@ export function finishBossCombat(run: RunState, meta: MetaState): 'Rewards' | 'C
     return 'RunSummary'
 }
 
-export function finishRewards(run: RunState): 'BossRelic' | 'Map' | 'Shop' {
-    if (run.rewardReturnRoom?.scene === 'Shop') {
-        run.pendingRoom = run.rewardReturnRoom; run.rewardReturnRoom = undefined; return 'Shop'
+export function finishRewards(run: RunState): 'BossRelic' | 'BlightChest' | 'Map' | 'Shop' | 'Event' {
+    if (run.rewardReturnRoom?.scene === 'Shop' || run.rewardReturnRoom?.scene === 'Event') {
+        const scene = run.rewardReturnRoom.scene
+        run.pendingRoom = run.rewardReturnRoom; run.rewardReturnRoom = undefined; return scene
     }
     run.eventState = undefined
     const advanceFloor = run.pendingRoom?.scene !== 'Rewards' || run.pendingRoom.rewards.advanceFloor !== false
     if (run.pendingRoom?.scene === 'Rewards' && run.pendingRoom.rewards.tier === 'boss') {
         const item = run.pendingRoom.rewards.items.find(item => item.kind === 'boss_relics')
+        if (hasModifier(run, 'BLIGHT_CHESTS') && (run.endlessLoop ?? 0) > 0) {
+            run.pendingBlights = drawBlights(run); run.pendingRoom = undefined
+            return 'BlightChest'
+        }
         run.bossRelicChoicePending = { sourceBossId: getRunBoss(run), choices: item?.kind === 'boss_relics' ? item.choices : [] }
         run.pendingRoom = undefined
         return 'BossRelic'

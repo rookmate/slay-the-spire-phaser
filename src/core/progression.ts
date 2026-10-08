@@ -1,4 +1,4 @@
-import { generateMap } from './map'
+import { getRunMap } from './map'
 import type { PotionId } from './potions'
 import type { RewardBundle } from './rewards'
 import type { RelicId, RunState } from './run'
@@ -18,12 +18,16 @@ export interface ShopInventory {
 }
 
 export type PendingRoom =
+    | { scene: 'Chest'; rewardSeed: string }
     | { scene: 'Combat'; roomKind: 'monster' | 'elite' | 'boss' }
     | { scene: 'Rewards'; rewards: RewardBundle }
     | { scene: 'Shop'; inventory?: ShopInventory }
     | { scene: 'Campfire' | 'Event' }
 
 export function getRunDestination(run: RunState) {
+    if (run.pendingAcquisitions?.length) return { scene: 'RelicAcquisition', data: { run } }
+    if (run.pendingBlights?.length) return { scene: 'BlightChest', data: { run } }
+    if (run.startingDraft) return { scene: 'StartingDeck', data: { run } }
     if (run.bossRelicChoicePending) return { scene: 'BossRelic', data: { run } }
     if (!run.neowCompleted) return { scene: 'Neow', data: { run } }
     if (run.pendingRoom) return { scene: run.pendingRoom.scene, data: { run, ...run.pendingRoom } }
@@ -31,7 +35,7 @@ export function getRunDestination(run: RunState) {
     // Old saves had no room checkpoint. A boss node has no outgoing path, so it
     // can only resume at the boss fight unless the relic choice is already saved.
     const nodeId = run.mapProgress?.currentNodeId
-    if (nodeId && generateMap(run.seed, run.act, run.mapRows ?? 16, 7, run.asc).byId[nodeId]?.kind === 'boss') {
+    if (nodeId && getRunMap(run).byId[nodeId]?.kind === 'boss') {
         return { scene: 'Combat', data: { run, roomKind: 'boss' as const } }
     }
     return { scene: 'Map', data: { run } }

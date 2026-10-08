@@ -1,3 +1,6 @@
+import { CHARACTERS } from '../core/characters'
+import { powerAmount } from '../core/combatMath'
+import { potionMultiplier } from '../core/potions'
 import Phaser from 'phaser'
 import type { Engine } from '../core/engine'
 import type { RunState } from '../core/run'
@@ -19,6 +22,8 @@ export class PlayerDisplay {
     private endTurnButton?: Phaser.GameObjects.Text
     private powerText?: Phaser.GameObjects.Text
     private relicText?: Phaser.GameObjects.Text
+    private resourceText?: Phaser.GameObjects.Text
+    private potionMenu?: Phaser.GameObjects.Container
     private potionTexts: Phaser.GameObjects.Text[] = []
 
     private onEndTurn?: () => void
@@ -60,12 +65,13 @@ export class PlayerDisplay {
         this.createEndTurnButton()
         this.createPowerText()
         this.createRelicText()
+        this.resourceText = this.scene.add.text(16, 42, '', { fontFamily: 'monospace', fontSize: '10px', color: '#dbc5a3', wordWrap: { width: 215 } })
         this.rebuildPotions()
         this.setupResizeHandler()
     }
 
     private createPlayerSprite(): void {
-        this.playerSprite = this.scene.add.image(110, 116, 'player:ironclad').setScale(0.23)
+        this.playerSprite = this.scene.add.image(110, 116, `player:${this.run.character}`).setDisplaySize(65, 75)
     }
 
     private createPlayerHpText(): void {
@@ -147,14 +153,14 @@ export class PlayerDisplay {
         const startX = 180
         const startY = combatLayout(this.scene.scale.width, this.scene.scale.height).footerTop + 10
         this.run.potions.forEach((potion, index) => {
-            const text = this.scene.add.text(startX + index * 128, startY, POTION_DEFS[potion].name, {
+            const text = this.scene.add.text(startX + index * 82, startY, POTION_DEFS[potion].name.replace(' Potion', ''), {
                 fontFamily: 'monospace',
-                fontSize: '11px',
+                fontSize: '10px', fixedWidth: 78, fixedHeight: 34, wordWrap: { width: 66 },
                 color: '#ffffff',
                 backgroundColor: '#3a3a3a',
                 padding: { x: 6, y: 4 },
             }).setInteractive({ useHandCursor: true })
-            text.on('pointerdown', () => this.onUsePotion?.(index))
+            text.on('pointerdown', () => this.openPotionMenu(index))
             this.potionTexts.push(text)
         })
     }
@@ -184,7 +190,7 @@ export class PlayerDisplay {
     }
 
     private getPlayerDetails(): string {
-        return ['Ironclad', ...this.engine.state.player.powers.map(power => `${power.id}:${power.stacks}`)].join('\n')
+        return [CHARACTERS[this.run.character].name, 'Orbs: passive / evoke', this.getResourceText(), ...this.engine.state.player.powers.map(power => `${power.id}:${power.stacks}`)].join('\n')
     }
 
     private getRelicText(): string {
@@ -192,6 +198,7 @@ export class PlayerDisplay {
     }
 
     update(): void {
+        this.resourceText?.setText(this.getResourceText())
         this.playerHpText?.setText(this.getPlayerHpLabel())
         this.energyText?.setText(this.getPlayerStatsText())
         this.powerText?.setText(this.getPlayerPowers())
@@ -199,12 +206,51 @@ export class PlayerDisplay {
         this.relicText?.setText(this.getRelicText())
     }
 
+    private getResourceText(): string {
+        const player = this.engine.state.player
+        const lines: string[] = []
+        if (player.orbSlots) {
+            const focus = powerAmount(player, 'FOCUS')
+            lines.push(player.orbs.map(orb => {
+                const passive = orb.type === 'plasma' ? 1 : Math.max(0, (orb.type === 'frost' ? 2 : orb.type === 'dark' ? 6 : 3) + focus)
+                const evoke = orb.type === 'dark' ? orb.storedDamage : orb.type === 'plasma' ? 2 : Math.max(0, (orb.type === 'frost' ? 5 : 8) + focus)
+                return `${orb.type[0].toUpperCase()} ${passive}/${evoke}`
+            }).concat(Array.from({ length: player.orbSlots - player.orbs.length }, () => '○')).join(' · '))
+        }
+        if (player.character === 'watcher' || player.stance !== 'neutral') lines.push(`${player.stance.toUpperCase()} · Mantra ${powerAmount(player, 'MANTRA')}/10`)
+        return lines.join('\n')
+    }
+    isPotionMenuOpen(): boolean { return !!this.potionMenu }
+    closePotionMenu(): void { this.potionMenu?.destroy(true); this.potionMenu = undefined }
+    private openPotionMenu(index: number): void {
+        if (!this.engine.canAcceptInput()) return
+        this.closePotionMenu()
+        const id = this.run.potions[index], def = POTION_DEFS[id]
+        const menu = this.scene.add.container(0, 0).setDepth(12000); this.potionMenu = menu
+        menu.add(this.scene.add.rectangle(0, 0, 800, 450, 0, 0.6).setOrigin(0).setInteractive())
+        menu.add(this.scene.add.rectangle(200, 80, 400, 200, 0x222222).setOrigin(0).setStrokeStyle(1, 0x777777))
+        menu.add(this.scene.add.text(218, 100, `${def.name}${potionMultiplier(this.run, id) === 2 ? ' ×2' : ''}\n\n${def.description}`, { fontFamily: 'monospace', fontSize: '16px', color: '#fff', wordWrap: { width: 365 } }))
+        const buttons: [string, () => void][] = [
+            ['Use', () => { this.closePotionMenu(); this.onUsePotion?.(index) }],
+            ['Discard', () => { this.run.potions.splice(index, 1); this.closePotionMenu(); this.rebuildPotions() }],
+            ['Cancel', () => this.closePotionMenu()],
+        ]
+        buttons.forEach(([label, action], i) => {
+            const text = this.scene.add.text(218 + i * 122, 230, label, { fontFamily: 'monospace', fontSize: '16px', color: '#fff', backgroundColor: '#444', padding: { x: 8, y: 8 } })
+            const enabled = label !== 'Use' || !def.autoRevivePercent
+            if (enabled) text.setInteractive({ useHandCursor: true }).on('pointerdown', action)
+            else text.setAlpha(0.4)
+            menu.add(text)
+        })
+    }
     getPlayerSprite(): Phaser.GameObjects.Image | undefined {
         return this.playerSprite
     }
 
     destroy(): void {
         if (this.resizeHandler) this.scene.scale.off('resize', this.resizeHandler)
+        this.closePotionMenu()
+        this.resourceText?.destroy()
         this.playerSprite?.destroy()
         this.playerHpText?.destroy()
         this.playerNameText?.destroy()

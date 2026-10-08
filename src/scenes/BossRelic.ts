@@ -1,3 +1,4 @@
+import { getRunDestination } from '../core/progression'
 import { advanceAct } from '../core/campaign'
 import Phaser from 'phaser'
 import type { RunState, RelicId } from '../core/run'
@@ -21,10 +22,12 @@ export class BossRelicScene extends Phaser.Scene {
         this.add.text(16, 46, 'Choose one relic and continue to the next act.', { ...style, fontSize: '14px', color: '#bbbbbb' })
 
         this.add.text(32, 320, 'Skip relic', style).setInteractive({ useHandCursor: true }).on('pointerdown', () => {
-            advanceAct(this.run); saveRun(this.run); this.scene.start('Map', { run: this.run })
+            advanceAct(this.run); saveRun(this.run); this.resume()
         })
         choices.forEach((relicId, index) => this.renderChoice(relicId, index))
     }
+
+    private resume(): void { const next = getRunDestination(this.run); this.scene.start(next.scene, next.data) }
 
     private renderChoice(relicId: RelicId, index: number): void {
         const def = RELIC_DEFS[relicId]
@@ -54,7 +57,7 @@ export class BossRelicScene extends Phaser.Scene {
             applyRelicAcquisition(this.run, relicId)
             advanceAct(this.run)
             saveRun(this.run)
-            this.scene.start('Map', { run: this.run })
+            this.resume()
         })
 
         this.children.bringToTop(bg)

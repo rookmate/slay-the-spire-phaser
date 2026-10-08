@@ -1,3 +1,4 @@
+import { queueCardRewards } from './acquisitions'
 import { changeMaxHp, gainGold } from '../health'
 import type { RelicDef } from '../relics'
 
@@ -10,7 +11,7 @@ export const CAMPAIGN_RELICS = {
     MEMBERSHIP_CARD: { id: 'MEMBERSHIP_CARD', name: 'Membership Card', rarity: 'shop', description: 'All merchant prices are halved.' },
     SMILING_MASK: { id: 'SMILING_MASK', name: 'Smiling Mask', rarity: 'common', description: 'Removing a card at a shop always costs 50 Gold.' },
     COURIER: { id: 'COURIER', name: 'The Courier', rarity: 'uncommon', description: 'Merchant stock replenishes after purchases. Prices are reduced by 20%.' },
-    ORRERY: { id: 'ORRERY', name: 'Orrery', rarity: 'shop', description: 'Choose cards from 5 card rewards when acquired.' },
+    ORRERY: { id: 'ORRERY', name: 'Orrery', rarity: 'shop', onAcquire: run => queueCardRewards(run, 'ORRERY', 5), description: 'Choose cards from 5 card rewards when acquired.' },
     GOLDEN_IDOL: { id: 'GOLDEN_IDOL', name: 'Golden Idol', rarity: 'event', description: 'Enemies drop 25% more Gold.' },
     BLOODY_IDOL: { id: 'BLOODY_IDOL', name: 'Bloody Idol', rarity: 'event', description: 'Whenever you gain Gold, heal 5 HP.' },
     MARK_OF_THE_BLOOM: { id: 'MARK_OF_THE_BLOOM', name: 'Mark of the Bloom', rarity: 'event', description: 'You can no longer heal.' },

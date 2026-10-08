@@ -1,11 +1,14 @@
-import { CARD_DEFS, createCardInstance, getUnlockedCollectibleCards } from './cards'
+import { selectCardPool } from './contentPools'
+import { cardColors, hasModifier } from './modes/modifiers'
+import { spendAtShop } from './relics/campaignRules'
+import { CARD_DEFS } from './cards'
 import type { MetaState } from './meta'
 import { POTION_DEFS } from './potions'
 import type { ShopInventory } from './progression'
-import { applyRelicAcquisition, canObtainPotion, getCardRewardChoiceCount, getShopPriceMultiplier, RELIC_DEFS } from './relics'
-import { cardChoices, drawPotion, drawRelic, rollCardRarity } from './rewardPools'
+import { applyRelicAcquisition, canObtainPotion, getShopPriceMultiplier, RELIC_DEFS } from './relics'
+import { drawPotion, drawRelic, rollCardRarity } from './rewardPools'
 import { RNG } from './rng'
-import { removeCardByInstanceId, type RunState } from './run'
+import { obtainCard, removeCardByInstanceId, type RunState } from './run'
 
 const cardBase = { common: 50, uncommon: 75, rare: 150, basic: 50 }
 function cardPrice(id: string, rng: RNG): number {
@@ -24,7 +27,7 @@ function potionPrice(id: keyof typeof POTION_DEFS, rng: RNG): number {
 }
 function shopSeed(run: RunState): string { return `${run.seed}-shop-${run.act}-${run.mapProgress?.currentNodeId ?? run.floor}` }
 function pickCard(run: RunState, meta: MetaState, rng: RNG, type: string, exclude: string[], colorlessRarity?: 'uncommon' | 'rare'): string {
-    const all = colorlessRarity ? Object.values(CARD_DEFS).filter(c => c.color === 'colorless' && c.poolEnabled && c.rarity === colorlessRarity).map(c => c.id) : getUnlockedCollectibleCards(meta).filter(id => CARD_DEFS[id].type === type)
+    const all = colorlessRarity ? Object.values(CARD_DEFS).filter(c => c.color === 'colorless' && c.poolEnabled && c.rarity === colorlessRarity).map(c => c.id) : selectCardPool({ character: run.character, source: 'shop', colors: cardColors(run), meta, unlockedIds: run.unlockedCardIds }).filter(id => CARD_DEFS[id].type === type)
     const available = all.filter(id => !exclude.includes(id))
     const rarity = colorlessRarity ?? rollCardRarity(rng, run, 'shop', false)
     const matching = available.filter(id => CARD_DEFS[id].rarity === rarity)
@@ -38,8 +41,8 @@ export function generateShop(run: RunState, meta: MetaState): ShopInventory {
     for (const rarity of ['uncommon', 'rare'] as const) cards.push(pickCard(run, meta, rng, '', cards, rarity))
     const relics: ShopInventory['relics'] = []
     // Smiling Mask is never sold. The third slot is reserved for shop relics.
-    for (let i = 0; i < 3; i++) relics.push(drawRelic(rng, meta, [...run.relics, ...relics, 'SMILING_MASK'], i === 2 ? 'shop' : undefined))
-    const potions = Array.from({ length: 3 }, () => drawPotion(rng))
+    for (let i = 0; i < 3; i++) relics.push(drawRelic(rng, meta, run, i === 2 ? 'shop' : undefined, [...relics, 'SMILING_MASK']))
+    const potions = Array.from({ length: 3 }, () => drawPotion(rng, run.character))
     const saleIndex = rng.int(0, 4)
     return { version: 2, cards, relics, potions, saleIndex, cardPrices: cards.map((id, i) => Math.floor(cardPrice(id, rng) * (i === saleIndex ? 0.5 : 1))), relicPrices: relics.map(id => relicPrice(id, rng)), potionPrices: potions.map(id => potionPrice(id, rng)), removalUsed: false, restockCount: 0 }
 }
@@ -57,9 +60,9 @@ export function shopPrice(run: RunState, base: number): number { return Math.max
 export function removalPrice(run: RunState): number { return run.relics.includes('SMILING_MASK') ? 50 : shopPrice(run, run.merchantRemoveCost) }
 export function purchaseRemoval(run: RunState, stock: ShopInventory, instanceId: string): boolean {
     const cost = removalPrice(run)
-    if (stock.removalUsed || run.gold < cost) return false
+    if (hasModifier(run, 'HOARDER') || stock.removalUsed || run.gold < cost) return false
     if (!removeCardByInstanceId(run, instanceId)) return false
-    run.gold -= cost
+    spendAtShop(run, cost)
     run.merchantRemoveCost += 25
     stock.removalUsed = true
     return true
@@ -74,8 +77,8 @@ export function purchaseShopItem(run: RunState, meta: MetaState, stock: ShopInve
     if (run.gold < cost || (kind === 'potions' && !canObtainPotion(run))) return false
     if (kind === 'relics' && run.relics.includes(id as keyof typeof RELIC_DEFS) && id !== 'CIRCLET') return false
     const rng = new RNG(`${shopSeed(run)}-restock-${stock.restockCount ?? 0}`)
-    run.gold -= cost
-    if (kind === 'cards') run.deck.push(createCardInstance(id))
+    spendAtShop(run, cost)
+    if (kind === 'cards') obtainCard(run, id)
     if (kind === 'relics') applyRelicAcquisition(run, id as keyof typeof RELIC_DEFS)
     if (kind === 'potions') run.potions.push(id as keyof typeof POTION_DEFS)
     ids.splice(index, 1); prices.splice(index, 1)
@@ -90,13 +93,9 @@ export function purchaseShopItem(run: RunState, meta: MetaState, stock: ShopInve
             const next = pickCard(run, meta, rng, def.type, stock.cards, def.color === 'colorless' ? def.rarity as 'uncommon' | 'rare' : undefined)
             stock.cards.push(next); stock.cardPrices!.push(cardPrice(next, rng))
         } else if (kind === 'relics') {
-            const next = drawRelic(rng, meta, [...run.relics, ...stock.relics!, 'SMILING_MASK'], RELIC_DEFS[id as keyof typeof RELIC_DEFS].rarity === 'shop' ? 'shop' : undefined)
-            stock.relics!.push(next); stock.relicPrices!.push(relicPrice(next, rng))
-        } else { const next = drawPotion(rng); stock.potions.push(next); stock.potionPrices!.push(potionPrice(next, rng)) }
-    }
-    if (id === 'ORRERY') {
-        run.rewardReturnRoom = { scene: 'Shop', inventory: stock }
-        run.pendingRoom = { scene: 'Rewards', rewards: { tier: 'chest', advanceFloor: false, items: Array.from({ length: 5 }, () => ({ kind: 'cards', choices: cardChoices(rng, meta, getCardRewardChoiceCount(run), run) })) } }
+            const next = drawRelic(rng, meta, run, undefined, [...stock.relics!, 'SMILING_MASK'])
+            stock.relics!.push(next); stock.relicPrices!.push(relicPrice(next, rng) / (run.asc >= 16 ? 1.1 : 1))
+        } else { const next = drawPotion(rng, run.character); stock.potions.push(next); stock.potionPrices!.push(potionPrice(next, rng)) }
     }
     return true
 }

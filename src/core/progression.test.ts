@@ -23,7 +23,7 @@ describe('run checkpoints', () => {
         { scene: 'Rewards', rewards: { tier: 'hallway', items: [{ kind: 'gold', amount: 15 }, { kind: 'cards', choices: ['STRIKE'] }] } },
     ]
     it.each(rooms)('resumes $scene from its saved room checkpoint', pendingRoom => {
-        const run = createNewRun('resume')
+        const run = createNewRun({ seed: 'resume' })
         run.neowCompleted = true
         run.pendingRoom = pendingRoom
         run.mapProgress = { currentNodeId: '13:3' }
@@ -38,7 +38,7 @@ describe('run checkpoints', () => {
     })
 
     it('restarts combat with checkpoint resources instead of a partially saved potion use', () => {
-        const run = createNewRun('combat-checkpoint')
+        const run = createNewRun({ seed: 'combat-checkpoint' })
         run.neowCompleted = true
         run.potions = ['FIRE_POTION']
         run.pendingRoom = { scene: 'Combat', roomKind: 'boss' }
@@ -53,7 +53,7 @@ describe('run checkpoints', () => {
     })
 
     it('does not duplicate rewards when restarting an unfinished choice screen', () => {
-        const run = createNewRun('reward-checkpoint')
+        const run = createNewRun({ seed: 'reward-checkpoint' })
         run.neowCompleted = true
         run.pendingRoom = { scene: 'Rewards', rewards: { tier: 'chest', items: [{ kind: 'gold', amount: 30 }] } }
         saveRun(run)
@@ -69,7 +69,7 @@ describe('run checkpoints', () => {
     })
 
     it('persists purchases together with remaining shop stock', () => {
-        const run = createNewRun('shop-checkpoint')
+        const run = createNewRun({ seed: 'shop-checkpoint' })
         run.neowCompleted = true
         const inventory = { cards: ['STRIKE', 'DEFEND'], potions: [], relic: 'ANCHOR' as const }
         run.pendingRoom = { scene: 'Shop', inventory }
@@ -81,7 +81,7 @@ describe('run checkpoints', () => {
     })
 
     it('recovers a legacy save stranded at a boss and prioritizes a won boss relic choice', () => {
-        const run = createNewRun('legacy-boss')
+        const run = createNewRun({ seed: 'legacy-boss' })
         run.neowCompleted = true
         const boss = generateMap(run.seed).nodes.find(node => node.kind === 'boss')!
         run.mapProgress = { currentNodeId: boss.id }
@@ -91,7 +91,7 @@ describe('run checkpoints', () => {
     })
 
     it('keeps the starting bonus and completed map as resume destinations', () => {
-        const run = createNewRun('resume-defaults')
+        const run = createNewRun({ seed: 'resume-defaults' })
         expect(getRunDestination(run).scene).toBe('Neow')
         run.neowCompleted = true
         expect(getRunDestination(run).scene).toBe('Map')

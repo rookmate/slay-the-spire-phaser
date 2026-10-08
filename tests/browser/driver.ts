@@ -105,9 +105,11 @@ export async function boot(page: Page, run?: RunState) {
     const errors: string[] = []
     page.on('pageerror', error => errors.push(error.message))
     await page.goto('/tests/browser/')
-    await page.waitForFunction(() => window.__testGame?.scene.isActive('MainMenu'))
+    await expect.poll(async () => errors.length ? errors.join('; ') : page.evaluate(() => window.__testGame?.scene.isActive('MainMenu') ?? false), { timeout: 15_000 }).toBe(true)
     if (run) {
         await page.evaluate(saved => localStorage.setItem('sts_run_v7', JSON.stringify(saved)), run)
+        await page.reload()
+        await page.waitForFunction(() => window.__testGame?.scene.isActive('MainMenu'))
         await clickText(page, 'Continue')
     }
     return errors

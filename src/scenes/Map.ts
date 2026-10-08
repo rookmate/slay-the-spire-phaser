@@ -1,19 +1,18 @@
+import { addRunMenu } from '../ui/runMenu'
+import { loadSettings } from '../core/settings'
+import { canEnterMapNode, enterMapNode } from '../core/relics/campaignRules'
 import Phaser from 'phaser'
 import { getAscensionLabel } from '../core/ascension'
-import { loadMeta } from '../core/meta'
 import type { RunState } from '../core/run'
 import { saveRun } from '../core/run'
 import { RNG } from '../core/rng'
-import { generateMap, resolveUnknown, updateUnknownWeights, defaultUnknownWeights, type GeneratedMap, type MapNode, type RoomKind, type UnknownOutcome } from '../core/map'
-import { generateRewardBundle } from '../core/rewards'
+import { getRunMap, type GeneratedMap, type MapNode } from '../core/map'
 import { getRelicDisplayName } from '../core/relics'
 import { getRunDestination } from '../core/progression'
 
 export class MapScene extends Phaser.Scene {
     run!: RunState
     gmap!: GeneratedMap
-    private meta = loadMeta()
-    private currentNodeId?: string
     private mapLayer!: Phaser.GameObjects.Container
     private contentHeight = 0
     private isDragging = false
@@ -26,7 +25,7 @@ export class MapScene extends Phaser.Scene {
 
     create(data: { run: RunState }): void {
         this.run = data.run
-        this.meta = loadMeta()
+        if (this.run.pendingAcquisitions?.length) { this.scene.start('RelicAcquisition', { run: this.run }); return }
         const style = { fontFamily: 'monospace', fontSize: '18px', color: '#ffffff' }
         this.add.text(16, 16, `Floor ${this.run.floor}  HP ${this.run.player.hp}/${this.run.player.maxHp}  Gold ${this.run.gold}`, style)
         this.add.text(16, 40, `Relics: ${this.run.relics.map(id => getRelicDisplayName(this.run, id)).join(', ') || 'None'}  Potions: ${this.run.potions.length}/${this.run.maxPotionSlots}`, {
@@ -41,9 +40,9 @@ export class MapScene extends Phaser.Scene {
         })
 
         // Generate map for this act
-        this.gmap = generateMap(this.run.seed, this.run.act, this.run.mapRows ?? 16, 7, this.run.asc)
-        this.currentNodeId = this.run.mapProgress?.currentNodeId
+        this.gmap = getRunMap(this.run)
         this.drawGraph()
+        addRunMenu(this, this.run)
 
         // Scroll with mouse wheel and drag (bind fresh every time we enter Map)
         this.input.removeAllListeners('wheel')
@@ -74,18 +73,10 @@ export class MapScene extends Phaser.Scene {
     }
 
     private enterNode(node: MapNode): void {
+        if (!this.isSelectable(node)) return
         const rng = new RNG(`${this.run.seed}-unknown-${this.run.floor}`)
-        this.currentNodeId = node.id
-        this.run.mapProgress = { currentNodeId: node.id }
-        this.run.burningEliteActive = Boolean(node.burning && !this.run.keys.emerald)
-        let kind: RoomKind | UnknownOutcome = node.kind
-        if (node.kind === 'unknown') {
-            const weights = this.run.unknownWeights ?? defaultUnknownWeights()
-            const outcome = resolveUnknown(rng, weights)
-            this.run.unknownWeights = updateUnknownWeights(weights, outcome)
-            kind = outcome
-        }
-
+        const kind = enterMapNode(this.run, this.gmap, node, rng)
+        this.run.burningEliteActive = Boolean(this.run.keysEnabled !== false && node.burning && !this.run.keys.emerald)
         if (kind === 'monster' || kind === 'elite' || kind === 'boss') {
             this.run.pendingRoom = { scene: 'Combat', roomKind: kind }
         } else if (kind === 'rest') {
@@ -95,8 +86,7 @@ export class MapScene extends Phaser.Scene {
         } else if (kind === 'chest') {
             const rewardKind = node.kind === 'unknown' ? 'unknown-chest' : 'chest'
             this.run.pendingRoom = {
-                scene: 'Rewards',
-                rewards: generateRewardBundle(`${this.run.seed}-reward-${node.id}-${rewardKind}`, 'chest', this.run, this.meta, { roomKind: 'chest', asc: this.run.asc }),
+                scene: 'Chest', rewardSeed: `${this.run.seed}-reward-${node.id}-${rewardKind}`,
             }
         } else {
             this.run.pendingRoom = { scene: 'Event' }
@@ -151,12 +141,7 @@ export class MapScene extends Phaser.Scene {
     }
 
     private isSelectable(n: MapNode): boolean {
-        // If no current node yet, only bottom row starts are valid
-        if (!this.currentNodeId) return this.gmap.startIds.includes(n.id)
-        // Otherwise must be a forward edge of current node
-        const cur = this.gmap.byId[this.currentNodeId]
-        if (!cur) return false
-        return cur.edgesTo.includes(n.id)
+        return canEnterMapNode(this.run, this.gmap, n)
     }
 
     private iconFor(kind: string): string {
@@ -174,6 +159,7 @@ export class MapScene extends Phaser.Scene {
     }
 
     private addPulsateAnimation(node: Phaser.GameObjects.Text): void {
+        if (loadSettings().reducedMotion) return
         // Create a subtle pulsating effect by scaling and changing alpha
         this.tweens.add({
             targets: node,

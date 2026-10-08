@@ -1,9 +1,19 @@
+import { hasModifier } from './modes/modifiers'
+import { RUN_EFFECT_RELICS } from './relics/runEffects'
+import { changeMaxHp } from './health'
+import { COMBAT_RULE_RELICS } from './relics/combatRules'
+import { COMBAT_CARD_RELICS } from './relics/combatCards'
+import { COMBAT_TURN_RELICS } from './relics/combatTurns'
+import { COMBAT_START_RELICS } from './relics/combatStart'
+import { UTILITY_RELICS } from './relics/utility'
+import { STARTER_RELICS } from './relics/starters'
 import { CAMPAIGN_RELICS } from './relics/campaign'
 import type { RoomKind } from './map'
 import type { Engine } from './engine'
 import type { MetaState } from './meta'
 import { getEffectiveUnlockedRelicIds } from './meta'
-import type { CombatState } from './state'
+import type { CharacterId } from './characters'
+import type { CardInstance, CombatState } from './state'
 import { getAscensionMerchantRemoveBaseCost, getAscensionShopPriceMultiplier } from './ascension'
 import type { RelicId, RelicStateEntry, RunState } from './run'
 
@@ -12,6 +22,14 @@ export interface RelicDef {
     name: string
     description: string
     rarity: 'starter' | 'common' | 'uncommon' | 'rare' | 'shop' | 'event' | 'boss'
+    character?: CharacterId
+    replaces?: RelicId
+    onPlayerHandReady?: (ctx: RelicCombatContext) => void
+    onOpeningHand?: (ctx: RelicCombatContext) => void
+    onCardResolved?: (ctx: RelicCombatContext, card: CardInstance) => void
+    onCardPlayed?: (ctx: RelicCombatContext, card: CardInstance) => void
+    onCardDiscarded?: (ctx: RelicCombatContext) => void
+    onShuffle?: (ctx: RelicCombatContext) => void
     energyPerTurn?: number
     postCombatHeal?: number
     blocksPotionGain?: boolean
@@ -29,6 +47,8 @@ export interface RelicDef {
 }
 
 export interface RelicCombatRuntimeEntry {
+    count?: number
+    types?: string[]
     used?: boolean
     attackConsumed?: boolean
     turnCounter?: number
@@ -75,16 +95,23 @@ const UNCOMMON_RELICS: RelicId[] = [
 ]
 
 export const RELIC_DEFS: Record<RelicId, RelicDef> = {
+    ...COMBAT_START_RELICS,
+    ...COMBAT_TURN_RELICS,
+    ...COMBAT_CARD_RELICS,
+    ...COMBAT_RULE_RELICS,
+    ...RUN_EFFECT_RELICS,
+    ...UTILITY_RELICS,
     ...CAMPAIGN_RELICS,
+    ...STARTER_RELICS,
     BURNING_BLOOD: {
-        id: 'BURNING_BLOOD',
+        id: 'BURNING_BLOOD', character: 'ironclad',
         name: 'Burning Blood',
         description: 'Heal 6 HP after combat.',
         rarity: 'starter',
         postCombatHeal: 6,
     },
     BLACK_BLOOD: {
-        id: 'BLACK_BLOOD',
+        id: 'BLACK_BLOOD', character: 'ironclad', replaces: 'BURNING_BLOOD',
         name: 'Black Blood',
         description: 'Heal 12 HP after combat.',
         rarity: 'boss',
@@ -114,7 +141,7 @@ export const RELIC_DEFS: Record<RelicId, RelicDef> = {
         energyPerTurn: 1,
     },
     MARK_OF_PAIN: {
-        id: 'MARK_OF_PAIN',
+        id: 'MARK_OF_PAIN', character: 'ironclad',
         name: 'Mark of Pain',
         description: 'Gain 1 Energy at the start of each turn. At the start of combat, shuffle 2 Wounds into your draw pile.',
         rarity: 'boss',
@@ -176,8 +203,7 @@ export const RELIC_DEFS: Record<RelicId, RelicDef> = {
         description: 'Gain 7 Max HP.',
         rarity: 'common',
         onAcquire: (run) => {
-            run.player.maxHp += 7
-            run.player.hp += 7
+            changeMaxHp(run, 7)
         },
     },
     PRESERVED_INSECT: {
@@ -207,7 +233,7 @@ export const RELIC_DEFS: Record<RelicId, RelicDef> = {
         rarity: 'common',
         onAttackPlayed: ({ runtime }, cardInstanceId) => {
             const entry = runtime.AKABEKO ?? (runtime.AKABEKO = {})
-            if (entry.attackConsumed) return
+            if (entry.attackConsumed) { entry.markedCardInstanceId = undefined; return }
             entry.attackConsumed = true
             entry.markedCardInstanceId = cardInstanceId
         },
@@ -267,14 +293,14 @@ export const RELIC_DEFS: Record<RelicId, RelicDef> = {
         name: 'Happy Flower',
         description: 'Every 3 turns, gain 1 Energy.',
         rarity: 'common',
-        onPlayerTurnStart: ({ engine, runtime }) => {
-            const entry = runtime.HAPPY_FLOWER ?? (runtime.HAPPY_FLOWER = {})
-            entry.turnCounter = (entry.turnCounter ?? 0) + 1
-            if (entry.turnCounter % 3 === 0) engine.enqueue({ kind: 'GainEnergy', amount: 1 })
+        onPlayerTurnStart: ({ engine }) => {
+            const entry = getRelicState(engine.run!, 'HAPPY_FLOWER')
+            entry.counter = ((entry.counter ?? 0) + 1) % 3
+            if (entry.counter === 0) engine.enqueue({ kind: 'GainEnergy', amount: 1 })
         },
     },
     PAPER_FROG: {
-        id: 'PAPER_FROG',
+        id: 'PAPER_FROG', character: 'ironclad',
         name: 'Paper Frog',
         description: 'Enemies with Vulnerable take 75% more attack damage rather than 50%.',
         rarity: 'uncommon',
@@ -291,7 +317,7 @@ export const RELIC_DEFS: Record<RelicId, RelicDef> = {
         },
     },
     CHARONS_ASHES: {
-        id: 'CHARONS_ASHES',
+        id: 'CHARONS_ASHES', character: 'ironclad',
         name: "Charon's Ashes",
         description: 'Whenever you exhaust a card, deal 3 damage to all enemies.',
         rarity: 'rare',
@@ -305,7 +331,7 @@ export const RELIC_DEFS: Record<RelicId, RelicDef> = {
 
 export const MVP_RELIC_POOL: RelicId[] = [...COMMON_RELICS, ...UNCOMMON_RELICS]
 
-export const BOSS_RELIC_POOL: RelicId[] = ['BLACK_BLOOD', 'SOZU', 'BUSTED_CROWN', 'COFFEE_DRIPPER', 'MARK_OF_PAIN', 'PHILOSOPHERS_STONE']
+export const BOSS_RELIC_POOL = (Object.keys(RELIC_DEFS) as RelicId[]).filter(id => RELIC_DEFS[id].rarity === 'boss')
 
 export function getRelicState(run: RunState, relicId: RelicId): RelicStateEntry {
     run.relicState ??= {}
@@ -319,7 +345,8 @@ export function setRelicCharges(run: RunState, relicId: RelicId, charges: number
 }
 
 export function applyRelicAcquisition(run: RunState, relicId: RelicId): void {
-    if (relicId === 'BLACK_BLOOD') run.relics = run.relics.filter(id => id !== 'BURNING_BLOOD')
+    const replaces = RELIC_DEFS[relicId].replaces
+    if (replaces) run.relics = run.relics.filter(id => id !== replaces)
     if (relicId === 'CIRCLET' && run.relics.includes(relicId)) { getRelicState(run, relicId).counter = (getRelicState(run, relicId).counter ?? 1) + 1; return }
     if (run.relics.includes(relicId)) return
     run.relics.push(relicId)
@@ -340,6 +367,25 @@ export function createRelicCombatContext(
     runtime: Partial<Record<RelicId, RelicCombatRuntimeEntry>>,
 ): RelicCombatContext {
     return { engine, run, combatState: engine.state, runtime }
+}
+
+export function triggerRelicOpeningHand(ctx: RelicCombatContext): void {
+    for (const id of ctx.run.relics) if (RELIC_DEFS[id].onOpeningHand) ctx.engine.afterQueuedEffects(() => RELIC_DEFS[id].onOpeningHand!(ctx))
+}
+export function triggerRelicHandReady(ctx: RelicCombatContext): void {
+    for (const id of ctx.run.relics) if (RELIC_DEFS[id].onPlayerHandReady) ctx.engine.afterQueuedEffects(() => RELIC_DEFS[id].onPlayerHandReady!(ctx))
+}
+export function triggerRelicCardResolved(ctx: RelicCombatContext, card: CardInstance): void {
+    for (const id of ctx.run.relics) RELIC_DEFS[id].onCardResolved?.(ctx, card)
+}
+export function triggerRelicCardPlayed(ctx: RelicCombatContext, card: CardInstance): void {
+    for (const id of ctx.run.relics) RELIC_DEFS[id].onCardPlayed?.(ctx, card)
+}
+export function triggerRelicDiscard(ctx: RelicCombatContext): void {
+    for (const id of ctx.run.relics) RELIC_DEFS[id].onCardDiscarded?.(ctx)
+}
+export function triggerRelicShuffle(ctx: RelicCombatContext): void {
+    for (const id of ctx.run.relics) RELIC_DEFS[id].onShuffle?.(ctx)
 }
 
 export function triggerRelicCombatStart(ctx: RelicCombatContext): void {
@@ -411,10 +457,10 @@ export function blocksPotionGain(run: Pick<RunState, 'relics'> | RelicId[]): boo
     return relics.some(relicId => RELIC_DEFS[relicId]?.blocksPotionGain)
 }
 
-export function getCardRewardChoiceCount(run: Pick<RunState, 'relics'> | RelicId[], baseChoices = 3): number {
+export function getCardRewardChoiceCount(run: Pick<RunState, 'relics'> & Partial<Pick<RunState, 'modifiers'>> | RelicId[], baseChoices = 3): number {
     const relics = Array.isArray(run) ? run : run.relics
     const delta = relics.reduce((sum, relicId) => sum + (RELIC_DEFS[relicId]?.cardRewardChoiceDelta ?? 0), 0)
-    return Math.max(1, baseChoices + delta)
+    return Math.max(0, baseChoices + delta - (!Array.isArray(run) && hasModifier(run, 'BINARY') ? 1 : 0))
 }
 
 export function getShopPriceMultiplier(run: Pick<RunState, 'asc'> & Partial<Pick<RunState, 'relics'>>): number {
@@ -438,7 +484,6 @@ export function getRelicDisplayName(run: Pick<RunState, 'relicState'>, relicId: 
 }
 
 export function isRelicUnlocked(meta: MetaState, relicId: RelicId): boolean {
-    if (RELIC_DEFS[relicId].rarity === 'boss') return true
     return getEffectiveUnlockedRelicIds(meta).has(relicId)
 }
 
@@ -448,5 +493,5 @@ export function getUnlockedRelicPool(meta: MetaState, rarity?: RelicDef['rarity'
         .map(id => id as RelicId)
         .filter(id => RELIC_DEFS[id].rarity !== 'starter')
         .filter(id => rarity ? RELIC_DEFS[id].rarity === rarity : ['common', 'uncommon', 'rare'].includes(RELIC_DEFS[id].rarity))
-        .filter(id => ['boss', 'shop'].includes(RELIC_DEFS[id].rarity) || ['SMILING_MASK', 'COURIER', 'MANGO', 'OLD_COIN', 'THREAD_AND_NEEDLE'].includes(id) || unlocked.has(id))
+        .filter(id => unlocked.has(id))
 }

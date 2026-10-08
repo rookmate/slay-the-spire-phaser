@@ -27,8 +27,8 @@ export class CombatChoiceOverlay {
     }
 
     refresh(choice?: PendingChoiceView): void {
-        const nextKey = choice ? `${choice.sourceCardInstanceId}-${choice.zone}-${choice.eligibleInstanceIds.join(',')}` : ''
-        const currentKey = this.currentChoice ? `${this.currentChoice.sourceCardInstanceId}-${this.currentChoice.zone}-${this.currentChoice.eligibleInstanceIds.join(',')}` : ''
+        const nextKey = choice?.id
+        const currentKey = this.currentChoice?.id
         if (nextKey === currentKey) return
 
         this.currentChoice = choice
@@ -39,7 +39,7 @@ export class CombatChoiceOverlay {
 
         if (!choice) return
 
-        const zoneCards = this.getZoneCards(choice.zone)
+        const zoneCards = choice.cards ?? this.engine.getCardsInZone(choice.zone)
         const overlay = this.scene.add.container(0, 0).setDepth(7000)
         this.container = overlay
 
@@ -102,17 +102,11 @@ export class CombatChoiceOverlay {
         this.selectedInstanceIds.clear()
     }
 
-    private getZoneCards(zone: PendingChoiceView['zone']): CardInstance[] {
-        if (zone === 'hand') return this.engine.state.player.hand
-        if (zone === 'discard') return this.engine.state.player.discardPile
-        return this.engine.state.player.exhaustPile
-    }
-
     private handleCardSelection(card: CardInstance): void {
         const choice = this.currentChoice
         if (!choice) return
 
-        if (choice.maxSelections === 1) {
+        if (choice.maxSelections === 1 && choice.minSelections === 1) {
             this.onSubmit?.([card.instanceId])
             return
         }

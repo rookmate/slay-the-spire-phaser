@@ -1,30 +1,33 @@
 import { expect, it } from 'vitest'
-import { createNewRun } from './run'
-import { canUpgradeCard, createCardInstance, resolveCard } from './cards'
+import { createNewRun, obtainCard } from './run'
+import { resolveCard } from './cards'
 import { createCombatEngine, applyCombatVictory } from './combat'
-import { generateMap, defaultUnknownWeights, resolveUnknown, updateUnknownWeights } from './map'
+import { getRunMap } from './map'
 import { completeRoom, getRunDestination } from './progression'
 import { RNG } from './rng'
 import { generateRewardBundle } from './rewards'
 import { advanceAct, finishBossCombat, finishRewards } from './campaign'
-import { applyRelicAcquisition, canRestAtCampfire } from './relics'
+import { applyRelicAcquisition } from './relics'
 import { generateShop, purchaseShopItem } from './shop'
 import { eventSeed, initializeEvent, resolveEventChoice } from './events'
 import { applyNeowOption, rollNeowOptions } from './neow'
-import { healRun } from './health'
+import { gainGold } from './health'
+import { canUseCampfire, useCampfire } from './campfire'
+import { enterMapNode } from './relics/campaignRules'
+import { prepareAcquisition, chooseAcquisition, acquisitionCandidates } from './relics/acquisitions'
+import { flipEventCard } from './events/additionalResolution'
 import { choosePlay, chooseRoute } from '../../tests/browser/policy'
 import { bossRelicPick, eventPick, neowPick, rewardPick, shopPick, upgradePick } from '../../tests/browser/strategy'
 const meta = { bestAscensionUnlocked: 0, totalWins: 0, totalRuns: 0, ironcladUnlockTier: 0, unlockedCardIds: [], unlockedRelicIds: [] }
-it('plays a legal seeded starter deck through all three acts', () => {
-    const run = createNewRun('campaign-312')
+export function simulateCampaign(seed: string) {
+    const run = createNewRun({ seed })
     applyNeowOption(run, meta, neowPick(rollNeowOptions(run.neowSeed)))
     let scene = getRunDestination(run).scene
     for (let step = 0; step < 250 && run.player.hp > 0 && scene !== 'RunSummary'; step++) {
         if (scene === 'Map') {
-            const node = chooseRoute(generateMap(run.seed, run.act), run.mapProgress?.currentNodeId)
-            run.mapProgress = { currentNodeId: node.id }; run.burningEliteActive = !!node.burning && !run.keys.emerald
-            let kind: string = node.kind
-            if (kind === 'unknown') { const weights = run.unknownWeights ?? defaultUnknownWeights(); kind = resolveUnknown(new RNG(`${run.seed}-unknown-${run.floor}`), weights); run.unknownWeights = updateUnknownWeights(weights, kind as 'event') }
+            const map = getRunMap(run), node = chooseRoute(map, run.mapProgress?.currentNodeId)
+            const kind = enterMapNode(run, map, node, new RNG(`${run.seed}-unknown-${run.floor}`))
+            run.burningEliteActive = !!node.burning && !run.keys.emerald
             if (kind === 'monster' || kind === 'elite' || kind === 'boss') run.pendingRoom = { scene: 'Combat', roomKind: kind }
             else if (kind === 'rest') run.pendingRoom = { scene: 'Campfire' }
             else if (kind === 'shop') run.pendingRoom = { scene: 'Shop' }
@@ -40,21 +43,22 @@ it('plays a legal seeded starter deck through all three acts', () => {
                 if (play) {
                     const def = resolveCard(play.card)
                     const targets = def.targeting?.type === 'single_enemy' ? [engine.state.enemies[play.enemyIndex!].id] : def.targeting?.type === 'all_enemies' ? engine.state.enemies.filter(e => e.hp > 0).map(e => e.id) : def.targeting?.type === 'player' ? ['player'] : []
-                    engine.playCard(play.card, targets); engine.runUntilIdle()
+                    const events = engine.playCard(play.card, targets); engine.runUntilIdle()
+                    if (!events.length && !engine.getPendingChoice()) { engine.enqueue({ kind: 'EndTurn' }); engine.runUntilIdle() }
                 } else { engine.enqueue({ kind: 'EndTurn' }); engine.runUntilIdle() }
             }
             if (!engine.state.victory) { run.player.hp = 0; break }
             applyCombatVictory(run, engine.state.player); run.pendingRoom = undefined
             if (kind === 'elite' && run.burningEliteActive) run.keys.emerald = true
             run.burningEliteActive = false
-            if (run.eventCombat) { run.pendingRoom = { scene: 'Rewards', rewards: run.eventCombat.rewards }; run.eventCombat = undefined; run.eventState = undefined }
+            if (run.eventCombat) { run.pendingRoom = { scene: 'Rewards', rewards: run.eventCombat.rewards }; if (run.eventCombat.resumeEvent) run.rewardReturnRoom = { scene: 'Event' }; else run.eventState = undefined; run.eventCombat = undefined }
             else if (kind === 'boss') { const next = finishBossCombat(run, meta); if (next === 'RunSummary') { scene = next; break } }
             else { if (kind === 'monster') run.hallwayCount = (run.hallwayCount ?? 0) + 1; run.pendingRoom = { scene: 'Rewards', rewards: generateRewardBundle(`${run.seed}-reward-${run.mapProgress?.currentNodeId}-${kind}`, kind === 'elite' ? 'elite' : 'hallway', run, meta) } }
         } else if (scene === 'Rewards' && run.pendingRoom?.scene === 'Rewards') {
             for (const item of run.pendingRoom.rewards.items) {
-                if (item.kind === 'gold') run.gold += item.amount
+                if (item.kind === 'gold') gainGold(run, item.amount)
                 if (item.kind === 'relic') applyRelicAcquisition(run, item.relicId)
-                if (item.kind === 'cards') { const id = rewardPick(run, item.choices); if (id) run.deck.push(createCardInstance(id, item.upgrades?.[item.choices.indexOf(id)] ?? 0)) }
+                if (item.kind === 'cards') { const id = rewardPick(run, item.choices); if (id) obtainCard(run, id, 'deck', item.upgrades?.[item.choices.indexOf(id)] ?? 0) }
             }
             finishRewards(run)
         } else if (scene === 'BossRelic') { applyRelicAcquisition(run, bossRelicPick(run.bossRelicChoicePending!.choices)); advanceAct(run) }
@@ -64,16 +68,33 @@ it('plays a legal seeded starter deck through all three acts', () => {
             completeRoom(run)
         } else if (scene === 'Campfire') {
             const card = upgradePick(run)
-            if (run.player.hp < run.player.maxHp * 0.8 && canRestAtCampfire(run)) healRun(run, Math.floor(run.player.maxHp * 0.3))
-            else if (card && canUpgradeCard(card)) card.upgradeLevel++
-            completeRoom(run)
+            if (run.player.hp < run.player.maxHp * 0.8 && canUseCampfire(run, 'rest')) useCampfire(run, 'rest')
+            else if (card && canUseCampfire(run, 'smith')) useCampfire(run, 'smith', card.instanceId)
+            else useCampfire(run, 'skip')
         } else if (scene === 'Event') {
             initializeEvent(run, meta)
             if (run.eventState?.resolved) completeRoom(run)
+            else if (run.eventState?.matching) {
+                const board = run.eventState.matching
+                if (board.revealed.length === 2) board.revealed = []
+                const index = board.cards.findIndex((_, i) => !board.matched.includes(i) && !board.revealed.includes(i))
+                flipEventCard(run, index)
+            }
             else { const pick = eventPick(run); const result = resolveEventChoice(run, meta, run.eventState!.id, pick.choice.id, eventSeed(run), pick.selection); if (result.nextScene === 'RunSummary') break }
+        }
+        if (scene === 'RelicAcquisition') {
+            const step = prepareAcquisition(run, meta)
+            if (step?.kind === 'select') chooseAcquisition(run, meta, acquisitionCandidates(run, step)[0]?.instanceId)
+            else if (step?.kind === 'cards') chooseAcquisition(run, meta, rewardPick(run, step.choices!))
+            else if (step?.kind === 'potion') chooseAcquisition(run, meta)
         }
         scene = getRunDestination(run).scene
     }
+    return { run, scene }
+}
+
+it('plays a legal seeded starter deck through all three acts', () => {
+    const { run, scene } = simulateCampaign('stage3-1506')
     expect(scene).toBe('RunSummary')
     expect(run.player.hp).toBeGreaterThan(0)
     expect(run.actsCleared).toEqual([1, 2, 3])

@@ -1,5 +1,7 @@
+import { prepareAcquisition, chooseAcquisition } from './relics/acquisitions'
+import { getRunDestination } from './progression'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { advanceAct, finishRewards } from './campaign'
+import { advanceAct } from './campaign'
 import { CARD_DEFS, createCardInstance } from './cards'
 import { createCombatEngine } from './combat'
 import { Engine, createDummyEnemy, createSimplePlayer } from './engine'
@@ -23,7 +25,8 @@ afterEach(() => vi.unstubAllGlobals())
 
 describe('merchant transactions', () => {
     it('stocks the original categories, a sale, and no duplicate relics', () => {
-        const run = createNewRun('shop')
+        const run = createNewRun({ seed: 'shop' })
+        const initial = structuredClone(run)
         const stock = generateShop(run, loadMeta())
         expect(stock.cards.slice(0, 5).map(id => CARD_DEFS[id].type)).toEqual(['attack', 'attack', 'skill', 'skill', 'power'])
         expect(stock.cards.slice(5).map(id => [CARD_DEFS[id].color, CARD_DEFS[id].rarity])).toEqual([['colorless', 'uncommon'], ['colorless', 'rare']])
@@ -31,11 +34,11 @@ describe('merchant transactions', () => {
         expect(RELIC_DEFS[stock.relics![2]].rarity).toBe('shop')
         expect(stock.potions).toHaveLength(3)
         expect(stock.saleIndex).toBeLessThan(5)
-        expect(generateShop(run, loadMeta())).toEqual(stock)
+        expect(generateShop(initial, loadMeta())).toEqual(stock)
         run.act = 2; expect(generateShop(run, loadMeta())).not.toEqual(stock)
     })
     it('charges only successful removals and persists the one-removal limit', () => {
-        const run = createNewRun('purge', 10); run.gold = 1000
+        const run = createNewRun({ seed: 'purge', ascension: 10 }); run.gold = 1000
         const stock = generateShop(run, loadMeta())
         run.pendingRoom = { scene: 'Shop', inventory: stock }
         expect(purchaseRemoval(run, stock, run.deck.find(c => c.defId === 'ASCENDERS_BANE')!.instanceId)).toBe(false)
@@ -47,7 +50,7 @@ describe('merchant transactions', () => {
         expect(run.gold).toBe(925); expect(run.merchantRemoveCost).toBe(100)
     })
     it('removes sold relics and restocks only with Courier', () => {
-        const run = createNewRun('stock'); run.gold = 10000
+        const run = createNewRun({ seed: 'stock' }); run.gold = 10000
         const stock = generateShop(run, loadMeta())
         const index = stock.relics!.findIndex(id => id !== 'COURIER')
         const relic = stock.relics![index]
@@ -59,24 +62,26 @@ describe('merchant transactions', () => {
         expect(stock.cards).toHaveLength(count)
     })
     it('combines discounts and preserves Smiling Mask’s fixed removal cost', () => {
-        const run = createNewRun('discount', 16); run.relics.push('COURIER', 'MEMBERSHIP_CARD')
+        const run = createNewRun({ seed: 'discount', ascension: 16 }); run.relics.push('COURIER', 'MEMBERSHIP_CARD')
         expect(shopPrice(run, 100)).toBe(44)
         expect(removalPrice(run)).toBe(33)
         run.relics.push('SMILING_MASK'); expect(removalPrice(run)).toBe(50)
     })
     it('returns to the same shop after all five Orrery rewards', () => {
-        const run = createNewRun('orrery'); run.gold = 1000
+        const run = createNewRun({ seed: 'orrery' }); run.gold = 1000; run.neowCompleted = true
         const stock = generateShop(run, loadMeta()); stock.relics = ['ORRERY']; stock.relicPrices = [150]
+        run.pendingRoom = { scene: 'Shop', inventory: stock }
         purchaseShopItem(run, loadMeta(), stock, 'relics', 0)
-        expect(run.pendingRoom?.scene === 'Rewards' && run.pendingRoom.rewards.items).toHaveLength(5)
-        expect(finishRewards(run)).toBe('Shop'); expect(run.floor).toBe(1)
+        expect(run.pendingAcquisitions).toHaveLength(5)
+        for (let i = 0; i < 5; i++) { prepareAcquisition(run, loadMeta()); chooseAcquisition(run, loadMeta()) }
+        expect(getRunDestination(run).scene).toBe('Shop'); expect(run.floor).toBe(1)
         expect(run.pendingRoom?.scene === 'Shop' && run.pendingRoom.inventory?.relics).toEqual([])
     })
 })
 
 describe('reward probabilities', () => {
     it('starts with no rare chance, advances on commons, and resets on a rare', () => {
-        const run = createNewRun('rarity'); const rng = new RNG('roll')
+        const run = createNewRun({ seed: 'rarity' }); const rng = new RNG('roll')
         vi.spyOn(rng, 'random').mockReturnValue(0)
         expect(rollCardRarity(rng, run, 'hallway')).toBe('uncommon')
         expect(run.rareCardOffset).toBeUndefined()
@@ -87,7 +92,7 @@ describe('reward probabilities', () => {
         expect(rollCardRarity(rng, run, 'hallway')).toBe('rare'); expect(run.rareCardOffset).toBe(-5)
     })
     it('keeps shop rolls from changing rarity and tracks potion misses/drops', () => {
-        const run = createNewRun('potion'); run.rareCardOffset = 7
+        const run = createNewRun({ seed: 'potion' }); run.rareCardOffset = 7
         generateShop(run, loadMeta()); expect(run.rareCardOffset).toBe(7)
         run.potionChance = 0
         expect(generateRewardBundle('miss', 'elite', run, loadMeta()).items.some(i => i.kind === 'potion')).toBe(false)
@@ -101,7 +106,7 @@ describe('reward probabilities', () => {
 
 describe('event consequences and checkpoints', () => {
     it('persists the Golden Idol trap, forbids leaving, and applies it once', () => {
-        const run = createNewRun('idol'); initializeEvent(run, loadMeta(), 'GOLDEN_IDOL')
+        const run = createNewRun({ seed: 'idol' }); initializeEvent(run, loadMeta(), 'GOLDEN_IDOL')
         resolveEventChoice(run, loadMeta(), 'GOLDEN_IDOL', 'GOLDEN_IDOL_TAKE', eventSeed(run))
         saveRun(run); const loaded = loadRun()!
         expect(getEventChoices(loaded).map(c => c.id)).toEqual(['IDOL_INJURY', 'IDOL_DAMAGE', 'IDOL_MAX_HP'])
@@ -114,34 +119,34 @@ describe('event consequences and checkpoints', () => {
     })
     it('uses distinct act pools and Ascension 15 event costs', () => {
         expect(getEventPool(1)).not.toContain('THE_JOUST'); expect(getEventPool(3)).toContain('MIND_BLOOM')
-        const run = createNewRun('cleric', 15); const id = run.deck[0].instanceId
+        const run = createNewRun({ seed: 'cleric', ascension: 15 }); const id = run.deck[0].instanceId
         resolveEventChoice(run, loadMeta(), 'CLERIC', 'CLERIC_PURGE', 'cost', { cardInstanceId: id })
         expect(run.gold).toBe(24); expect(run.deck.some(c => c.instanceId === id)).toBe(false)
     })
     it('can die to event damage and cannot use invalid selections to evade costs', () => {
-        const run = createNewRun('goop'); run.player.hp = 5
+        const run = createNewRun({ seed: 'goop' }); run.player.hp = 5
         const result = resolveEventChoice(run, loadMeta(), 'WORLD_OF_GOOP', 'WORLD_OF_GOOP_REACH', 'goop')
         expect(result.nextScene).toBe('RunSummary'); expect(run.player.hp).toBe(0)
-        const other = createNewRun('remove'); initializeEvent(other, loadMeta(), 'BEGGAR')
+        const other = createNewRun({ seed: 'remove' }); initializeEvent(other, loadMeta(), 'BEGGAR')
         resolveEventChoice(other, loadMeta(), 'BEGGAR', 'BEGGAR_GIVE', 'beggar', { cardInstanceId: 'absent' })
         expect(other.gold).toBe(99); expect(other.eventState?.resolved).toBeUndefined()
     })
     it('keeps curse transformations cursed and charges Parasite max HP', () => {
-        const run = createNewRun('transform', 10); const parasite = createCardInstance('PARASITE'); run.deck.push(parasite)
+        const run = createNewRun({ seed: 'transform', ascension: 10 }); const parasite = createCardInstance('PARASITE'); run.deck.push(parasite)
         const transformed = transformCard(run, loadMeta(), parasite.instanceId, 'curse')!
         expect(CARD_DEFS[transformed.defId].type).toBe('curse'); expect(transformed.defId).not.toBe('PARASITE')
         expect(run.player.maxHp).toBe(77)
         expect(transformCard(run, loadMeta(), run.deck.find(c => c.defId === 'ASCENDERS_BANE')!.instanceId, 'bane')).toBeUndefined()
     })
     it('blocks healing after Mind Bloom, including act transitions and max-HP gains', () => {
-        const run = createNewRun('bloom'); run.act = 3; run.player.hp = 20
+        const run = createNewRun({ seed: 'bloom' }); run.act = 3; run.player.hp = 20
         resolveEventChoice(run, loadMeta(), 'MIND_BLOOM', 'BLOOM_AWAKE', 'bloom')
         expect(healRun(run, 100)).toBe(0)
         applyRelicAcquisition(run, 'MANGO'); expect(run.player.maxHp).toBe(94); expect(run.player.hp).toBe(20)
         advanceAct(run); expect(run.player.hp).toBe(20)
     })
     it('starts event battles with their specified enemies and rewards', () => {
-        const run = createNewRun('sphere'); run.act = 3
+        const run = createNewRun({ seed: 'sphere' }); run.act = 3
         resolveEventChoice(run, loadMeta(), 'MYSTERIOUS_SPHERE', 'SPHERE_FIGHT', 'sphere')
         expect(createCombatEngine(run, 'monster').state.enemies.map(e => e.specId)).toEqual(['ORB_WALKER', 'ORB_WALKER'])
         expect(run.eventCombat?.rewards.items.some(i => i.kind === 'relic' && RELIC_DEFS[i.relicId].rarity === 'rare')).toBe(true)

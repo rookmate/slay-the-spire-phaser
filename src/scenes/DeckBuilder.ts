@@ -1,61 +1,24 @@
 import Phaser from 'phaser'
-import { CARD_DEFS, createCardInstance } from '../core/cards'
+import { CARD_DEFS, createCardInstance, canUpgradeCard } from '../core/cards'
 import { getEffectiveUnlockedCardIds, loadMeta } from '../core/meta'
 import type { RunState } from '../core/run'
-// import { saveRun } from '../core/run'
-import { Card } from '../ui/Card'
-
+import type { CardColor } from '../core/state'
+import { CardGrid } from '../ui/CardGrid'
+import { menuButton, menuText } from '../ui/menu'
 export class DeckBuilderScene extends Phaser.Scene {
     run!: RunState
-    private list!: Phaser.GameObjects.Container
-    private contentHeight = 0
-
+    private color: CardColor | 'status' | 'curse' = 'ironclad'
+    private upgraded = false
     constructor() { super('DeckBuilder') }
-
-    create(data: { run: RunState }): void {
-        this.run = data.run
-        const meta = loadMeta()
-        const unlockedCards = getEffectiveUnlockedCardIds(meta)
-        const style = { fontFamily: 'monospace', fontSize: '16px', color: '#ffffff' }
-        this.add.text(16, 16, 'Card Library', {
-            fontFamily: 'monospace', fontSize: '18px', color: '#ffffff',
-        })
-        const keys = Object.values(CARD_DEFS)
-            .filter(card => card.poolEnabled)
-            .map(card => card.id)
-        keys.sort()
-
-        // Scrollable grid of all cards
-        this.list = this.add.container(0, 60)
-        const colW = 130
-        const rowHCard = 190
-        const cols = 5
-        keys.forEach((id, i) => {
-            const col = i % cols
-            const row = Math.floor(i / cols)
-            const card = createCardInstance(id)
-            const view = new Card(this, card, {
-                x: 16 + col * colW,
-                y: row * rowHCard,
-                scale: 1,
-                locked: !unlockedCards.has(id),
-            })
-            this.list.add(view)
-        })
-        const totalRows = Math.ceil(keys.length / cols)
-        this.contentHeight = totalRows * rowHCard
-
-        // Scroll with mouse wheel
-        this.input.on('wheel', (_p: any, _go: any, _dx: number, dy: number) => {
-            this.list.y = Phaser.Math.Clamp(this.list.y - dy, 60 - (this.contentHeight - (this.scale.height - 120)), 60)
-        })
-
-        // No deck list here; this scene shows the full card library
-
-        this.add.text(16, this.scale.height - 40, 'Back', { ...style, backgroundColor: '#444', padding: { x: 8, y: 6 } })
-            .setInteractive({ useHandCursor: true })
-            .on('pointerdown', () => this.scene.start('MainMenu'))
+    create(data: { run: RunState }): void { this.run = data.run; this.render() }
+    private render(): void {
+        this.children.removeAll(true)
+        this.add.text(24, 18, 'Card Library', { ...menuText, fontSize: '24px' })
+        ;(['ironclad', 'silent', 'defect', 'watcher', 'colorless', 'curse', 'status'] as const).forEach((color, i) => menuButton(this, 16 + i * 111, 56, color[0].toUpperCase() + color.slice(1), () => { this.color = color; this.render() }))
+        const unlocked = getEffectiveUnlockedCardIds(loadMeta())
+        const cards = Object.values(CARD_DEFS).filter(card => card.color === this.color || card.type === this.color).sort((a, b) => a.name.localeCompare(b.name)).map(card => createCardInstance(card.id, this.upgraded && canUpgradeCard(createCardInstance(card.id)) ? 1 : 0))
+        new CardGrid(this, this.add.container(0, 0), cards, 105, () => {}, card => unlocked.has(card.defId) || !CARD_DEFS[card.defId].poolEnabled)
+        menuButton(this, 405, 399, this.upgraded ? 'Show base' : 'Show upgrades', () => { this.upgraded = !this.upgraded; this.render() })
+        menuButton(this, 650, 399, 'Back', () => this.scene.start('MainMenu'))
     }
-
-    // No finish method; read-only library
 }

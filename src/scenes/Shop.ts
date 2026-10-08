@@ -1,5 +1,6 @@
+import { addRunMenu } from '../ui/runMenu'
 import Phaser from 'phaser'
-import { createCardInstance } from '../core/cards'
+import { canRemoveCard, createCardInstance } from '../core/cards'
 import { loadMeta, type MetaState } from '../core/meta'
 import { POTION_DEFS } from '../core/potions'
 import { completeRoom, type ShopInventory } from '../core/progression'
@@ -32,11 +33,13 @@ export class ShopScene extends Phaser.Scene {
     private buy(kind: 'cards' | 'relics' | 'potions', index: number): void {
         if (!purchaseShopItem(this.run, this.meta, this.inventory, kind, index)) return
         saveRun(this.run)
-        if (this.run.pendingRoom?.scene === 'Rewards') this.scene.start('Rewards', { run: this.run, rewards: this.run.pendingRoom.rewards })
+        if (this.run.pendingAcquisitions?.length) this.scene.start('RelicAcquisition', { run: this.run })
+        else if (this.run.pendingRoom?.scene === 'Rewards') this.scene.start('Rewards', { run: this.run, rewards: this.run.pendingRoom.rewards })
         else this.render()
     }
     private render(): void {
         this.children.removeAll(true)
+        addRunMenu(this, this.run)
         this.add.text(18, 16, `Merchant    ${this.run.gold} Gold    A${this.run.asc}`, { fontFamily: 'monospace', fontSize: '22px', color: '#fff' })
         this.inventory.cards.forEach((id, i) => {
             const x = 18 + i * 109
@@ -57,8 +60,8 @@ export class ShopScene extends Phaser.Scene {
             this.add.text(18 + i * 256, 359, POTION_DEFS[id].description, { fontFamily: 'monospace', fontSize: '12px', color: '#bbb', wordWrap: { width: 236 } })
         })
         const cost = removalPrice(this.run)
-        this.button(18, 401, this.inventory.removalUsed ? 'Card removal used' : `Remove a card · ${cost} G`, !this.inventory.removalUsed && this.run.gold >= cost && this.run.deck.some(card => card.defId !== 'ASCENDERS_BANE'), () => this.selector.open({
-            title: 'Choose a card to remove', cards: this.run.deck, filter: card => card.defId !== 'ASCENDERS_BANE', onSelect: card => {
+        this.button(18, 401, this.inventory.removalUsed ? 'Card removal used' : `Remove a card · ${cost} G`, !this.inventory.removalUsed && this.run.gold >= cost && this.run.deck.some(canRemoveCard), () => this.selector.open({
+            title: 'Choose a card to remove', cards: this.run.deck, filter: canRemoveCard, onSelect: card => {
                 if (purchaseRemoval(this.run, this.inventory, card.instanceId)) { saveRun(this.run); this.render() }
             },
         }))

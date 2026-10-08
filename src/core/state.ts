@@ -1,11 +1,27 @@
+import type { Engine } from './engine'
+import type { CharacterId } from './characters'
+import type { OrbState, OrbType, StanceId } from './combat/resources'
 import type { Action, EntityId } from './actions'
 
 export type CardType = 'attack' | 'skill' | 'power' | 'status' | 'curse'
-export type ChoiceZone = 'hand' | 'discard' | 'exhaust'
-export type CardDestination = 'hand' | 'drawPile' | 'drawPileTop' | 'discardPile' | 'exhaustPile'
+export type ChoiceZone = 'hand' | 'discard' | 'exhaust' | 'draw' | 'offer'
+export type CardDestination = 'hand' | 'drawPile' | 'drawPileTop' | 'drawPileBottom' | 'discardPile' | 'exhaustPile'
 
 export type PowerId =
-    | 'CONSTRICTED' | 'INVINCIBLE'
+    | 'MAGNETISM' | 'MAYHEM' | 'PANACHE' | 'SADISTIC_NATURE' | 'NO_BLOCK'
+    | 'BATTLE_HYMN' | 'BLASPHEMER' | 'COLLECT' | 'DEVA_FORM' | 'DEVOTION' | 'FASTING' | 'FORESIGHT'
+    | 'LIKE_WATER' | 'MASTER_REALITY' | 'NIRVANA' | 'OMEGA' | 'STUDY' | 'SIMMERING_FURY'
+    | 'MARK' | 'TALK_TO_THE_HAND' | 'WAVE_OF_THE_HAND' | 'WREATH_OF_FLAME'
+    | 'AMPLIFY' | 'ECHO_FORM' | 'DUPLICATION' | 'REBOUND' | 'BIASED_COGNITION' | 'CREATIVE_AI' | 'HELLO_WORLD'
+    | 'LOOP' | 'MACHINE_LEARNING' | 'SELF_REPAIR' | 'STATIC_DISCHARGE' | 'STORM' | 'HEATSINKS'
+    | 'ACCURACY' | 'AFTER_IMAGE' | 'THOUSAND_CUTS' | 'ENVENOM' | 'INFINITE_BLADES' | 'NOXIOUS_FUMES'
+    | 'TOOLS_OF_THE_TRADE' | 'WELL_LAID_PLANS' | 'WRAITH_FORM' | 'CORPSE_EXPLOSION' | 'CHOKE'
+    | 'BLUR' | 'BLOCK_NEXT_TURN' | 'ENERGY_NEXT_TURN' | 'DRAW_NEXT_TURN' | 'BURST'
+    | 'PHANTASMAL_KILLER' | 'DOUBLE_DAMAGE' | 'STRENGTH_UP_NEXT_TURN' | 'BUFFER' | 'REGENERATION'
+    | 'EQUILIBRIUM' | 'ESTABLISHMENT' | 'DEXTERITY_DOWN' | 'FREE_ATTACK'
+    | 'FOCUS' | 'ELECTRODYNAMICS' | 'LOCK_ON' | 'MENTAL_FORTRESS' | 'RUSHDOWN' | 'MANTRA' | 'POISON'
+    | 'DOUBLE_TAP'
+    | 'SLOW' | 'CONSTRICTED' | 'INVINCIBLE'
     | 'RITUAL' | 'CONFUSION' | 'HEX' | 'ENTANGLED' | 'DRAW_REDUCTION'
     | 'PLATED_ARMOR' | 'REGENERATE' | 'INTANGIBLE' | 'RUPTURE' | 'CURL_UP'
     | 'FRAIL'
@@ -42,12 +58,20 @@ export interface CardInstance {
     instanceId: string
     defId: string
     upgradeLevel: number
+    storedHits?: number
+    bottled?: boolean | import('./run').RelicId
+    permanentDamage?: number
+    permanentBlock?: number
+    costUntilPlayed?: number
+    retained?: boolean
     costForCombat?: number
     costForTurn?: number
     confusedCost?: number
 }
 
 export interface PendingChoiceView {
+    id: number
+    cards?: CardInstance[]
     prompt: string
     zone: ChoiceZone
     eligibleInstanceIds: string[]
@@ -66,33 +90,12 @@ export interface LimboCardState {
     spentEnergy: number
 }
 
-export interface CardChoiceRequest extends PendingChoiceView {
+export interface CardChoiceRequest extends Omit<PendingChoiceView, 'id'> {
     onSubmit: (instanceIds: string[]) => void
     onCancel?: () => void
 }
 
-export interface CardEngineApi {
-    state: CombatState
-    enqueue: (a: Action) => void
-    playTopCard?: () => void
-    setDoubleTapCharges?: (charges: number) => void
-    modifyOutgoingAttackDamageFromPlayer?: (base: number, cardInstanceId?: string) => number
-    handleExhaustFromHand?: (card: CardInstance) => void
-    handleExhaust?: (card: CardInstance) => void
-    addTemporaryThorns?: (amount: number) => void
-    beginChoice?: (choice: CardChoiceRequest) => void
-    deferChoice?: (startChoice: () => void) => void
-    getCardsInZone?: (zone: ChoiceZone) => CardInstance[]
-    moveCardToDestination?: (instanceId: string, zone: ChoiceZone, destination: CardDestination) => CardInstance | undefined
-    createCardsInDestination?: (defId: string, destination: Exclude<CardDestination, 'drawPileTop' | 'exhaustPile'>, count?: number, upgradeLevel?: number) => CardInstance[]
-    upgradeCardInstance?: (instanceId: string, zones?: ChoiceZone[]) => CardInstance | undefined
-    getLimboCard?: () => CardInstance | undefined
-    randomInt?: (min: number, max: number) => number
-    copyCardToHand?: (instanceId: string, count?: number) => CardInstance[]
-    exhaustCardsInHand?: (predicate: (card: CardInstance) => boolean) => CardInstance[]
-    getCardCombatBonusDamage?: (instanceId: string) => number
-    modifyCardCombatBonusDamage?: (instanceId: string, delta: number) => number
-}
+export type CardEngineApi = Engine
 
 export interface EnemyEngineApi {
     state: CombatState
@@ -129,6 +132,7 @@ export interface CardDef {
     retain?: boolean
     ethereal?: boolean
     upgrade?: {
+        targeting?: CardDef['targeting']
         name?: string
         cost?: number
         baseDamage?: number
@@ -160,6 +164,13 @@ export interface CardDef {
         card: CardInstance
         spentEnergy: number
     }) => void
+    dynamicCost?: (ctx: { engine: CardEngineApi; card: CardInstance; cost: number }) => number
+    onDraw?: (ctx: { engine: CardEngineApi; card: CardInstance }) => void
+    resolveDestination?: CardDestination
+    onDiscard?: (ctx: { engine: CardEngineApi; card: CardInstance }) => void
+    onRetain?: (ctx: { engine: CardEngineApi; card: CardInstance }) => void
+    onFatal?: (ctx: { engine: Engine; card: CardInstance }) => void
+    removable?: boolean
     onExhaust?: (ctx: {
         engine: CardEngineApi
         card: CardInstance
@@ -167,6 +178,10 @@ export interface CardDef {
 }
 
 export interface PlayerState {
+    character: CharacterId
+    orbs: OrbState[]
+    orbSlots: number
+    stance: StanceId
     id: EntityId
     maxHp: number
     hp: number
@@ -218,15 +233,34 @@ export interface EnemyState {
 }
 
 export interface CombatState {
+    orbsChanneled: Record<OrbType, number>
+    panacheCount?: number
+    bombs?: { turns: number; damage: number }[]
+    extraTurn?: boolean
+    mantraGained?: number
+    devaEnergy?: number
+    previousCardType?: CardType
+    lastCardType?: CardType
+    echoRepeatsThisTurn?: number
+    attacksThisTurn?: number
+    powersPlayed?: number
+    lastDrawnCard?: CardInstance
+    nextTurnCopies?: CardInstance[]
+    discardsThisTurn: number
     player: PlayerState
     enemies: EnemyState[]
     turn: 'player' | 'enemy'
+    escaped?: boolean
     victory: boolean
     defeat: boolean
     limbo: LimboCardState[]
-    cardRuntime: Record<string, { bonusDamage?: number; triggered?: boolean }>
+    cardRuntime: Record<string, { bonusDamage?: number; bonusBlock?: number; triggered?: boolean }>
     facingEnemyId?: string
     hpLossCount?: number
+    enemyDamageTaken?: number
+    nonCurseCardsPlayed?: number
+    scoreCombo?: boolean
+    scoreOverkill?: boolean
     cardsPlayed?: number
     turnNumber?: number
 }

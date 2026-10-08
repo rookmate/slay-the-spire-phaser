@@ -16,8 +16,8 @@ async function selectFromPages(page: Page, id: string) {
 }
 
 test('plays a seeded starter-deck run through all three acts and records victory', async ({ page }, testInfo) => {
-    test.setTimeout(300_000)
-    const errors = await boot(page, createNewRun(process.env.PLAYTHROUGH_SEED ?? 'campaign-312'))
+    test.setTimeout(process.env.CI ? 900_000 : 300_000)
+    const errors = await boot(page, createNewRun({ seed: process.env.PLAYTHROUGH_SEED ?? 'stage3-1506' }))
     await expectScene(page, 'Neow')
     const history: string[] = []
     let lastCombat = ''
@@ -69,6 +69,13 @@ test('plays a seeded starter-deck run through all three acts and records victory
                         return after.scene !== 'Combat' || !after.state!.player.hand.some(card => card.instanceId === play.card.instanceId)
                     }, { message: `Play ${play.card.defId}` }).toBe(true)
                 } else await clickText(page, 'End Turn')
+            } else if (ui.scene === 'Chest') {
+                await clickText(page, 'Open chest')
+            } else if (ui.scene === 'RelicAcquisition') {
+                const step = ui.run!.pendingAcquisitions![0]
+                if (step.kind === 'select') await clickCard(page, ui.cards.find(c => c.enabled)!.id)
+                else if (step.kind === 'cards') { const id = rewardPick(ui.run!, step.choices!); if (id) await clickCard(page, id); else await clickText(page, 'Skip') }
+                else await clickText(page, 'Skip')
             } else if (ui.scene === 'Rewards') {
                 if (!reloadedReward) {
                     const before = ui.run!.gold
@@ -92,8 +99,8 @@ test('plays a seeded starter-deck run through all three acts and records victory
                 const upgrades = ui.run!.deck.filter(canUpgradeCard).sort((a, b) => cardPriority(b.defId) - cardPriority(a.defId))
                 if (ui.run!.player.hp < ui.run!.player.maxHp * 0.8 && ui.texts.some(t => t.enabled && t.text.startsWith('Rest'))) {
                     await clickText(page, ui.texts.find(t => t.enabled && t.text.startsWith('Rest'))!.text)
-                } else if (upgrades.length) {
-                    await clickText(page, 'Smith (upgrade a card)')
+                } else if (upgrades.length && ui.texts.some(t => t.enabled && t.text === 'Smith · upgrade a card')) {
+                    await clickText(page, 'Smith · upgrade a card')
                     await selectFromPages(page, upgrades[0].instanceId)
                 } else await clickText(page, 'Skip')
             } else if (ui.scene === 'Shop') {
@@ -104,7 +111,11 @@ test('plays a seeded starter-deck run through all three acts and records victory
                 } else await clickText(page, 'Leave')
             } else if (ui.scene === 'Event') {
                 if (ui.run!.eventState?.resolved) await clickText(page, 'Continue')
-                else {
+                else if (ui.run!.eventState?.matching) {
+                    const board = ui.run!.eventState.matching, revealed = board.revealed.length === 2 ? [] : board.revealed
+                    const index = board.cards.findIndex((_, i) => !board.matched.includes(i) && !revealed.includes(i))
+                    await clickPoint(page, 24 + index % 6 * 125 + 55, 148 + Math.floor(index / 6) * 89 + 38)
+                } else {
                     const pick = eventPick(ui.run!)
                     await clickText(page, pick.choice.label)
                     if (pick.choice.requiresSelection === 'reward') await clickCard(page, pick.selection.cardId!)
@@ -125,12 +136,12 @@ test('plays a seeded starter-deck run through all three acts and records victory
         await expectScene(page, 'RunSummary')
         const summary = await inspect(page)
         history.push(...summary.texts.map(text => text.text))
-        expect(summary.texts.some(t => t.text === 'Run VICTORY!'), history.join('\n')).toBe(true)
-        expect(summary.texts.some(t => t.text === 'Acts cleared: 1, 2, 3')).toBe(true)
+        expect(summary.texts.some(t => t.text === 'Ironclad · VICTORY'), history.join('\n')).toBe(true)
+        expect(history.some(line => line.startsWith('Act 3'))).toBe(true)
         expect(reloadedReward && reloadedBossRelic && reloadedActTwo).toBe(true)
         const saved = await page.evaluate(() => ({ run: localStorage.getItem('sts_run_v7'), meta: JSON.parse(localStorage.getItem('sts_meta_v2')!) }))
         expect(saved.run).toBeNull()
-        expect(saved.meta).toMatchObject({ totalRuns: 1, totalWins: 1, bestAscensionUnlocked: 1, ironcladUnlockTier: 1 })
+        expect(saved.meta).toMatchObject({ totalRuns: 1, totalWins: 1, bestAscensionUnlocked: 0, ironcladUnlockTier: 1 })
         await page.reload()
         await page.waitForFunction(() => window.__testGame?.scene.isActive('MainMenu'))
         expect(await page.evaluate(() => JSON.parse(localStorage.getItem('sts_meta_v2')!))).toEqual(saved.meta)

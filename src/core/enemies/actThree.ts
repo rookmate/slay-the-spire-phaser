@@ -97,7 +97,7 @@ export const ACT_THREE_ENEMIES: Record<string, EnemySpec> = {
             { id: 'multi', weight: 35, limit: 2, intent: () => attack(enemy, 6, 7, 3) },
             { id: 'scythe', weight: enemy.aiState?.lastMove ? 30 : 0, limit: 1, intent: () => attack(enemy, 45) },
         ]),
-        onIntentResolved: (_engine, enemy) => { setPower(enemy, 'INTANGIBLE', turn(enemy) % 2 === 0 ? 1 : 0) },
+        onIntentResolved: (_engine, enemy) => { if (turn(enemy) % 2 === 0) setPower(enemy, 'INTANGIBLE', Math.max(2, enemy.powers.find(p => p.id === 'INTANGIBLE')?.stacks ?? 0)) },
     },
     GIANT_HEAD: { id: 'GIANT_HEAD', name: 'Giant Head', hp: 500, highHp: 520, tags: ['elite'],
         initialize: enemy => { enemy.aiState = { slow: 0 } },

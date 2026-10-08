@@ -1,11 +1,12 @@
+import { addRunMenu } from '../ui/runMenu'
 import Phaser from 'phaser'
 import { finishRewards } from '../core/campaign'
 import { createCardInstance } from '../core/cards'
-import { gainGold } from '../core/health'
+import { changeMaxHp, gainGold } from '../core/health'
 import { POTION_DEFS } from '../core/potions'
 import { applyRelicAcquisition, blocksPotionGain, getRelicDisplayName } from '../core/relics'
 import type { RewardBundle, RewardItem } from '../core/rewards'
-import { saveRun, type RunState } from '../core/run'
+import { obtainCardInstance, saveRun, type RunState } from '../core/run'
 import { Card } from '../ui/Card'
 
 /** Resolve one saved reward at a time, including repeated card/potion rewards. */
@@ -30,14 +31,18 @@ export class RewardsScene extends Phaser.Scene {
         this.run.pendingRoom = { scene: 'Rewards', rewards: this.rewards }; saveRun(this.run)
     }
     private render(): void {
-        this.children.removeAll(true); this.choiceCards = []; this.pendingCardReward = false; this.pendingPotionReward = undefined
+        if (this.run.pendingAcquisitions?.length) { this.scene.start('RelicAcquisition', { run: this.run }); return }
+        this.children.removeAll(true)
+        addRunMenu(this, this.run); this.choiceCards = []; this.pendingCardReward = false; this.pendingPotionReward = undefined
         this.add.text(24, 24, `Rewards    ${this.run.gold} Gold`, { fontFamily: 'monospace', fontSize: '24px', color: '#fff' })
         for (const [i, item] of this.rewards.items.entries()) {
             if (this.rewards.claimed?.includes(i)) continue
             if (item.kind === 'gold') { gainGold(this.run, item.amount); this.claim(i); this.message += `Gold +${item.amount}. `; continue }
             if (item.kind === 'boss_relics') continue
-            if (item.kind === 'relic' && !(this.rewards.tier === 'chest' && !this.run.keys.sapphire)) {
-                applyRelicAcquisition(this.run, item.relicId); this.claim(i); this.message += `Obtained ${getRelicDisplayName(this.run, item.relicId)}. `; continue
+            if (item.kind === 'relic' && !(this.rewards.tier === 'chest' && this.run.keysEnabled !== false && !this.run.keys.sapphire && i === this.rewards.items.findIndex(reward => reward.kind === 'relic'))) {
+                applyRelicAcquisition(this.run, item.relicId); this.claim(i); this.message += `Obtained ${getRelicDisplayName(this.run, item.relicId)}. `
+                if (this.run.pendingAcquisitions?.length) { this.scene.start('RelicAcquisition', { run: this.run }); return }
+                continue
             }
             if (item.kind === 'potion' && (blocksPotionGain(this.run) || this.run.potions.length < this.run.maxPotionSlots)) {
                 if (!blocksPotionGain(this.run)) { this.run.potions.push(item.potionId); this.message += `Obtained ${POTION_DEFS[item.potionId].name}. ` }
@@ -56,7 +61,7 @@ export class RewardsScene extends Phaser.Scene {
             this.pendingPotionReward = item.potionId
             this.add.text(24, 158, `${POTION_DEFS[item.potionId].name}: ${POTION_DEFS[item.potionId].description}`, { fontFamily: 'monospace', fontSize: '18px', color: '#fff' })
             this.add.text(24, 210, 'Replace a potion:', { fontFamily: 'monospace', fontSize: '17px', color: '#ccc' })
-            this.run.potions.forEach((id, slot) => this.button(24 + slot * 250, 250, POTION_DEFS[id].name, () => { this.run.potions[slot] = item.potionId; complete() }))
+            this.run.potions.forEach((id, slot) => this.button(24 + slot % 3 * 252, 250 + Math.floor(slot / 3) * 54, POTION_DEFS[id].name, () => { this.run.potions[slot] = item.potionId; complete() }))
             this.button(635, 365, 'Skip Potion', complete)
         }
         if (item.kind === 'relic') {
@@ -75,11 +80,12 @@ export class RewardsScene extends Phaser.Scene {
             const view = new Card(this, createCardInstance(id, item.upgrades?.[i] ?? 0), { x: start + i * spacing, y: 147, interactive: true })
             view.on('pointerdown', () => {
                 if (this.rewards.claimed?.includes(index)) return
-                this.run.deck.push(view.getCardInstance()); this.run.cardsSeen = (this.run.cardsSeen ?? 0) + item.choices.length
+                obtainCardInstance(this.run, view.getCardInstance()); this.run.cardsSeen = (this.run.cardsSeen ?? 0) + item.choices.length
                 this.claim(index); this.render()
             })
             this.add.existing(view); this.choiceCards.push(view)
         })
+        if (this.run.relics.includes('SINGING_BOWL')) this.button(445, 365, '+2 max HP', () => { changeMaxHp(this.run, 2); this.claim(index); this.render() })
         this.button(680, 365, 'Skip', () => { this.claim(index); this.render() })
     }
 }

@@ -1,3 +1,5 @@
+import { resolveCard } from '../core/cards'
+import { playCue } from './sound'
 import Phaser from 'phaser'
 import type { Engine } from '../core/engine'
 import type { EmittedEvent } from '../core/actions'
@@ -23,6 +25,8 @@ export class CombatUI {
     private overlayManager: OverlayManager
     private visualEffects: VisualEffects
     private choiceOverlay: CombatChoiceOverlay
+    private selectedCard?: CardInstance
+    private keyHandler?: (event: KeyboardEvent) => void
     private pendingPotionIndex: number | null = null
     private pendingText?: Phaser.GameObjects.Text
 
@@ -77,10 +81,17 @@ export class CombatUI {
 
     apply(events: EmittedEvent[]): void {
         for (const event of events) {
+            if (event.kind === 'CardPlayed') playCue('card')
+            if (event.kind === 'TurnChanged' && event.turn === 'player') playCue('turn')
+            if (event.kind === 'Healed' && event.amount > 0 && event.target === this.engine.state.player.id) this.visualEffects.showDamageNumber(event.amount, 110, 95, true)
             if (event.kind === 'DamageApplied') {
                 const enemyIndex = this.engine.state.enemies.findIndex(enemy => enemy.id === event.target)
-                if (enemyIndex >= 0) this.enemyDisplay.flashEnemyText(enemyIndex)
-                if (event.target === 'player') this.visualEffects.screenShake()
+                if (enemyIndex >= 0) {
+                    this.enemyDisplay.flashEnemyText(enemyIndex)
+                    const sprite = this.enemyDisplay.getEnemySprites()[enemyIndex]
+                    if (sprite && event.amount > 0) this.visualEffects.showDamageNumber(event.amount, sprite.x, sprite.y - 25)
+                }
+                if (event.target === this.engine.state.player.id && event.amount > 0) { this.visualEffects.screenShake(); this.visualEffects.showDamageNumber(event.amount, 110, 95) }
             }
         }
         this.update()
@@ -95,6 +106,7 @@ export class CombatUI {
     }
 
     destroy(): void {
+        if (this.keyHandler) this.scene.input.keyboard?.off('keydown', this.keyHandler)
         if (this.pointerMoveHandler) this.scene.input.off('pointermove', this.pointerMoveHandler)
         if (this.pointerUpHandler) this.scene.input.off('pointerup', this.pointerUpHandler)
         if (this.resizeHandler) this.scene.scale.off('resize', this.resizeHandler)
@@ -108,9 +120,37 @@ export class CombatUI {
         this.choiceOverlay.destroy()
     }
 
+    private clearTargeting(): void {
+        this.selectedCard = undefined
+        this.pendingPotionIndex = null
+        this.pendingText?.destroy()
+        this.pendingText = undefined
+    }
+
     private setupEventHandlers(): void {
+        this.keyHandler = (event: KeyboardEvent) => {
+            if (event.repeat) return
+            if (event.key === 'Escape') {
+                this.clearTargeting()
+                this.dragSystem.cancelDrag(); this.playerDisplay.closePotionMenu(); this.overlayManager.close(); return
+            }
+            if (this.dragSystem.isCurrentlyDragging() || !this.engine.canAcceptInput() || this.overlayManager.isOpen() || this.playerDisplay.isPotionMenuOpen()) return
+            if (event.key.toLowerCase() === 'e') { this.clearTargeting(); this.onEnd?.(); return }
+            if (!/^[0-9]$/.test(event.key)) return
+            const index = event.key === '0' ? 9 : Number(event.key) - 1, card = this.engine.state.player.hand[index]
+            if (!card) return
+            this.clearTargeting()
+            const def = resolveCard(card)
+            if (def.targeting?.type === 'single_enemy' || def.targeting?.type === 'any') {
+                this.selectedCard = card; this.pendingPotionIndex = null; this.pendingText?.destroy()
+                this.pendingText = this.scene.add.text(400, 24, `${def.name}: select an enemy`, { fontFamily: 'monospace', fontSize: '16px', color: '#fff', backgroundColor: '#333' }).setOrigin(0.5).setDepth(6000)
+            } else this.onPlay?.(card, def.targeting?.type === 'all_enemies' ? this.engine.state.enemies.filter(e => e.hp > 0).map(e => e.id) : def.targeting?.type === 'player' ? [this.engine.state.player.id] : [])
+        }
+        this.scene.input.keyboard?.on('keydown', this.keyHandler)
+
         this.handManager.setOnCardDrag((card, cardIndex, pointer) => {
-            if (this.pendingPotionIndex !== null || this.engine.getPendingChoice()) return
+            if (this.engine.getPendingChoice() || this.playerDisplay.isPotionMenuOpen()) return
+            this.clearTargeting()
             this.dragSystem.startDrag(card, cardIndex, pointer)
         })
 
@@ -125,6 +165,10 @@ export class CombatUI {
 
         this.enemyDisplay.setOnEnemyClick((enemyIndex) => {
             if (this.engine.getPendingChoice()) return
+            if (this.selectedCard) {
+                const card = this.selectedCard; this.selectedCard = undefined; this.pendingText?.destroy(); this.pendingText = undefined
+                this.onPlay?.(card, [this.engine.state.enemies[enemyIndex].id]); return
+            }
             if (this.pendingPotionIndex === null) return
             const potionId = this.run.potions[this.pendingPotionIndex]
             if (!potionId) return
@@ -137,7 +181,8 @@ export class CombatUI {
         })
 
         this.playerDisplay.setOnUsePotion((potionIndex) => {
-            if (this.engine.getPendingChoice()) return
+            if (this.engine.getPendingChoice() || this.dragSystem.isCurrentlyDragging()) return
+            this.clearTargeting()
             const potionId = this.run.potions[potionIndex]
             if (!potionId) return
             const potion = POTION_DEFS[potionId]
@@ -159,6 +204,7 @@ export class CombatUI {
 
         this.playerDisplay.setOnEndTurn(() => {
             if (this.pendingPotionIndex !== null || this.engine.getPendingChoice()) return
+            this.selectedCard = undefined; this.pendingText?.destroy(); this.pendingText = undefined
             this.onEnd?.()
             this.update()
         })

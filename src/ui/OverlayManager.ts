@@ -53,17 +53,19 @@ export class OverlayManager {
         const overlay = this.scene.add.container(0, 0).setDepth(COMBAT_UI_CONFIG.depths.overlay)
         this.overlay = overlay
         overlay.add(this.scene.add.rectangle(0, 0, width, height, 0x111111, 0.98).setOrigin(0).setInteractive())
-        overlay.add(this.scene.add.text(20, 20, titles[pile], { fontFamily: 'monospace', fontSize: '16px', color: '#fff' }))
+        overlay.add(this.scene.add.text(20, 20, pile === 'drawPile' && this.engine.run?.relics.includes('FROZEN_EYE') ? 'Draw Pile, next card first' : titles[pile], { fontFamily: 'monospace', fontSize: '16px', color: '#fff' }))
         overlay.add(this.scene.add.text(width - 20, 16, 'Close', {
             fontFamily: 'monospace', fontSize: '16px', color: '#fff', backgroundColor: '#444', padding: { x: 8, y: 6 },
         }).setOrigin(1, 0).setInteractive({ useHandCursor: true }).on('pointerdown', () => this.close()))
         const cards = [...this.engine.state.player[pile]]
-        if (pile === 'drawPile') cards.sort((a, b) => resolveCard(a).name.localeCompare(resolveCard(b).name))
+        if (pile === 'drawPile' && !this.engine.run?.relics.includes('FROZEN_EYE')) cards.sort((a, b) => resolveCard(a).name.localeCompare(resolveCard(b).name))
         new CardGrid(this.scene, overlay, cards, 64, () => {})
     }
 
     refreshOverlays(): void { if (this.pile) this.showPile(this.pile) }
-    private close(): void {
+    isOpen(): boolean { return !!this.overlay }
+
+    close(): void {
         this.overlay?.destroy(true)
         this.overlay = undefined
         this.pile = undefined

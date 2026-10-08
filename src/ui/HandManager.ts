@@ -1,3 +1,4 @@
+import { loadSettings } from '../core/settings'
 import Phaser from 'phaser'
 import type { Engine } from '../core/engine'
 import { Card } from './Card'
@@ -65,7 +66,7 @@ export class HandManager {
             this.scene.tweens.killTweensOf(card)
             this.handContainer.bringToTop(card)
             card.setDepth(index === hovered ? COMBAT_UI_CONFIG.depths.handHover : index)
-            if (animate) this.scene.tweens.add({ targets: card, ...positions[index], duration: 100 })
+            if (animate && !loadSettings().reducedMotion) this.scene.tweens.add({ targets: card, ...positions[index], duration: 100 })
             else card.setPosition(positions[index].x, positions[index].y)
         })
         if (hovered !== null) this.handContainer.bringToTop(this.handCards[hovered])
