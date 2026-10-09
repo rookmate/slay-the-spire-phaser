@@ -1,6 +1,7 @@
+import { PersistenceError } from '../core/persistence'
 import { roomBackdrop } from '../ui/theme'
 import Phaser from 'phaser'
-import { backupProfile, exportProfile, importProfile, MAX_PROFILE_BYTES, parseProfile, JOURNAL_KEY } from '../core/profile/storage'
+import { backupProfile, exportProfile, importProfile, MAX_PROFILE_BYTES, parseProfile } from '../core/profile/storage'
 import type { Profile } from '../core/profile/schema'
 import { menuButton, menuText } from '../ui/menu'
 
@@ -19,7 +20,7 @@ export class ProfileScene extends Phaser.Scene {
     private attempt(action: () => void): void {
         try { action() } catch (error) {
             this.pending = undefined
-            if (localStorage.getItem(JOURNAL_KEY)) { this.scene.start('ProfileRecovery'); return }
+            if (error instanceof PersistenceError) return
             this.message = error instanceof Error ? error.message : 'Could not access the profile.'
         }
         this.render()

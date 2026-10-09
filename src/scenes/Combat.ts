@@ -6,7 +6,7 @@ import { getRunDestination } from '../core/progression'
 import Phaser from 'phaser'
 import { createCombatEngine } from '../core/combat'
 import type { Engine } from '../core/engine'
-import { loadMeta, saveMeta } from '../core/meta'
+import { loadMeta, saveMeta, type MetaState } from '../core/meta'
 import type { RunState } from '../core/run'
 import { saveRun } from '../core/run'
 import { CombatUI } from '../ui/CombatUI'
@@ -18,7 +18,7 @@ export class CombatScene extends Phaser.Scene {
     private ui!: CombatUI
     private run!: RunState
     private roomKind: RoomKind = 'monster'
-    private meta = loadMeta()
+    private meta!: MetaState
 
     constructor() {
         super('Combat')

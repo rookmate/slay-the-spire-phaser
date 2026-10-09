@@ -68,6 +68,15 @@ from the commercial game will produce a different run. Daily challenges use a
 UTC date and save scores on this device. Saves and profiles use browser local
 storage; clearing browser data removes them.
 
+Save failures pause play and offer retry, reload, and a downloadable checkpoint.
+Retry writes the captured checkpoint before reloading; it does not repeat the
+purchase or event choice. Run replacements, results, and event updates save
+run and profile data together, with a rollback journal for interrupted writes.
+On HTTPS or localhost, one tab owns the profile writer until it closes. Other
+tabs wait. HTTP LAN previews retain value checks before each write and stop on
+foreign changes, but cannot guarantee serialization of simultaneous writes
+without the browser's Web Locks API. Use HTTPS for a hosted release.
+
 ## Campaign regression checks
 
 Core tests replay fixed three-act victories for Ironclad, Silent, Defect, and

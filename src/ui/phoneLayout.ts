@@ -20,7 +20,7 @@ export function attachPhoneLayout(game: Phaser.Game): void {
     const pauseActiveScenes = () => {
         for (const scene of game.scene.getScenes(true)) {
             // Loading must finish before the first playable screen is paused.
-            if (scene.scene.key === 'Boot') continue
+            if (['Boot', 'ProfileRecovery'].includes(scene.scene.key)) continue
             paused.add(scene.scene.key)
             scene.scene.pause()
         }

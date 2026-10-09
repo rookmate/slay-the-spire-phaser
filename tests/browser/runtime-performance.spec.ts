@@ -15,19 +15,23 @@ test('an unlocked idle menu performs no storage polling', async ({ page }) => {
     expect(reads).toBe(0); expect(errors).toEqual([])
 })
 
-test('foreign settings writes and clear refresh the cached preferences immediately', async ({ page, context }) => {
+test('foreign settings writes stop the tab until it reloads the new preferences', async ({ page, context }) => {
     await boot(page)
     const other = await context.newPage(); await other.goto('/tests/browser/')
-    await other.waitForFunction(() => window.__testGame?.scene.isActive('MainMenu'))
+    await expect(other.getByRole('dialog')).toContainText('Profile open in another tab')
     const volume = () => page.evaluate(async () => {
         const path = '/src/core/settings.ts'
         return (await import(path)).loadSettings().volume as number
     })
     expect(await volume()).toBe(0.3)
     await other.evaluate(() => localStorage.setItem('sts_settings_v1', JSON.stringify({ volume: 0.7 })))
-    await expect.poll(volume).toBe(0.7)
+    await expect(page.getByRole('dialog')).toContainText('Your save changed in another tab')
+    await page.reload(); await page.waitForFunction(() => window.__testGame?.scene.isActive('MainMenu'))
+    expect(await volume()).toBe(0.7)
     await other.evaluate(() => localStorage.clear())
-    await expect.poll(volume).toBe(0.3)
+    await expect(page.getByRole('dialog')).toContainText('Your save changed in another tab')
+    await page.reload(); await page.waitForFunction(() => window.__testGame?.scene.isActive('MainMenu'))
+    expect(await volume()).toBe(0.3)
     await other.close()
 })
 

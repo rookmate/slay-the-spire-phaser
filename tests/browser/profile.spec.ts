@@ -90,6 +90,7 @@ test('failed rollback immediately blocks gameplay and profile writes until recov
         localStorage.setItem('sts_run_v7', JSON.stringify(original.run))
         localStorage.setItem('sts_settings_v1', JSON.stringify(original.settings))
     }, { ...original, meta: { ...original.meta, notifications: [] as { id: string; title: string; detail: string }[] } })
+    await page.reload(); await page.waitForFunction(() => window.__testGame?.scene.isActive('MainMenu'))
     await clickText(page, 'Settings'); await clickText(page, 'Profile backup')
     const next = importedProfile(); next.run.runId = 'replacement'
     await chooseFile(page, next); await expect.poll(async () => (await inspect(page)).texts.some(t => t.text === 'Replace profile')).toBe(true)
@@ -97,14 +98,12 @@ test('failed rollback immediately blocks gameplay and profile writes until recov
         const set = Storage.prototype.setItem
         Storage.prototype.setItem = function (key, value) { if (key === 'sts_run_v7') throw new DOMException('Simulated full storage', 'QuotaExceededError'); set.call(this, key, value) }
     })
-    await clickText(page, 'Replace profile'); await expectScene(page, 'ProfileRecovery')
-    const blocked = await inspect(page)
-    expect(blocked.texts.filter(t => t.enabled).map(t => t.text)).toEqual(['Retry recovery', 'Download recovery journal'])
-    expect(await page.getByLabel('Import profile file').count()).toBe(0)
+    await clickText(page, 'Replace profile'); await expect(page.getByRole('dialog')).toContainText('Profile recovery required')
+    expect(await page.getByRole('dialog').getByRole('button').allTextContents()).toEqual(['Retry recovery', 'Download recovery journal'])
     const frozen = await page.evaluate(() => ({ ...localStorage }))
     expect(frozen[JOURNAL_KEY]).toBeTruthy(); expect(frozen.sts_run_v7).toBeUndefined()
     await page.waitForTimeout(1100); expect(await page.evaluate(() => ({ ...localStorage }))).toEqual(frozen)
-    await clickText(page, 'Retry recovery'); await page.waitForFunction(() => window.__testGame?.scene.isActive('MainMenu'))
+    await page.getByRole('button', { name: 'Retry recovery' }).click(); await page.waitForFunction(() => window.__testGame?.scene.isActive('MainMenu'))
     await clickText(page, 'Continue'); await expectScene(page, 'Rewards')
     expect((await inspect(page)).run!.runId).toBe(original.run.runId)
     expect(await page.evaluate(key => localStorage.getItem(key), JOURNAL_KEY)).toBeNull(); expect(errors).toEqual([])

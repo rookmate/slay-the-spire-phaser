@@ -1,4 +1,6 @@
 import { emitStorageChange, META_CHANGED } from './storageEvents'
+import { persistence, META_KEY } from './persistence'
+export { META_KEY } from './persistence'
 import { clampAscension, MAX_ASCENSION } from './ascension'
 import { CHARACTERS, CHARACTER_IDS, type CharacterId } from './characters'
 import type { CardInstance } from './state'
@@ -36,7 +38,6 @@ export interface MetaState {
     unlockedCardIds: string[]
     unlockedRelicIds: RelicId[]
 }
-export const META_KEY = 'sts_meta_v2'
 export function createDefaultMeta(): MetaState {
     return { version: 3, bestAscensionUnlocked: 0, totalWins: 0, totalRuns: 0, ironcladUnlockTier: 0, unlockedCardIds: [], unlockedRelicIds: [], history: [] }
 }
@@ -53,8 +54,9 @@ export function getCharacterProgress(meta: MetaState, character: CharacterId): C
     return progress
 }
 export function loadMeta(): MetaState {
+    const raw = persistence().read(META_KEY)
     try {
-        const parsed = JSON.parse(localStorage.getItem(META_KEY) ?? 'null') as Partial<MetaState> | null
+        const parsed = JSON.parse(raw ?? 'null') as Partial<MetaState> | null
         if (!parsed || typeof parsed !== 'object') return createDefaultMeta()
         const meta = { ...createDefaultMeta(), ...parsed, unlockedCardIds: parsed.unlockedCardIds ?? [], unlockedRelicIds: parsed.unlockedRelicIds ?? [] }
         for (const id of CHARACTER_IDS) {
@@ -73,7 +75,7 @@ export function loadMeta(): MetaState {
     } catch { return createDefaultMeta() }
 }
 export function saveMeta(meta: MetaState): void {
-    localStorage.setItem(META_KEY, JSON.stringify(meta))
+    persistence().commit({ [META_KEY]: JSON.stringify(meta) })
     emitStorageChange(META_CHANGED)
 }
 export function getSelectableAscensions(meta: MetaState, character: CharacterId = 'ironclad'): number[] {
