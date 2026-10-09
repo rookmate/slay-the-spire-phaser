@@ -5,10 +5,10 @@ import { changeMaxHp, combatHealingAmount } from './health'
 import { completeRoom } from './progression'
 import { resolveCard } from './cards'
 import { getRunBoss } from './campaign'
-import { getEncounterActSeed, getEnemyActSeed } from './acts'
-import { affectsRoomTier } from './ascension'
+import { getEnemyActSeed } from './acts'
 import { createEnemyState, rollEngineIntentForEnemy } from './enemies'
-import { bossEncounter, generateEncounter } from './encounters'
+import { bossEncounter } from './encounters'
+import { prepareEncounter } from './encounterState'
 import { Engine, createPlayerFromDeck } from './engine'
 import type { RoomKind } from './map'
 import { getEncounterEliteHpMultiplier, getPostCombatHeal, getRelicEnergyBonus, triggerRelicOpeningHand, triggerRelicHandReady } from './relics'
@@ -20,11 +20,10 @@ export function createCombatEngine(run: RunState, roomKind: RoomKind): Engine {
     if (run.act === 1 && roomKind === 'boss') (run.runFlags ??= {}).reachedFirstBoss = true
     const { seed, act } = run
     const combatIndex = run.combatCount ?? 0
-    const tier = affectsRoomTier(roomKind)
     const player = createPlayerFromDeck(seed, run.deck, run.player.hp, run.player.maxHp)
     player.character = run.character
     player.orbSlots = run.character === 'defect' ? 3 : hasModifier(run, 'DIVERSE') || hasModifier(run, 'BLUE_CARDS') ? 1 : 0
-    const keys = run.eventCombat?.enemies ?? (roomKind === 'boss' ? bossEncounter(getRunBoss(run)) : generateEncounter(new RNG(getEncounterActSeed(seed, act, tier, roomKind === 'monster' ? (run.hallwayCount ?? 0) : combatIndex)), act, tier, roomKind === 'monster' ? (run.hallwayCount ?? 0) : combatIndex))
+    const keys = run.eventCombat?.enemies ?? (roomKind === 'boss' ? bossEncounter(getRunBoss(run)) : prepareEncounter(run, roomKind === 'elite' ? 'elite' : 'monster').enemies)
     const hpMultiplier = getEncounterEliteHpMultiplier(run, roomKind)
     const enemies = keys.map((key, index) => {
         const enemy = createEnemyState(key, `e${index + 1}`, run.asc, new RNG(getEnemyActSeed(seed, act, combatIndex, index)))
@@ -49,7 +48,7 @@ export function createCombatEngine(run: RunState, roomKind: RoomKind): Engine {
         const intentSeed = `${getEnemyActSeed(seed, act, combatIndex, index)}-intent`
         if (enemy.specId === 'LAGAVULIN' && run.eventCombat?.awakeLagavulin) { enemy.aiState = { ...enemy.aiState, asleep: false, turn: 2 }; enemy.block = 0 }
         if (enemy.specId === 'SENTRY') enemy.aiState = { ...enemy.aiState, turn: index % 2 }
-        if (act === 3 && enemy.specId === 'JAW_WORM') { enemy.block = 6; enemy.powers.push({ id: 'STRENGTH', stacks: run.asc >= 17 ? 5 : 3 }) }
+        if (act === 3 && enemy.specId === 'JAW_WORM') { enemy.block = run.asc >= 17 ? 9 : 6; enemy.powers.push({ id: 'STRENGTH', stacks: run.asc >= 17 ? 5 : run.asc >= 2 ? 4 : 3 }) }
         if (keys.includes('AWAKENED_ONE') && enemy.specId === 'CULTIST') enemy.tags = ['minion']
         if (keys.includes('GREMLIN_LEADER') && enemy.specId !== 'GREMLIN_LEADER') enemy.tags = ['minion']
         enemy.intent = rollEngineIntentForEnemy(new RNG(intentSeed), enemy, engine.state)

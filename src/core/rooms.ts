@@ -1,3 +1,4 @@
+import { prepareEncounter, recordEncounter } from './encounterState'
 import { campaignAchievements, combatAchievements, endingAchievements } from './achievements/progress'
 import { affectsRoomTier } from './ascension'
 import { finishBossCombat } from './campaign'
@@ -16,7 +17,10 @@ export function enterRoom(run: RunState, node: MapNode): boolean {
     if (!canEnterMapNode(run, map, node)) return false
     const kind = enterMapNode(run, map, node, new RNG(`${run.seed}-unknown-${run.floor}`))
     run.burningEliteActive = Boolean(run.keysEnabled !== false && node.burning && !run.keys.emerald)
-    if (kind === 'monster' || kind === 'elite' || kind === 'boss') run.pendingRoom = { scene: 'Combat', roomKind: kind }
+    if (kind === 'monster' || kind === 'elite' || kind === 'boss') {
+        run.pendingRoom = { scene: 'Combat', roomKind: kind }
+        if (kind !== 'boss') prepareEncounter(run, kind)
+    }
     else if (kind === 'rest') run.pendingRoom = { scene: 'Campfire' }
     else if (kind === 'shop') run.pendingRoom = { scene: 'Shop' }
     else if (kind === 'chest') run.pendingRoom = { scene: 'Chest', rewardSeed: `${run.seed}-reward-${node.id}-${node.kind === 'unknown' ? 'unknown-chest' : 'chest'}` }
@@ -37,6 +41,7 @@ export function finishCombat(run: RunState, engine: Engine, room: RoomKind, meta
     recordCombatStats(run, engine, room)
     combatAchievements(run, engine)
     if (engine.state.defeat) { run.player.hp = 0; return 'defeat' }
+    recordEncounter(run)
     if (engine.state.escaped) { applyCombatEscape(run, engine.state.player, room); return }
     applyCombatVictory(run, engine.state.player)
     run.pendingRoom = undefined

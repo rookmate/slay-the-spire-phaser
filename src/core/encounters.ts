@@ -1,6 +1,5 @@
 import type { Act } from './acts'
 import { RNG } from './rng'
-import type { EncounterTier } from './rewards'
 
 export type EnemyKey = 'POINTY' | 'ROMEO' | 'BEAR' | 'SLAVER_BLUE' | 'BLUE_SLAVER' | 'MUGGER' | 'GREEN_LOUSE' | 'SPIRE_SHIELD' | 'SPIRE_SPEAR' | 'CORRUPT_HEART' | 'SPIKER' | 'REPULSOR' | 'EXPLODER' | 'ORB_WALKER' | 'DARKLING' | 'SPIRE_GROWTH' | 'MAW' | 'TRANSIENT' | 'WRITHING_MASS' | 'DAGGER' | 'REPTOMANCER' | 'NEMESIS' | 'GIANT_HEAD' | 'DONU' | 'DECA' | 'TIME_EATER' | 'AWAKENED_ONE' | 'CULTIST' | 'JAW_WORM' | 'RED_LOUSE' | 'SPIKE_SLIME_S' | 'SPIKE_SLIME_M' | 'SPIKE_SLIME_L' | 'ACID_SLIME_S' | 'ACID_SLIME_M' | 'ACID_SLIME_L' | 'FUNGI_BEAST' | 'SNEAKY_GREMLIN' | 'MAD_GREMLIN' | 'FAT_GREMLIN' | 'SHIELD_GREMLIN' | 'WIZARD_GREMLIN' | 'GREMLIN_NOB' | 'LAGAVULIN' | 'SENTRY' | 'SLIME_BOSS' | 'HEXAGHOST' | 'THE_GUARDIAN' | 'LOOTER' | 'SLAVER_RED' | 'RED_SLAVER' | 'SNECKO' | 'CHOSEN' | 'BYRD' | 'SPHERIC_GUARDIAN' | 'SHELLED_PARASITE' | 'SNAKE_PLANT' | 'CENTURION' | 'MYSTIC' | 'BOOK_OF_STABBING' | 'GREMLIN_MINION' | 'GREMLIN_LEADER' | 'TASKMASTER' | 'TORCH_HEAD' | 'THE_COLLECTOR' | 'THE_CHAMP' | 'BRONZE_ORB' | 'BRONZE_AUTOMATON'
 
@@ -13,24 +12,6 @@ export function pickWeighted<T>(rng: RNG, items: { item: T; weight: number }[]):
     return items[items.length - 1].item
 }
 
-export function generateEncounter(rng: RNG, act: Act, tier: EncounterTier, combatIndex: number): EnemyKey[] {
-    if (act === 4) return tier === 'boss' ? ['CORRUPT_HEART'] : ['SPIRE_SHIELD', 'SPIRE_SPEAR']
-    if (tier === 'boss') return bossEncounter(getActBoss(rng, act))
-    if (act === 3) {
-        if (tier === 'elite') return pick(rng, [['GIANT_HEAD'], ['NEMESIS'], ['REPTOMANCER', 'DAGGER', 'DAGGER']])
-        if (combatIndex < 2) return pick(rng, [['DARKLING', 'DARKLING', 'DARKLING'], ['ORB_WALKER'], ['SPIKER', 'REPULSOR', 'EXPLODER']])
-        return pick(rng, [['SPIKER', 'SPIKER', 'REPULSOR', 'EXPLODER'], ['DARKLING', 'DARKLING', 'DARKLING'], ['SPIRE_GROWTH'], ['MAW'], ['TRANSIENT'], ['WRITHING_MASS'], ['JAW_WORM', 'JAW_WORM', 'JAW_WORM']])
-    }
-    if (act === 2) {
-        if (tier === 'elite') return pick(rng, [['BOOK_OF_STABBING'], ['GREMLIN_LEADER', 'SNEAKY_GREMLIN', 'FAT_GREMLIN'], ['RED_SLAVER', 'TASKMASTER', 'BLUE_SLAVER']])
-        if (combatIndex < 2) return pick(rng, [['CHOSEN'], ['BYRD', 'BYRD', 'BYRD'], ['SPHERIC_GUARDIAN'], ['SHELLED_PARASITE'], ['LOOTER', 'MUGGER']])
-        return pick(rng, [['CHOSEN', 'BYRD'], ['CHOSEN', 'CULTIST'], ['SENTRY', 'SPHERIC_GUARDIAN'], ['SHELLED_PARASITE', 'FUNGI_BEAST'], ['SNAKE_PLANT'], ['SNECKO'], ['CENTURION', 'MYSTIC'], ['CULTIST', 'CULTIST', 'CULTIST']])
-    }
-    if (tier === 'elite') return pick(rng, [['GREMLIN_NOB'], ['LAGAVULIN'], ['SENTRY', 'SENTRY', 'SENTRY']])
-    return generateActOneHallwayEncounter(rng, combatIndex)
-}
-
-function pick(rng: RNG, pool: EnemyKey[][]): EnemyKey[] { return pool[rng.int(0, pool.length - 1)] }
 export const ACT_BOSSES: Record<1 | 2 | 3 | 4, EnemyKey[]> = {
     1: ['THE_GUARDIAN', 'SLIME_BOSS', 'HEXAGHOST'],
     2: ['THE_CHAMP', 'THE_COLLECTOR', 'BRONZE_AUTOMATON'],
@@ -44,73 +25,107 @@ export function bossEncounter(boss: EnemyKey): EnemyKey[] {
     return [boss]
 }
 
-function generateActOneHallwayEncounter(rng: RNG, combatIndex: number): EnemyKey[] {
-    if (combatIndex < 3) return firstThree(rng)
-    return remaining(rng)
+
+interface EncounterDefinition {
+    act: Act
+    tier: 'hallway' | 'elite'
+    pool?: 'easy' | 'hard' | 'both'
+    weight: number
+    enemies: (rng: RNG) => EnemyKey[]
 }
-
-function firstThree(rng: RNG): EnemyKey[] {
-    const choice = pickWeighted<string>(rng, [
-        { item: 'CULTIST' as EnemyKey, weight: 2 },
-        { item: 'JAW_WORM' as EnemyKey, weight: 2 },
-        { item: 'TWO_LOUSE' as const, weight: 2 },
-        { item: 'SMALL_SLIMES' as const, weight: 2 },
-    ])
-
-    if (choice === ('TWO_LOUSE' as const)) return [pickLouse(rng), pickLouse(rng)]
-    if (choice === ('SMALL_SLIMES' as const)) {
-        return rng.random() < 0.5 ? ['SPIKE_SLIME_M', 'ACID_SLIME_S'] : ['ACID_SLIME_M', 'SPIKE_SLIME_S']
-    }
-    return [choice as EnemyKey]
+const fixed = (...keys: EnemyKey[]) => () => [...keys]
+const louse = (rng: RNG): EnemyKey => rng.random() < 0.5 ? 'RED_LOUSE' : 'GREEN_LOUSE'
+const mediumSlime = (rng: RNG): EnemyKey => rng.random() < 0.5 ? 'SPIKE_SLIME_M' : 'ACID_SLIME_M'
+const shapes: EnemyKey[] = ['REPULSOR', 'EXPLODER', 'SPIKER']
+function sample(rng: RNG, pool: EnemyKey[], count: number): EnemyKey[] {
+    const remaining = [...pool]
+    return Array.from({ length: count }, () => remaining.splice(rng.int(0, remaining.length - 1), 1)[0])
 }
+const hallway = (act: Act, pool: 'easy' | 'hard' | 'both', weight: number, enemies: EncounterDefinition['enemies']): EncounterDefinition => ({ act, tier: 'hallway', pool, weight, enemies })
+const elite = (act: Act, ...keys: EnemyKey[]): EncounterDefinition => ({ act, tier: 'elite', weight: 1, enemies: fixed(...keys) })
 
-function remaining(rng: RNG): EnemyKey[] {
-    const choice = pickWeighted<string>(rng, [
-        { item: 'GANG_GREMLINS' as const, weight: 1 },
-        { item: 'LARGE_SLIME' as const, weight: 2 },
-        { item: 'SWARM_SLIMES' as const, weight: 1 },
-        { item: 'SLAVER_BLUE' as EnemyKey, weight: 2 },
-        { item: 'SLAVER_RED' as EnemyKey, weight: 1 },
-        { item: 'THREE_LOUSE' as const, weight: 2 },
-        { item: 'FUNGI_PAIR' as const, weight: 2 },
-        { item: 'EXOR_THUGS' as const, weight: 1.5 },
-        { item: 'EXOR_WILDLIFE' as const, weight: 1.5 },
-        { item: 'LOOTER' as EnemyKey, weight: 2 },
-    ])
-
-    if (choice === ('GANG_GREMLINS' as const)) {
-        const pool: EnemyKey[] = ['FAT_GREMLIN', 'FAT_GREMLIN', 'SNEAKY_GREMLIN', 'SNEAKY_GREMLIN', 'MAD_GREMLIN', 'MAD_GREMLIN', 'SHIELD_GREMLIN', 'WIZARD_GREMLIN']
-        const picks: EnemyKey[] = []
-        for (let i = 0; i < 4 && pool.length > 0; i++) {
-            const idx = rng.int(0, pool.length - 1)
-            picks.push(pool[idx])
-            pool.splice(idx, 1)
-        }
-        return picks
-    }
-    if (choice === ('LARGE_SLIME' as const)) return [rng.random() < 0.5 ? 'SPIKE_SLIME_L' : 'ACID_SLIME_L']
-    if (choice === ('SWARM_SLIMES' as const)) return ['SPIKE_SLIME_S', 'SPIKE_SLIME_S', 'SPIKE_SLIME_S', 'ACID_SLIME_S', 'ACID_SLIME_S']
-    if (choice === ('THREE_LOUSE' as const)) return [pickLouse(rng), pickLouse(rng), pickLouse(rng)]
-    if (choice === ('FUNGI_PAIR' as const)) return ['FUNGI_BEAST', 'FUNGI_BEAST']
-    if (choice === ('EXOR_THUGS' as const)) {
-        const first = rng.random() < 0.5 ? pickLouse(rng) : pickMediumSlime(rng)
-        const second = pickWeighted<string>(rng, [
-            { item: (rng.random() < 0.5 ? 'SLAVER_RED' : 'SLAVER_BLUE') as EnemyKey, weight: 1 },
-            { item: 'CULTIST' as EnemyKey, weight: 1 },
-            { item: 'LOOTER' as EnemyKey, weight: 1 },
+// Families, weights and compositions: https://slaythespire.wiki.gg/wiki/Monsters
+// A family keeps the same ID regardless of the colors/species rolled within it.
+export const ENCOUNTERS = {
+    CULTIST: hallway(1, 'easy', 2, fixed('CULTIST')),
+    JAW_WORM: hallway(1, 'easy', 2, fixed('JAW_WORM')),
+    TWO_LOUSE: hallway(1, 'easy', 2, rng => [louse(rng), louse(rng)]),
+    SMALL_SLIMES: hallway(1, 'easy', 2, rng => rng.random() < 0.5 ? ['SPIKE_SLIME_M', 'ACID_SLIME_S'] : ['ACID_SLIME_M', 'SPIKE_SLIME_S']),
+    GANG_GREMLINS: hallway(1, 'hard', 1, rng => sample(rng, ['FAT_GREMLIN', 'FAT_GREMLIN', 'SNEAKY_GREMLIN', 'SNEAKY_GREMLIN', 'MAD_GREMLIN', 'MAD_GREMLIN', 'SHIELD_GREMLIN', 'WIZARD_GREMLIN'], 4)),
+    LARGE_SLIME: hallway(1, 'hard', 2, rng => [rng.random() < 0.5 ? 'SPIKE_SLIME_L' : 'ACID_SLIME_L']),
+    SWARM_SLIMES: hallway(1, 'hard', 1, fixed('SPIKE_SLIME_S', 'SPIKE_SLIME_S', 'SPIKE_SLIME_S', 'ACID_SLIME_S', 'ACID_SLIME_S')),
+    BLUE_SLAVER: hallway(1, 'hard', 2, fixed('SLAVER_BLUE')),
+    RED_SLAVER: hallway(1, 'hard', 1, fixed('SLAVER_RED')),
+    THREE_LOUSE: hallway(1, 'hard', 2, rng => [louse(rng), louse(rng), louse(rng)]),
+    FUNGI_PAIR: hallway(1, 'hard', 2, fixed('FUNGI_BEAST', 'FUNGI_BEAST')),
+    EXOR_THUGS: hallway(1, 'hard', 1.5, rng => {
+        const first = rng.random() < 0.5 ? louse(rng) : mediumSlime(rng)
+        const second = pickWeighted<EnemyKey>(rng, [
+            { item: rng.random() < 0.5 ? 'SLAVER_RED' : 'SLAVER_BLUE', weight: 1 },
+            { item: 'CULTIST', weight: 1 }, { item: 'LOOTER', weight: 1 },
         ])
-        return [first, second as EnemyKey]
-    }
-    if (choice === ('EXOR_WILDLIFE' as const)) {
-        return [rng.random() < 0.5 ? 'FUNGI_BEAST' : 'JAW_WORM', rng.random() < 0.5 ? pickLouse(rng) : pickMediumSlime(rng)]
-    }
-    return [choice as EnemyKey]
+        return [first, second]
+    }),
+    EXOR_WILDLIFE: hallway(1, 'hard', 1.5, rng => [rng.random() < 0.5 ? 'FUNGI_BEAST' : 'JAW_WORM', rng.random() < 0.5 ? louse(rng) : mediumSlime(rng)]),
+    LOOTER: hallway(1, 'hard', 2, fixed('LOOTER')),
+    GREMLIN_NOB: elite(1, 'GREMLIN_NOB'),
+    LAGAVULIN: elite(1, 'LAGAVULIN'),
+    THREE_SENTRIES: elite(1, 'SENTRY', 'SENTRY', 'SENTRY'),
+    CHOSEN: hallway(2, 'easy', 2, fixed('CHOSEN')),
+    THREE_BYRDS: hallway(2, 'easy', 2, fixed('BYRD', 'BYRD', 'BYRD')),
+    SPHERIC_GUARDIAN: hallway(2, 'easy', 2, fixed('SPHERIC_GUARDIAN')),
+    SHELLED_PARASITE: hallway(2, 'easy', 2, fixed('SHELLED_PARASITE')),
+    TWO_THIEVES: hallway(2, 'easy', 2, fixed('LOOTER', 'MUGGER')),
+    CHOSEN_BYRD: hallway(2, 'hard', 2, fixed('CHOSEN', 'BYRD')),
+    CHOSEN_CULTIST: hallway(2, 'hard', 3, fixed('CHOSEN', 'CULTIST')),
+    SENTRY_GUARDIAN: hallway(2, 'hard', 2, fixed('SENTRY', 'SPHERIC_GUARDIAN')),
+    SNAKE_PLANT: hallway(2, 'hard', 6, fixed('SNAKE_PLANT')),
+    SNECKO: hallway(2, 'hard', 4, fixed('SNECKO')),
+    CENTURION_MYSTIC: hallway(2, 'hard', 6, fixed('CENTURION', 'MYSTIC')),
+    THREE_CULTISTS: hallway(2, 'hard', 3, fixed('CULTIST', 'CULTIST', 'CULTIST')),
+    PARASITE_FUNGI: hallway(2, 'hard', 3, fixed('SHELLED_PARASITE', 'FUNGI_BEAST')),
+    BOOK_OF_STABBING: elite(2, 'BOOK_OF_STABBING'),
+    GREMLIN_LEADER: elite(2, 'GREMLIN_LEADER', 'SNEAKY_GREMLIN', 'FAT_GREMLIN'),
+    SLAVERS: elite(2, 'RED_SLAVER', 'TASKMASTER', 'BLUE_SLAVER'),
+    THREE_DARKLINGS: hallway(3, 'both', 1, fixed('DARKLING', 'DARKLING', 'DARKLING')),
+    ORB_WALKER: hallway(3, 'easy', 1, fixed('ORB_WALKER')),
+    THREE_SHAPES: hallway(3, 'easy', 1, rng => sample(rng, [...shapes, ...shapes], 3)),
+    FOUR_SHAPES: hallway(3, 'hard', 1, rng => sample(rng, [...shapes, ...shapes], 4)),
+    MAW: hallway(3, 'hard', 1, fixed('MAW')),
+    GUARDIAN_SHAPES: hallway(3, 'hard', 1, rng => [shapes[rng.int(0, 2)], shapes[rng.int(0, 2)], 'SPHERIC_GUARDIAN']),
+    SPIRE_GROWTH: hallway(3, 'hard', 1, fixed('SPIRE_GROWTH')),
+    TRANSIENT: hallway(3, 'hard', 1, fixed('TRANSIENT')),
+    JAW_WORM_HORDE: hallway(3, 'hard', 1, fixed('JAW_WORM', 'JAW_WORM', 'JAW_WORM')),
+    WRITHING_MASS: hallway(3, 'hard', 1, fixed('WRITHING_MASS')),
+    GIANT_HEAD: elite(3, 'GIANT_HEAD'),
+    NEMESIS: elite(3, 'NEMESIS'),
+    REPTOMANCER: elite(3, 'REPTOMANCER', 'DAGGER', 'DAGGER'),
+    SHIELD_SPEAR: elite(4, 'SPIRE_SHIELD', 'SPIRE_SPEAR'),
+} satisfies Record<string, EncounterDefinition>
+
+export type EncounterId = keyof typeof ENCOUNTERS
+export interface Encounter { id: EncounterId; enemies: EnemyKey[] }
+export interface EncounterHistory { hallway: EncounterId[]; elite?: EncounterId }
+
+const firstHardExclusions: Partial<Record<EncounterId, EncounterId[]>> = {
+    TWO_LOUSE: ['THREE_LOUSE'], SMALL_SLIMES: ['SWARM_SLIMES', 'LARGE_SLIME'],
+    LOOTER: ['EXOR_THUGS'], BLUE_SLAVER: ['RED_SLAVER', 'EXOR_THUGS'],
+}
+export function selectEncounter(rng: RNG, act: Act, tier: 'hallway' | 'elite', hallwayCount: number, history: EncounterHistory = { hallway: [] }): Encounter {
+    if (act === 4) return { id: 'SHIELD_SPEAR', enemies: ENCOUNTERS.SHIELD_SPEAR.enemies(rng) }
+    const pool = hallwayCount < (act === 1 ? 3 : 2) ? 'easy' : 'hard'
+    const excluded = tier === 'hallway' ? [...history.hallway.slice(-2)] : history.elite ? [history.elite] : []
+    const previous = history.hallway.at(-1)
+    if (act === 1 && tier === 'hallway' && hallwayCount === 3 && previous) excluded.push(...(firstHardExclusions[previous] ?? []))
+    const candidates = (Object.keys(ENCOUNTERS) as EncounterId[]).filter(id => {
+        const entry = ENCOUNTERS[id]
+        return entry.act === act && entry.tier === tier && !excluded.includes(id)
+            && (tier === 'elite' || entry.pool === pool || entry.pool === 'both')
+    })
+    const id = pickWeighted(rng, candidates.map(item => ({ item, weight: ENCOUNTERS[item].weight })))
+    return { id, enemies: ENCOUNTERS[id].enemies(rng) }
 }
 
-function pickLouse(rng: RNG): EnemyKey {
-    return rng.random() < 0.5 ? 'RED_LOUSE' : 'GREEN_LOUSE'
-}
-
-function pickMediumSlime(rng: RNG): EnemyKey {
-    return rng.random() < 0.5 ? 'SPIKE_SLIME_M' : 'ACID_SLIME_M'
+export function generateEncounter(rng: RNG, act: Act, tier: 'hallway' | 'elite' | 'boss', combatIndex: number): EnemyKey[] {
+    return tier === 'boss' ? bossEncounter(getActBoss(rng, act)) : selectEncounter(rng, act, tier, combatIndex).enemies
 }

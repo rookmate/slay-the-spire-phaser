@@ -24,7 +24,8 @@ npm run build
 - Character and shared relics, all 42 potions, and 51 random events. Multi-step
   acquisitions, bottles, transformations, event combat, and Match and Keep save
   their outstanding choices.
-- Act-specific encounters and bosses, branching maps, burning elites, three keys,
+- Weighted act-specific encounters, hallway and elite repeat restrictions, variable
+  enemy groups, branching maps, burning elites, three keys,
   A20's second Act 3 boss, and the final rest/shop/elite/Heart sequence.
 - Merchant stock, discounts, removal, Courier restocking, Orrery, campfire relic
   actions, and a choice to leave chests closed.
@@ -56,7 +57,8 @@ The canvas leaves room for device safe areas and adapts to the browser's visible
 Runs are saved at room entry and completion. Continue restarts an unfinished
 fight from its entry checkpoint, including its original potions and relic
 counters. Active play time is saved separately so the timer cannot overwrite a
-combat checkpoint. Won fights and outstanding reward choices save without
+combat checkpoint. Enemy lineups are fixed at room entry. Older saves preserve
+the unfinished fight and begin tracking encounter history from that point. Won fights and outstanding reward choices save without
 duplicating gold or relics. Shops save purchases and stock together.
 
 XP is earned across run modes and continues relic progression. Cards do not
@@ -113,6 +115,7 @@ interactions, not every possible card/relic/enemy combination.
 Rules were checked against original-game references for
 [Ascension](https://slaythespire.wiki.gg/wiki/Ascension),
 [map generation](https://slaythespire.wiki.gg/wiki/Map_Generation),
+[encounter pools and repeat rules](https://slaythespire.wiki.gg/wiki/Monsters),
 [Neow](https://slaythespire.wiki.gg/wiki/Neow),
 [card rewards](https://slay-the-spire.fandom.com/wiki/Card_Rewards),
 [events](https://slaythespire.wiki.gg/wiki/Events),
