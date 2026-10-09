@@ -1,3 +1,4 @@
+import { characterTexture } from '../ui/portraits'
 import Phaser from 'phaser'
 import { createNewRun, loadRun, saveRun } from '../core/run'
 import { getCharacterProgress, loadMeta, saveMeta } from '../core/meta'
@@ -44,7 +45,7 @@ export class MainMenuScene extends Phaser.Scene {
             const selected = id === this.character
             const x = 34 + i * 104
             this.add.rectangle(x, 113, 94, 71, selected ? 0x443527 : 0x191a16, 0.92).setOrigin(0).setStrokeStyle(1, selected ? palette.copper : palette.line, selected ? 1 : 0.5)
-            this.add.image(x + 47, 136, `player:${id}`).setDisplaySize(37, 44)
+            this.add.image(x + 47, 136, ...characterTexture(this, id)).setDisplaySize(37, 44)
             const button = this.add.text(x, 114, CHARACTERS[id].name, { ...menuText, fontSize: '13px', fontStyle: 'bold', align: 'center', fixedWidth: 94, fixedHeight: 69, padding: { top: 45 }, color: palette.text }).setResolution(2)
             button.setData('character', id)
             if (this.mode !== 'daily') button.setInteractive({ useHandCursor: true }).on('pointerdown', () => {
@@ -93,7 +94,7 @@ export class MainMenuScene extends Phaser.Scene {
             else menuButton(this, 241, 360, 'Continue', () => { if (saved) { const next = getRunDestination(saved); this.scene.start(next.scene, next.data) } }, !!saved, { width: 195 })
         }
         if (saved && this.mode === 'custom' && !this.replaceConfirmed) menuButton(this, 660, 20, 'Continue', () => { const next = getRunDestination(saved); this.scene.start(next.scene, next.data) }, true, { quiet: true })
-        this.add.image(609, 267, `player:${this.character}`).setDisplaySize(238, 238)
+        this.add.image(609, 267, ...characterTexture(this, this.character)).setDisplaySize(238, 238)
         this.add.text(609, 395, this.mode === 'daily' ? 'Daily challenge' : character.name, { resolution: 2, fontFamily: DISPLAY_FONT, fontSize: '20px', color: '#f1dec0' }).setOrigin(0.5).setResolution(2)
         this.add.rectangle(0, 410, 800, 40, palette.ink, 0.96).setOrigin(0)
         this.add.rectangle(24, 410, 752, 1, palette.line).setOrigin(0)

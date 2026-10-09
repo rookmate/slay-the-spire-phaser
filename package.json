@@ -12,6 +12,7 @@
     "preview": "vite preview",
     "test": "vitest run src",
     "test:browser": "tsc -p tsconfig.browser.json && playwright test",
+    "check:assets": "node scripts/check-assets.mjs",
     "build:performance": "vite build --config vite.performance.config.ts",
     "test:performance": "tsc -p tsconfig.browser.json && npm run build && npm run build:performance && playwright test --config playwright.performance.config.ts"
   },

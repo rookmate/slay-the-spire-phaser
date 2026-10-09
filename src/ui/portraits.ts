@@ -1,5 +1,5 @@
 import type Phaser from 'phaser'
-import { CHARACTER_IDS } from '../core/characters'
+import { CHARACTER_IDS, type CharacterId } from '../core/characters'
 /** Original vector portraits for all four characters. */
 export function loadCharacterPortraits(scene: Phaser.Scene): void {
     scene.load.image('art:characters', '/art/characters.webp')
@@ -16,13 +16,14 @@ export function loadCharacterPortraits(scene: Phaser.Scene): void {
 /** Keep the vector portraits as a fallback if the painted atlas cannot load. */
 export function installCharacterPortraits(scene: Phaser.Scene): void {
     if (!scene.textures.exists('art:characters')) return
-    const atlas = scene.textures.get('art:characters').getSourceImage() as HTMLImageElement
+    const texture = scene.textures.get('art:characters'), atlas = texture.getSourceImage()
     const width = Math.floor(atlas.width / 2), height = Math.floor(atlas.height / 2)
     CHARACTER_IDS.forEach((id, i) => {
-        const key = `player:${id}`
-        scene.textures.remove(key)
-        const texture = scene.textures.createCanvas(key, width, height)!
-        texture.context.drawImage(atlas, i % 2 * width, Math.floor(i / 2) * height, width, height, 0, 0, width, height)
-        texture.refresh()
+        if (!texture.has(id)) texture.add(id, 0, i % 2 * width, Math.floor(i / 2) * height, width, height)
+        scene.textures.remove(`player:${id}`)
     })
+}
+
+export function characterTexture(scene: Phaser.Scene, character: CharacterId): [string, string?] {
+    return scene.textures.exists('art:characters') ? ['art:characters', character] : [`player:${character}`]
 }

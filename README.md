@@ -109,14 +109,20 @@ master. Failed checks upload screenshots, traces, and an HTML report.
 `npm run test:performance` builds the shipping app and a separate minified combat
 fixture, then serves both with Vite preview. It records three cold starts at
 10 Mbps download, 40 ms latency and 4× CPU slowdown, and three ten-card fights
-against five enemies at 844×390. Preview serves JavaScript without gzip, so its
-transfer measurements must not be presented as compressed deployment sizes.
+against five enemies at 844×390. Cold loading is measured separately with gzip
+JavaScript/CSS and uncompressed delivery. Vite preview supplies gzip
+locally; configure compression on the actual deployment host as well.
 
-CI requires one final UI refresh per card play and no replacement of unchanged
-hand views. It uploads timing samples to the `performance-results` artifact.
+The opt-in benchmark requires one final UI refresh per card play and no
+replacement of unchanged hand views. CI limits font downloads to 130 KB, gzip startup resources to
+2 MB, uncompressed resources to 3.2 MB, and named artwork texture backing to
+32 MiB. Texture bytes estimate RGBA backing, excluding text, CPU copies and
+driver overhead. CI checks gameplay, allocations, lifecycle, and built asset
+sizes. Browser timing measurements are an opt-in local check; JSON samples are
+written to `performance-results`.
 `PERFORMANCE_TIMING=1 npm run test:performance` also enforces p95 interaction
-samples ≤200 ms, p95 application frame work ≤10 ms, and p95 discrete UI refresh
-work ≤50 ms. Run timing comparisons on the same idle machine; shared CI runner
+samples ≤200 ms, p95 application frame work ≤10 ms, p95 discrete UI refresh
+work ≤50 ms, and p75 cold menu readiness ≤2.5 seconds with gzip delivery. Run timing comparisons on the same idle machine; shared CI runner
 speeds vary. The reference host is an Intel Core i7-12700H running Chromium with
 4× CPU throttling. `PERFORMANCE_BASELINE=1` records the pre-optimization allocation
 counts without enforcing the new allocation limits.
@@ -124,12 +130,21 @@ counts without enforcing the new allocation limits.
 The interaction and frame targets follow [Web Vitals](https://web.dev/articles/vitals)
 and [rendering guidance](https://web.dev/articles/rendering-performance). The
 `spire:menu-ready` mark records the first rendered menu in the shipping build.
-It is a custom canvas readiness metric, not LCP. Event Timing samples are lab
+It is a custom canvas readiness metric, not LCP. Vite preview compresses its
+JavaScript by default; earlier notes describing it as uncompressed were incorrect. Event Timing samples are lab
 interaction measurements, not field INP; actual frame intervals and long tasks
 are reported separately. Software graphics, CPU throttling and automation do
 not establish physical-phone FPS, battery use or field Core Web Vitals compliance.
 
 Idle work is event-driven: settings are cached as independent snapshots and refresh on saves, imports, and cross-tab changes; notifications have no polling timer. The active run clock checkpoints every five seconds and flushes when paused, hidden, or leaving the page. A sudden process crash can lose up to five seconds of elapsed time. Clock checkpoints preserve the room-entry inventory, stop during profile recovery, and reject stale writers after a foreign replacement. Browser regressions check zero idle storage reads and stable view, texture, and listener counts across repeated combat entry.
+
+Measured improvements on the original three-fight lab profile: survivor view
+replacement fell from 90 to 0 per fight, UI refresh p95 from 33.1 ms to about
+11 ms, and observed interaction p95 from 104 ms to 64 ms. Font assets fell from
+321,844 to 119,708 bytes. Shared portrait frames remove 6,290,064 bytes of named
+RGBA texture backing. These figures are measurements, not device-independent
+promises. The in-app preview confirms shared textures and downloaded asset sizes;
+its background/focus throttling prevents a reliable desktop FPS claim.
 
 ## Remaining differences
 
@@ -149,7 +164,7 @@ Rules were checked against original-game references for
 [potions](https://slaythespire.wiki.gg/wiki/Potions), and
 [custom modes](https://slaythespire.wiki.gg/wiki/Custom_Mode).
 
-Presentation uses painted backgrounds, character portraits, and shared card illustrations, with SVG portraits for all 68 enemy IDs. The map uses room symbols and a scrollable route. Barlow fonts ship locally under the SIL Open Font License in `public/fonts/OFL.txt`; generated artwork and its prompts are recorded in [`public/art/sources.json`](public/art/sources.json). Each act has a synthesized musical theme. Settings control master, music, and effects volume separately. Audio starts after a click or keypress and pauses in hidden tabs.
+Presentation uses painted backgrounds, character portraits, and shared card illustrations, with SVG portraits for all 68 enemy IDs. The map uses room symbols and a scrollable route. Barlow fonts ship as WOFF2, converted losslessly with `ttf2woff2@8.0.1`, under the SIL Open Font License in `public/fonts/OFL.txt`; generated artwork and its prompts are recorded in [`public/art/sources.json`](public/art/sources.json). Each act has a synthesized musical theme. Settings control master, music, and effects volume separately. Audio starts after a click or keypress and pauses in hidden tabs.
 
 Targeted cards stay lifted in the hand while a curved arrow marks the selected enemy. Keyboard selection uses the same aiming display. Release over an enemy to play, or press Escape to cancel. Untargeted cards follow your drag and show when they are ready to play. Reduced motion removes card travel, shakes, flashes, and impact motion.
 

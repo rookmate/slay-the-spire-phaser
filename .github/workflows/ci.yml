@@ -25,17 +25,9 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+      - run: npm run check:assets
       - run: npx playwright install --with-deps chromium
       - run: npm run test:browser
-      - run: npm run test:performance
-      - name: Upload performance measurements
-        if: always()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-        with:
-          name: performance-results
-          path: performance-results/
-          if-no-files-found: ignore
-          retention-days: 14
       - name: Upload browser failure details
         if: failure() || cancelled()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
