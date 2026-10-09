@@ -1,3 +1,4 @@
+import { access, bindAction } from '../ui/accessibility'
 import { characterTexture } from '../ui/portraits'
 import { addRunMenu } from '../ui/runMenu'
 import { canEnterMapNode } from '../core/relics/campaignRules'
@@ -88,6 +89,7 @@ export class MapScene extends Phaser.Scene {
             if (available) ring.setInteractive({ useHandCursor: true }).on('pointerup', (pointer: Phaser.Input.Pointer) => {
                 if (this.pressedNode === node.id && !this.dragged && viewport.contains(pointer.x, pointer.y)) this.enterNode(node)
             })
+            if (available) bindAction(ring, () => this.enterNode(node), { id: `room:${node.id}`, label: `Floor ${node.row + 1}, ${node.burning && !this.run.keys.emerald ? 'Burning elite' : roomNames[node.kind]}, path ${node.col + 1}. Leads to ${node.edgesTo.map(id => roomNames[this.gmap.byId[id].kind]).join(', ') || 'the next act'}.`, onFocus: () => this.scrollTo(viewport.y + viewport.height / 2 - y) })
             const icon = this.add.graphics(); drawMapIcon(icon, node.kind, x, y, color)
             const label = this.add.text(x, y + 19, node.burning && !this.run.keys.emerald ? 'Burning elite' : roomNames[node.kind], { ...bodyText, fontSize: '10px', fontStyle: available ? 'bold' : 'normal', color: available ? '#49301c' : '#867458' }).setOrigin(0.5, 0).setResolution(2)
             this.mapLayer.add([ring, icon, label])
@@ -103,6 +105,7 @@ export class MapScene extends Phaser.Scene {
     private scrollTo(y: number): void {
         const { viewport } = mapLayout(this.scale.width, this.gmap.cols)
         this.mapLayer.y = Phaser.Math.Clamp(y, Math.min(viewport.y, viewport.bottom - this.contentHeight), viewport.y)
+        access(this).refresh()
     }
 
     private bindScrolling(): void {

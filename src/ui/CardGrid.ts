@@ -1,3 +1,4 @@
+import { access, bindAction, actionButton } from './accessibility'
 import { UI_FONT } from './theme'
 import type Phaser from 'phaser'
 import type { CardInstance } from '../core/state'
@@ -12,7 +13,7 @@ export class CardGrid {
     private scene: Phaser.Scene
     private cards: CardInstance[]
     private top: number
-    private onSelect: (card: CardInstance) => void
+    private onSelect?: (card: CardInstance) => void
     private eligible: (card: CardInstance) => boolean
     private selected: (card: CardInstance) => boolean
 
@@ -21,7 +22,7 @@ export class CardGrid {
         parent: Phaser.GameObjects.Container,
         cards: CardInstance[],
         top: number,
-        onSelect: (card: CardInstance) => void,
+        onSelect?: (card: CardInstance) => void,
         eligible: (card: CardInstance) => boolean = () => true,
         selected: (card: CardInstance) => boolean = () => false,
     ) {
@@ -57,8 +58,9 @@ export class CardGrid {
             })
             view.setAlpha(eligible ? 1 : 0.4)
             view.setSelected(this.selected(card))
-            view.on('pointerdown', () => this.onSelect(card))
+            if (this.onSelect) view.on('pointerdown', () => this.onSelect?.(card))
             this.container.add(view)
+            if (this.onSelect) bindAction(view, () => this.onSelect?.(card), { label: () => `Select ${view.accessLabel()}`, id: `select:${card.instanceId}`, enabled: () => this.eligible(card), pressed: () => this.selected(card) })
         })
 
         const style = { resolution: 2, fontFamily: UI_FONT, fontSize: '16px', color: '#fff', padding: { x: 10, y: 7 } }
@@ -66,11 +68,12 @@ export class CardGrid {
         for (const [label, x, delta] of [['Previous', 20, -1], ['Next', 220, 1]] as const) {
             const enabled = this.page + delta >= 0 && this.page + delta < pages
             const button = this.scene.add.text(x, layout.footerY, label, { ...style, backgroundColor: '#353126' }).setAlpha(enabled ? 1 : 0.35)
-            if (enabled) button.setInteractive({ useHandCursor: true }).on('pointerdown', () => {
+            actionButton(button, label, () => {
                 this.page += delta
                 this.refresh()
-            })
+            }, enabled)
             this.container.add(button)
         }
+        access(this.scene).refresh()
     }
 }

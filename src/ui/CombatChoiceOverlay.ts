@@ -1,3 +1,4 @@
+import { access, bindAction } from './accessibility'
 import { UI_FONT } from './theme'
 import Phaser from 'phaser'
 import type { Engine } from '../core/engine'
@@ -45,6 +46,7 @@ export class CombatChoiceOverlay {
         const zoneCards = choice.cards ?? this.engine.getCardsInZone(choice.zone)
         const overlay = this.scene.add.container(0, 0).setDepth(7000)
         this.container = overlay
+        access(this.scene).modal(overlay)
 
         const bg = this.scene.add.rectangle(0, 0, this.scene.scale.width, this.scene.scale.height, 0x090909, 0.86)
             .setOrigin(0, 0)
@@ -78,10 +80,12 @@ export class CombatChoiceOverlay {
             padding: { x: 10, y: 7 },
         }).setOrigin(1, 0)
         confirm.setInteractive({ useHandCursor: true })
-        confirm.on('pointerdown', () => {
+        const submit = () => {
             if (!this.canSubmit()) return
             this.onSubmit?.([...this.selectedInstanceIds])
-        })
+        }
+        confirm.on('pointerdown', submit)
+        bindAction(confirm, submit, { label: 'Confirm', enabled: () => this.canSubmit() })
         overlay.add(confirm)
 
         if (choice.canSkip) {
@@ -94,6 +98,7 @@ export class CombatChoiceOverlay {
             }).setOrigin(1, 0).setInteractive({ useHandCursor: true })
             skip.on('pointerdown', () => this.onCancel?.())
             overlay.add(skip)
+            bindAction(skip, () => this.onCancel?.(), { label: 'Skip' })
         }
     }
 

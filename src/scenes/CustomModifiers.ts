@@ -8,7 +8,7 @@ export class CustomModifiersScene extends Phaser.Scene {
     constructor() { super('CustomModifiers') }
     create(data: { modifiers: ModifierId[] }): void { this.modifiers = [...data.modifiers]; this.page = 0; this.render() }
     private render(): void {
-        this.children.removeAll(true)
+        for (const child of [...this.children.list]) child.destroy()
         roomBackdrop(this)
         this.add.text(24, 20, 'Custom modifiers', { ...menuText, fontSize: '26px' })
         MODIFIER_IDS.slice(this.page * 8, this.page * 8 + 8).forEach((id, index) => {

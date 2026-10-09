@@ -1,12 +1,12 @@
 import Phaser from 'phaser'
 import { BASICS, GLOSSARY, type HelpSection } from '../ui/help/content'
 
-export interface HelpData { owner: string; context?: HelpSection[]; onClose?: () => void }
+export interface HelpData { owner: string; context?: HelpSection[]; onClose?: () => void; returnFocus?: HTMLElement | null }
 
 /** Launch over the live scene so choices, settings destinations and the run clock stay intact. */
 export function openHelp(scene: Phaser.Scene, context?: HelpSection[], onClose?: () => void): void {
     if (scene.scene.isActive('Help')) return
-    scene.scene.launch('Help', { owner: scene.scene.key, context, onClose } satisfies HelpData)
+    scene.scene.launch('Help', { owner: scene.scene.key, context, onClose, returnFocus: document.activeElement as HTMLElement | null } satisfies HelpData)
     scene.scene.pause()
 }
 
@@ -14,7 +14,7 @@ export class HelpScene extends Phaser.Scene {
     constructor() { super('Help') }
     create(data: HelpData): void {
         this.scene.bringToTop()
-        const previousFocus = document.activeElement as HTMLElement | null
+        const previousFocus = data.returnFocus
         const panel = document.createElement('section')
         panel.className = 'game-help'; panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-modal', 'true'); panel.setAttribute('aria-label', 'Game guide')
         const header = document.createElement('header'), title = document.createElement('h1'), close = document.createElement('button')
@@ -67,9 +67,12 @@ export class HelpScene extends Phaser.Scene {
         const shutdown = () => {
             destroy()
             this.events.off(Phaser.Scenes.Events.DESTROY, destroy)
-            if (this.scene.isPaused(data.owner)) this.scene.resume(data.owner)
+            const restoreFocus = () => queueMicrotask(() => { if (previousFocus?.isConnected) previousFocus.focus() })
+            if (this.scene.isPaused(data.owner)) {
+                this.scene.get(data.owner).events.once(Phaser.Scenes.Events.RESUME, restoreFocus)
+                this.scene.resume(data.owner)
+            } else restoreFocus()
             data.onClose?.()
-            if (previousFocus?.isConnected) previousFocus.focus()
         }
         this.events.once(Phaser.Scenes.Events.SHUTDOWN, shutdown)
         this.events.once(Phaser.Scenes.Events.DESTROY, destroy)

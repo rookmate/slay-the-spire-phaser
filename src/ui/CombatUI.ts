@@ -1,3 +1,5 @@
+import { access, editingText } from './accessibility'
+import { enemyIntent } from './help/combat'
 import { UI_FONT } from './theme'
 import { menuButton } from './menu'
 import { resolveCard } from '../core/cards'
@@ -119,6 +121,8 @@ export class CombatUI {
             if (event.kind === 'HpLost' && event.amount > 0) this.visualEffects.showDamageNumber(event.amount, x, y - 25)
         }
         this.update()
+        const player = this.engine.state.player
+        access(this.scene).announce(`Turn ${this.engine.state.turnNumber}. ${player.hp} HP, ${player.block} Block, ${player.energy} energy. ${this.engine.state.enemies.filter(enemy => enemy.hp > 0).map(enemy => `${enemy.name}: ${enemy.hp} HP, ${enemyIntent(this.engine, enemy)}`).join('. ')}`)
     }
 
     update(): void {
@@ -128,6 +132,7 @@ export class CombatUI {
         this.playerDisplay.update()
         this.overlayManager.refreshOverlays()
         this.choiceOverlay.refresh(this.engine.getPendingChoice())
+        access(this.scene).refresh()
     }
 
     destroy(): void {
@@ -164,9 +169,22 @@ export class CombatUI {
         this.onPlay?.(card, targets)
     }
 
+    private activateCard(view: Card): void {
+        if (!this.engine.canAcceptInput() || this.overlayManager.isOpen() || this.playerDisplay.isPotionMenuOpen()) return
+        this.clearTargeting()
+        const def = resolveCard(view.getCardInstance())
+        if (def.targeting?.type === 'single_enemy' || def.targeting?.type === 'any') {
+            this.dragSystem.selectCard(view)
+            const target = this.engine.state.enemies.find(enemy => this.engine.canPlayCard(view.getCardInstance(), [enemy.id]))
+            if (target) access(this.scene).focus(`target:${target.id}`)
+            access(this.scene).announce(`Select an enemy for ${def.name}.`)
+        } else this.playCard(view, def.targeting?.type === 'all_enemies' ? this.engine.state.enemies.filter(e => e.hp > 0).map(e => e.id) : def.targeting?.type === 'player' ? [this.engine.state.player.id] : [])
+    }
+
     private setupEventHandlers(): void {
+        this.handManager.setOnActivate(view => this.activateCard(view))
         this.keyHandler = (event: KeyboardEvent) => {
-            if (event.repeat) return
+            if (event.repeat || editingText(event)) return
             if (event.key === 'Escape') {
                 if (this.choiceOverlay.dismissInspection()) return
                 const dismiss = this.dragSystem.isTargeting() || this.pendingPotionIndex !== null || this.handManager.isInspecting()
@@ -181,12 +199,7 @@ export class CombatUI {
             const index = event.key === '0' ? 9 : Number(event.key) - 1, card = this.engine.state.player.hand[index]
             if (!card) return
             if (event.altKey) { this.handManager.inspectCard(index); return }
-            this.clearTargeting()
-            const def = resolveCard(card)
-            const view = this.handManager.getHandCards()[index]
-            if (def.targeting?.type === 'single_enemy' || def.targeting?.type === 'any') {
-                this.dragSystem.selectCard(view)
-            } else this.playCard(view, def.targeting?.type === 'all_enemies' ? this.engine.state.enemies.filter(e => e.hp > 0).map(e => e.id) : def.targeting?.type === 'player' ? [this.engine.state.player.id] : [])
+            this.activateCard(this.handManager.getHandCards()[index])
         }
         this.scene.input.keyboard?.on('keydown', this.keyHandler)
 
@@ -232,6 +245,9 @@ export class CombatUI {
                     backgroundColor: '#353126',
                     padding: { x: 8, y: 6 },
                 }).setOrigin(0.5, 0)
+                const target = this.engine.state.enemies.find(enemy => enemy.hp > 0)
+                if (target) access(this.scene).focus(`target:${target.id}`)
+                access(this.scene).announce(`Select an enemy for ${potion.name}.`)
                 return
             }
             const targets = potion.target === 'player' ? [this.engine.state.player.id] : []

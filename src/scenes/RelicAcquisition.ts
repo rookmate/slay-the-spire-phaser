@@ -1,3 +1,4 @@
+import { actionButton } from '../ui/accessibility'
 import { UI_FONT, roomBackdrop } from '../ui/theme'
 import Phaser from 'phaser'
 import { createCardInstance } from '../core/cards'
@@ -22,14 +23,14 @@ export class RelicAcquisitionScene extends Phaser.Scene {
         saveRun(this.run); this.render()
     }
     private button(x: number, y: number, label: string, choice?: string | number): void {
-        this.add.text(x, y, label, { resolution: 2, fontFamily: UI_FONT, fontSize: '16px', color: '#fff', backgroundColor: '#353126', padding: { x: 10, y: 8 } })
-            .setInteractive({ useHandCursor: true }).on('pointerdown', () => this.choose(choice))
+        const button = this.add.text(x, y, label, { resolution: 2, fontFamily: UI_FONT, fontSize: '16px', color: '#fff', backgroundColor: '#353126', padding: { x: 10, y: 8 } })
+        actionButton(button, label, () => this.choose(choice))
     }
     private render(): void {
         const step = prepareAcquisition(this.run, this.meta)
         saveRun(this.run)
         if (!step) { const next = getRunDestination(this.run); this.scene.start(next.scene, next.data); return }
-        this.children.removeAll(true)
+        for (const child of [...this.children.list]) child.destroy()
         roomBackdrop(this)
         const def = RELIC_DEFS[step.source]
         this.add.text(24, 20, def.name, { resolution: 2, fontFamily: UI_FONT, fontSize: '26px', color: '#fff' })

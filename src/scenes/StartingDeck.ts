@@ -12,7 +12,7 @@ export class StartingDeckScene extends Phaser.Scene {
     private render(): void {
         const draft = this.run.startingDraft
         if (!draft) { const next = getRunDestination(this.run); this.scene.start(next.scene, next.data); return }
-        this.children.removeAll(true)
+        for (const child of [...this.children.list]) child.destroy()
         roomBackdrop(this)
         this.add.text(24, 20, draft.kind === 'sealed' ? 'Sealed Deck' : 'Draft', { ...menuText, fontSize: '26px' })
         this.add.text(24, 64, `Choose ${draft.remaining} more cards. Deck: ${this.run.deck.length}`, menuText)

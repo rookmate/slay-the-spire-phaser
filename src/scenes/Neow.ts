@@ -1,3 +1,4 @@
+import { actionButton } from '../ui/accessibility'
 import { UI_FONT, roomBackdrop } from '../ui/theme'
 import Phaser from 'phaser'
 import { canUpgradeCard } from '../core/cards'
@@ -20,8 +21,8 @@ export class NeowScene extends Phaser.Scene {
         this.add.text(24, 72, 'Choose a blessing for your climb.', { resolution: 2, fontFamily: UI_FONT, fontSize: '18px', color: '#bdb29d' })
         this.options.forEach((option, i) => {
             const y = 108 + i * 80
-            this.add.text(24, y, option.label, { resolution: 2, fontFamily: UI_FONT, fontSize: '18px', color: '#fff', backgroundColor: '#353126', padding: { x: 12, y: 10 } })
-                .setInteractive({ useHandCursor: true }).on('pointerdown', () => this.chooseOption(option))
+            const button = this.add.text(24, y, option.label, { resolution: 2, fontFamily: UI_FONT, fontSize: '18px', color: '#fff', backgroundColor: '#353126', padding: { x: 12, y: 10 } })
+            actionButton(button, `${option.label}. ${option.description}`, () => this.chooseOption(option))
             this.add.text(24, y + 44, option.description, { resolution: 2, fontFamily: UI_FONT, fontSize: '14px', color: '#bdb29d', wordWrap: { width: 744 } })
         })
         this.events.once('shutdown', () => this.selector.destroy())

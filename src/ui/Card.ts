@@ -1,3 +1,4 @@
+import { access, bindAction } from './accessibility'
 import { UI_FONT } from './theme'
 import { cardDescription } from '../core/cardText'
 import type { Engine } from '../core/engine'
@@ -40,6 +41,7 @@ export class Card extends Phaser.GameObjects.Container {
     constructor(scene: Phaser.Scene, card: CardInstance, opts: CardOptions) {
         super(scene, opts.x, opts.y)
         this.card = card; this.engine = opts.engine
+        this.setData('accessCard', true)
         this.locked = !!opts.locked
         const def = resolveCard(card), w = Card.CARD_WIDTH, h = Card.CARD_HEIGHT
         const color = cardColor(def)
@@ -64,6 +66,7 @@ export class Card extends Phaser.GameObjects.Container {
         const inspect = scene.add.text(w - 23, h - 21, '?', { resolution: 2, fontFamily: UI_FONT, fontSize: '14px', fontStyle: 'bold', color: '#644923', padding: { x: 5, y: 1 } }).setResolution(2).setInteractive({ useHandCursor: true })
         inspect.on('pointerdown', (_pointer: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => { event?.stopPropagation(); this.showDetails(!this.detail) })
         this.add(inspect)
+        bindAction(inspect, () => this.showDetails(true, true), { id: `inspect:${card.instanceId}`, label: () => `Inspect ${this.accessLabel()}` })
         this.shade = scene.add.rectangle(0, 0, w, h, 0x151512, 0.3).setOrigin(0).setVisible(false)
         this.add(this.shade)
         this.setDescription(cardDescription(card, opts.engine))
@@ -116,8 +119,13 @@ export class Card extends Phaser.GameObjects.Container {
     }
     isShowingDetails(): boolean { return !!this.detail }
 
-    showDetails(show: boolean): void {
-        if (show === !!this.detail) return
+    accessLabel(): string {
+        const def = resolveCard(this.card)
+        return `${def.name}. ${def.type}. ${def.xCost ? 'X' : this.engine?.getCardCost(this.card) ?? def.cost} energy. ${cardDescription(this.card, this.engine)}`
+    }
+
+    showDetails(show: boolean, modal = false): void {
+        if (show === !!this.detail) { if (show && modal && this.detail) access(this.scene).modal(this.detail, () => this.showDetails(false)); return }
         this.detail?.destroy(true); this.detail = undefined
         if (!show || !this.scene) return
         const def = resolveCard(this.card), width = 224
@@ -133,6 +141,8 @@ export class Card extends Phaser.GameObjects.Container {
         this.detail.add([this.scene.add.rectangle(0, 0, width, height, 0x24231e).setOrigin(0).setStrokeStyle(1, 0xc3a771), title, body])
         const close = this.scene.add.text(width - 19, 2, '×', { fontSize: '16px', color: '#f5d78a' }).setInteractive({ useHandCursor: true })
         close.on('pointerdown', () => this.showDetails(false)); this.detail.add(close)
+        bindAction(close, () => this.showDetails(false), { label: `Close ${def.name} details` })
+        if (modal) access(this.scene).modal(this.detail, () => this.showDetails(false))
     }
     inspectAtPoint(x: number, y: number): boolean {
         const local = this.getLocalPoint(x, y)

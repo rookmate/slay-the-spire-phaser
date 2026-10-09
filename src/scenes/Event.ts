@@ -1,3 +1,4 @@
+import { actionButton } from '../ui/accessibility'
 import { UI_FONT, roomBackdrop } from '../ui/theme'
 import { addRunMenu } from '../ui/runMenu'
 import { flipEventCard } from '../core/events/additionalResolution'
@@ -25,7 +26,7 @@ export class EventScene extends Phaser.Scene {
         this.events.once('shutdown', () => this.selector.destroy())
     }
     private render(): void {
-        this.children.removeAll(true)
+        for (const child of [...this.children.list]) child.destroy()
         roomBackdrop(this)
         addRunMenu(this, this.run)
         const event = EVENT_DEFS[this.eventId]
@@ -37,12 +38,11 @@ export class EventScene extends Phaser.Scene {
             const disabled = choice.disabled?.(this.run) ?? false
             const y = 132 + i * 65
             const text = this.add.text(24, y, choice.label, { resolution: 2, fontFamily: UI_FONT, fontSize: '19px', color: disabled ? '#777' : '#fff', backgroundColor: '#353126', padding: { x: 10, y: 8 } })
-            if (!disabled) text.setInteractive({ useHandCursor: true }).on('pointerdown', () => this.handleChoice(choice))
+            actionButton(text, `${choice.label}. ${choice.description ?? ''}`, () => this.handleChoice(choice), !disabled)
             this.add.text(24, y + 40, choice.description ?? '', { resolution: 2, fontFamily: UI_FONT, fontSize: '14px', color: '#bdb29d', wordWrap: { width: 744 } })
         })
         this.add.text(24, 345, this.run.eventState?.notes?.join(' ') ?? '', { resolution: 2, fontFamily: UI_FONT, fontSize: '15px', color: '#dbc5a3', wordWrap: { width: 750 } })
-        if (this.run.eventState?.resolved) this.add.text(24, 399, 'Continue', { resolution: 2, fontFamily: UI_FONT, fontSize: '18px', color: '#fff', backgroundColor: '#353126', padding: { x: 12, y: 8 } })
-            .setInteractive({ useHandCursor: true }).on('pointerdown', () => this.leave())
+        if (this.run.eventState?.resolved) actionButton(this.add.text(24, 399, 'Continue', { resolution: 2, fontFamily: UI_FONT, fontSize: '18px', color: '#fff', backgroundColor: '#353126', padding: { x: 12, y: 8 } }), 'Continue', () => this.leave())
     }
     private renderMatchingGame(): void {
         const board = this.run.eventState!.matching!
@@ -51,7 +51,7 @@ export class EventScene extends Phaser.Scene {
             const shown = board.matched.includes(index) || board.revealed.includes(index)
             const x = 24 + index % 6 * 125, y = 148 + Math.floor(index / 6) * 89
             const tile = this.add.text(x, y, shown ? CARD_DEFS[id].name : '?', { resolution: 2, fontFamily: UI_FONT, fontSize: '13px', color: '#fff', backgroundColor: board.matched.includes(index) ? '#385132' : '#343434', fixedWidth: 115, fixedHeight: 77, padding: { x: 8, y: 8 }, wordWrap: { width: 99 } })
-            if (!this.run.eventState!.resolved && !board.matched.includes(index)) tile.setInteractive({ useHandCursor: true }).on('pointerdown', () => { if (flipEventCard(this.run, index)) { saveRun(this.run); this.render() } })
+            actionButton(tile, `Card ${index + 1}: ${shown ? CARD_DEFS[id].name : 'face down'}${board.matched.includes(index) ? ', matched' : ''}`, () => { if (flipEventCard(this.run, index)) { saveRun(this.run); this.render() } }, !this.run.eventState!.resolved && !board.matched.includes(index))
         })
     }
     private handleChoice(choice: EventChoiceDef): void {

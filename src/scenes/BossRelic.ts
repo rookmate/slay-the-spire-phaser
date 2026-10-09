@@ -1,3 +1,4 @@
+import { actionButton } from '../ui/accessibility'
 import { UI_FONT, roomBackdrop } from '../ui/theme'
 import { getRunDestination } from '../core/progression'
 import { advanceAct } from '../core/campaign'
@@ -23,7 +24,7 @@ export class BossRelicScene extends Phaser.Scene {
         this.add.text(16, 16, 'Boss Relic', { ...style, fontSize: '24px' })
         this.add.text(16, 46, 'Choose one relic and continue to the next act.', { ...style, fontSize: '14px', color: '#bbbbbb' })
 
-        this.add.text(32, 320, 'Skip relic', style).setInteractive({ useHandCursor: true }).on('pointerdown', () => {
+        actionButton(this.add.text(32, 320, 'Skip relic', style), 'Skip relic', () => {
             advanceAct(this.run); saveRun(this.run); this.resume()
         })
         choices.forEach((relicId, index) => this.renderChoice(relicId, index))
@@ -55,7 +56,7 @@ export class BossRelicScene extends Phaser.Scene {
             padding: { x: 8, y: 6 },
         }).setInteractive({ useHandCursor: true })
 
-        select.on('pointerdown', () => {
+        actionButton(select, `Take ${def.name}. ${def.description}`, () => {
             applyRelicAcquisition(this.run, relicId)
             advanceAct(this.run)
             saveRun(this.run)
