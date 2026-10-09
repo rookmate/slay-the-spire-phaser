@@ -1,3 +1,4 @@
+import { bindAction } from '../ui/accessibility'
 import { openHelp } from './Help'
 import { characterTexture } from '../ui/portraits'
 import Phaser from 'phaser'
@@ -34,7 +35,7 @@ export class MainMenuScene extends Phaser.Scene {
     }
     private render(): void {
         this.seedInput?.destroy(); this.seedInput = undefined
-        this.children.removeAll(true)
+        for (const child of [...this.children.list]) child.destroy()
         const meta = loadMeta(), saved = loadRun(), progress = getCharacterProgress(meta, this.character), character = CHARACTERS[this.character]
         if (this.textures.exists('art:spire')) this.add.image(400, 225, 'art:spire').setDisplaySize(800, 450)
         this.add.rectangle(0, 0, 465, 410, palette.ink, 0.52).setOrigin(0)
@@ -49,9 +50,11 @@ export class MainMenuScene extends Phaser.Scene {
             this.add.image(x + 47, 136, ...characterTexture(this, id)).setDisplaySize(37, 44)
             const button = this.add.text(x, 114, CHARACTERS[id].name, { ...menuText, fontSize: '13px', fontStyle: 'bold', align: 'center', fixedWidth: 94, fixedHeight: 69, padding: { top: 45 }, color: palette.text }).setResolution(2)
             button.setData('character', id)
-            if (this.mode !== 'daily') button.setInteractive({ useHandCursor: true }).on('pointerdown', () => {
+            const selectCharacter = () => {
                 this.character = id; this.ascension = 0; this.replaceConfirmed = false; this.render()
-            }).on('pointerover', () => button.setColor(palette.gold)).on('pointerout', () => button.setColor(palette.text))
+            }
+            bindAction(button, selectCharacter, { label: `${CHARACTERS[id].name}: ${CHARACTERS[id].description}`, enabled: () => this.mode !== 'daily', pressed: () => this.character === id, id: `character:${id}` })
+            if (this.mode !== 'daily') button.setInteractive({ useHandCursor: true }).on('pointerdown', selectCharacter).on('pointerover', () => button.setColor(palette.gold)).on('pointerout', () => button.setColor(palette.text))
         })
         this.add.text(34, 196, character.name, { resolution: 2, fontFamily: DISPLAY_FONT, fontSize: '29px', color: palette.text }).setResolution(2)
         this.add.text(434, 204, `${character.maxHp} HP  ·  XP tier ${progress.unlockTier}/5`, { ...menuText, fontSize: '13px', color: palette.gold }).setOrigin(1, 0).setResolution(2)
@@ -71,8 +74,8 @@ export class MainMenuScene extends Phaser.Scene {
         } else {
             this.ascension = Math.min(this.ascension, this.mode === 'custom' ? 20 : progress.ascension)
             this.add.text(34, 323, `Ascension ${this.ascension}`, { ...menuText, fontSize: '14px' }).setResolution(2)
-            menuButton(this, 142, 314, '-', () => { this.ascension = Math.max(0, this.ascension - 1); this.render() })
-            menuButton(this, 181, 314, '+', () => { this.ascension = Math.min(this.mode === 'custom' ? 20 : progress.ascension, this.ascension + 1); this.render() })
+            menuButton(this, 142, 314, '-', () => { this.ascension = Math.max(0, this.ascension - 1); this.render() }, true, { description: 'Decrease Ascension' })
+            menuButton(this, 181, 314, '+', () => { this.ascension = Math.min(this.mode === 'custom' ? 20 : progress.ascension, this.ascension + 1); this.render() }, true, { description: 'Increase Ascension' })
             if (this.mode === 'seeded' || this.mode === 'custom') {
                 const input = document.createElement('input')
                 input.type = 'text'; input.value = this.seed; input.placeholder = this.mode === 'custom' ? 'Random seed' : 'Enter seed'; input.maxLength = 64

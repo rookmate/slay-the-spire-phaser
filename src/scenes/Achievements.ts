@@ -10,7 +10,7 @@ export class AchievementsScene extends Phaser.Scene {
     constructor() { super('Achievements') }
     create(): void { this.render() }
     private render(): void {
-        this.children.removeAll(true)
+        for (const child of [...this.children.list]) child.destroy()
         roomBackdrop(this)
         const earned = loadMeta().achievements ?? {}
         const ids = ACHIEVEMENT_IDS.filter(id => this.filter === 'all' || (this.filter === 'earned') === !!earned[id])

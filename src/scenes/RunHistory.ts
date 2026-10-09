@@ -10,7 +10,7 @@ export class RunHistoryScene extends Phaser.Scene {
     constructor() { super('RunHistory') }
     create(): void { this.page = 0; this.render() }
     private render(): void {
-        this.children.removeAll(true)
+        for (const child of [...this.children.list]) child.destroy()
         roomBackdrop(this)
         const history = loadMeta().history ?? []
         this.add.text(24, 20, 'Run History', { ...menuText, fontSize: '26px' })
@@ -21,11 +21,11 @@ export class RunHistoryScene extends Phaser.Scene {
         menuButton(this, 300, 403, 'Next', () => { this.page++; this.render() }, (this.page + 1) * 6 < history.length)
     }
     private showEntry(entry: RunHistoryEntry): void {
-        this.children.removeAll(true)
+        for (const child of [...this.children.list]) child.destroy()
         roomBackdrop(this)
         this.add.text(24, 20, `${CHARACTERS[entry.character].name} · ${entry.result} · ${entry.score} points`, { ...menuText, fontSize: '22px' })
         this.add.text(24, 58, `${entry.mode} · Seed ${entry.seed} · Floor ${entry.floor} · ${Math.floor(entry.elapsedSeconds / 60)}m`, menuText)
-        new CardGrid(this, this.add.container(0, 0), entry.deck.filter(c => CARD_DEFS[c.id]).map(c => createCardInstance(c.id, c.upgrade)), 104, () => {})
+        new CardGrid(this, this.add.container(0, 0), entry.deck.filter(c => CARD_DEFS[c.id]).map(c => createCardInstance(c.id, c.upgrade)), 104, undefined)
         menuButton(this, 650, 402, 'Back', () => this.render())
     }
 }

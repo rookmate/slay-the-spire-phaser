@@ -1,3 +1,4 @@
+import { bindAction } from './accessibility'
 import { loadSettings } from '../core/settings'
 import Phaser from 'phaser'
 import type { Engine } from '../core/engine'
@@ -13,6 +14,8 @@ export class HandManager {
     private handInputArea: Phaser.GameObjects.Rectangle
     private currentHoverIndex: number | null = null
     private selectedCard?: Card
+    private onActivate?: (card: Card) => void
+    setOnActivate(callback: (card: Card) => void): void { this.onActivate = callback }
     private onCardDrag?: (card: Card, cardIndex: number, pointer: Phaser.Input.Pointer) => void
 
     constructor(scene: Phaser.Scene, engine: Engine) {
@@ -53,6 +56,9 @@ export class HandManager {
             } else {
                 card = new Card(this.scene, instance, { x: 0, y: 0, engine: this.engine })
                 this.handContainer.add(card)
+                const view = card
+                bindAction(view, () => this.onActivate?.(view), { id: `play:${instance.instanceId}`, label: () => `Play ${view.accessLabel()}`,
+                    enabled: () => this.engine.canAcceptInput() && this.engine.getPlayableCards().some(play => play.card.instanceId === instance.instanceId) })
             }
             return card
         })
@@ -107,7 +113,7 @@ export class HandManager {
     }
 
     inspectCard(index: number): void {
-        this.handCards.forEach((card, i) => card.showDetails(i === index))
+        this.handCards.forEach((card, i) => card.showDetails(i === index, true))
     }
 
     isInspecting(): boolean { return this.handCards.some(card => card.isShowingDetails()) }

@@ -26,7 +26,7 @@ export class ProfileScene extends Phaser.Scene {
     }
     private render(): void {
         this.fileInput?.destroy(); this.fileInput = undefined
-        this.children.removeAll(true)
+        for (const child of [...this.children.list]) child.destroy()
         roomBackdrop(this)
         this.add.text(24, 20, 'Profile backup', { ...menuText, fontSize: '26px' })
         this.add.text(24, 65, 'Export progress, achievements, settings, and your saved run.\nCombat resumes from the start of its room.', { ...menuText, lineSpacing: 8 })

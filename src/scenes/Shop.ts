@@ -1,3 +1,5 @@
+import { actionButton } from '../ui/accessibility'
+import { CARD_DEFS } from '../core/cards'
 import { UI_FONT, roomBackdrop } from '../ui/theme'
 import { addRunMenu } from '../ui/runMenu'
 import Phaser from 'phaser'
@@ -27,9 +29,9 @@ export class ShopScene extends Phaser.Scene {
         this.render()
         this.events.once('shutdown', () => this.selector.destroy())
     }
-    private button(x: number, y: number, label: string, enabled: boolean, action: () => void): void {
+    private button(x: number, y: number, label: string, enabled: boolean, action: () => void, description = label): void {
         const text = this.add.text(x, y, label, { resolution: 2, fontFamily: UI_FONT, fontSize: '14px', color: enabled ? '#fff' : '#888', backgroundColor: '#353126', padding: { x: 6, y: 6 } })
-        if (enabled) text.setInteractive({ useHandCursor: true }).on('pointerdown', action)
+        actionButton(text, description, action, enabled)
     }
     private buy(kind: 'cards' | 'relics' | 'potions', index: number): void {
         if (!purchaseShopItem(this.run, this.meta, this.inventory, kind, index)) return
@@ -39,7 +41,7 @@ export class ShopScene extends Phaser.Scene {
         else this.render()
     }
     private render(): void {
-        this.children.removeAll(true)
+        for (const child of [...this.children.list]) child.destroy()
         roomBackdrop(this)
         addRunMenu(this, this.run)
         this.add.text(18, 16, `Merchant    ${this.run.gold} Gold    A${this.run.asc}`, { resolution: 2, fontFamily: UI_FONT, fontSize: '22px', color: '#fff' })
@@ -47,7 +49,7 @@ export class ShopScene extends Phaser.Scene {
             const x = 18 + i * 109
             this.add.existing(new Card(this, createCardInstance(id), { x, y: 56, scale: 0.70 }))
             const price = shopPrice(this.run, this.inventory.cardPrices![i])
-            this.button(x, 190, `${i === this.inventory.saleIndex ? 'Sale ' : ''}${price} G`, this.run.gold >= price, () => this.buy('cards', i))
+            this.button(x, 190, `${i === this.inventory.saleIndex ? 'Sale ' : ''}${price} G`, this.run.gold >= price, () => this.buy('cards', i), `Buy ${CARD_DEFS[id].name} for ${price} gold`)
         })
         this.inventory.relics!.forEach((id, i) => {
             const x = 18 + i * 256

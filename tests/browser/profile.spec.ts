@@ -73,7 +73,7 @@ test('a combat achievement notifies once and remains earned after reloading its 
     run.potions = ['ENERGY_POTION', 'ENERGY_POTION', 'ENERGY_POTION']
     const errors = await boot(page, run)
     for (let i = 0; i < 3; i++) { await clickText(page, 'Energy'); await clickText(page, 'Use') }
-    await expect(page.getByRole('status')).toContainText('Adrenaline')
+    await expect(page.getByRole('status').filter({ hasText: 'Achievement:' })).toContainText('Adrenaline')
     const first = await page.evaluate(() => JSON.parse(localStorage.getItem('sts_meta_v2')!).achievements.ADRENALINE)
     await page.reload(); await page.waitForFunction(() => window.__testGame?.scene.isActive('MainMenu'))
     await clickText(page, 'Continue'); for (let i = 0; i < 3; i++) { await clickText(page, 'Energy'); await clickText(page, 'Use') }

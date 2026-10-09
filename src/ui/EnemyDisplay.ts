@@ -1,3 +1,4 @@
+import { bindAction } from './accessibility'
 import { enemyEffects, enemyIntent } from './help/combat'
 import { loadSettings } from '../core/settings'
 import type Phaser from 'phaser'
@@ -51,6 +52,7 @@ export class EnemyDisplay {
             sprite.on('pointerdown', () => {
                 if (enemy.hp > 0) this.onEnemyClick?.(index)
             })
+            bindAction(sprite, () => { if (enemy.hp > 0) this.onEnemyClick?.(index) }, { id: `target:${enemy.id}`, label: () => `Target ${enemy.name}. ${enemy.hp}/${enemy.maxHp} HP. ${enemy.block} Block. ${enemyIntent(this.engine, enemy)}`, enabled: () => enemy.hp > 0 && this.engine.canAcceptInput() })
             this.enemySprites.push(sprite)
             const barWidth = Math.min(80, slot.width - 12)
             this.healthTracks.push(this.scene.add.rectangle(slot.x - barWidth / 2, slot.y + 109, barWidth, 3, 0x443239).setOrigin(0))
@@ -68,6 +70,7 @@ export class EnemyDisplay {
                 fontFamily: style.fontFamily, fontSize: '10px', color: '#ccbfa5',
             }).setOrigin(0.5, 0).setInteractive({ useHandCursor: true }).on('pointerdown', () => this.onInspect?.(enemy.id))
 
+            bindAction(powers, () => this.onInspect?.(enemy.id), { label: `Inspect ${enemy.name} effects`, id: `effects:${enemy.id}` })
             sprite.on('pointerover', () => name.setAlpha(1))
             sprite.on('pointerout', () => name.setAlpha(0))
 

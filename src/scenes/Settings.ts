@@ -16,7 +16,7 @@ export class SettingsScene extends Phaser.Scene {
         this.render()
     }
     private render(): void {
-        this.children.removeAll(true)
+        for (const child of [...this.children.list]) child.destroy()
         roomBackdrop(this)
         const settings = loadSettings()
         const change = (action: () => void) => { action(); saveSettings(settings); playCue('card'); this.render() }
@@ -25,7 +25,7 @@ export class SettingsScene extends Phaser.Scene {
         const level = (key: 'volume' | 'musicVolume' | 'effectsVolume', label: string, y: number, prefix = '') => {
             this.add.text(24, y + 11, `${label}: ${Math.round(settings[key] * 100)}%`, menuText)
             for (const [x, delta, mark] of [[240, -0.1, '-'], [320, 0.1, '+']] as const)
-                menuButton(this, x, y, `${prefix}${mark}`, () => change(() => { settings[key] = Math.max(0, Math.min(1, Math.round((settings[key] + delta) * 100) / 100)) }))
+                menuButton(this, x, y, `${prefix}${mark}`, () => change(() => { settings[key] = Math.max(0, Math.min(1, Math.round((settings[key] + delta) * 100) / 100)) }), true, { description: `${delta < 0 ? 'Decrease' : 'Increase'} ${label}` })
         }
         level('volume', 'Volume', 139)
         menuButton(this, 24, 199, `Music: ${settings.music ? 'on' : 'off'}`, () => change(() => { settings.music = !settings.music }))

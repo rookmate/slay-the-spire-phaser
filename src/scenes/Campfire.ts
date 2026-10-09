@@ -1,3 +1,4 @@
+import { actionButton } from '../ui/accessibility'
 import { UI_FONT, roomBackdrop } from '../ui/theme'
 import { addRunMenu } from '../ui/runMenu'
 import Phaser from 'phaser'
@@ -29,10 +30,10 @@ export class CampfireScene extends Phaser.Scene {
         actions.forEach(([action, label], i) => {
             const enabled = canUseCampfire(this.run, action)
             const button = this.add.text(24, 70 + i * 49, label, { ...style, color: enabled ? '#fff' : '#888', backgroundColor: '#353126', padding: { x: 10, y: 8 } })
-            if (enabled) button.setInteractive({ useHandCursor: true }).on('pointerdown', () => {
+            actionButton(button, label, () => {
                 if (action === 'smith') this.selector.open({ title: 'Choose a card to upgrade', cards: this.run.deck, filter: canUpgradeCard, onSelect: card => this.choose(action, card.instanceId) })
                 else this.choose(action)
-            })
+            }, enabled)
         })
         this.events.once('shutdown', () => this.selector.destroy())
     }

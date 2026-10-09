@@ -13,11 +13,11 @@ export class InventoryScene extends Phaser.Scene {
     constructor() { super('Inventory') }
     create(data: { run: RunState }): void { this.run = data.run; this.page = 0; this.render() }
     private render(): void {
-        this.children.removeAll(true)
+        for (const child of [...this.children.list]) child.destroy()
         roomBackdrop(this)
         this.add.text(24, 16, `${this.run.player.hp}/${this.run.player.maxHp} HP · ${this.run.gold} Gold`, menuText)
         ;(['deck', 'relics', 'potions'] as const).forEach((tab, i) => menuButton(this, 24 + i * 175, 50, tab[0].toUpperCase() + tab.slice(1), () => { this.tab = tab; this.page = 0; this.render() }))
-        if (this.tab === 'deck') new CardGrid(this, this.add.container(0, 0), this.run.deck, 104, () => {})
+        if (this.tab === 'deck') new CardGrid(this, this.add.container(0, 0), this.run.deck, 104, undefined)
         if (this.tab === 'relics') {
             this.run.relics.slice(this.page * 5, this.page * 5 + 5).forEach((id, i) => {
                 this.add.text(24, 108 + i * 53, getRelicDisplayName(this.run, id), { ...menuText, color: '#dbc5a3' })
@@ -32,8 +32,8 @@ export class InventoryScene extends Phaser.Scene {
                 const y = 104 + i * 56, def = POTION_DEFS[id]
                 this.add.text(24, y, `${def.name}${potionMultiplier(this.run, id) === 2 ? ' ×2' : ''}`, menuText)
                 this.add.text(24, y + 22, def.description, { ...menuText, fontSize: '12px', wordWrap: { width: 510 } })
-                menuButton(this, 560, y, 'Use', () => { if (usePotionOutsideCombat(this.run, i)) { saveRun(this.run); this.render() } }, !!def.useOutsideCombat)
-                menuButton(this, 650, y, 'Discard', () => { this.run.potions.splice(i, 1); saveRun(this.run); this.render() })
+                menuButton(this, 560, y, 'Use', () => { if (usePotionOutsideCombat(this.run, i)) { saveRun(this.run); this.render() } }, !!def.useOutsideCombat, { description: `Use ${def.name}. ${def.description}` })
+                menuButton(this, 650, y, 'Discard', () => { this.run.potions.splice(i, 1); saveRun(this.run); this.render() }, true, { description: `Discard ${def.name}` })
             })
         }
         menuButton(this, 650, 399, 'Back', () => { const next = getRunDestination(this.run); this.scene.start(next.scene, next.data) })

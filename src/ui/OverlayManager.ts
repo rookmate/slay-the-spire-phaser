@@ -1,3 +1,4 @@
+import { access, bindAction } from './accessibility'
 import { openHelp } from '../scenes/Help'
 import { combatHelp } from './help/combat'
 import { UI_FONT } from './theme'
@@ -37,6 +38,7 @@ export class OverlayManager {
                 resolution: 2, fontFamily: UI_FONT, fontSize: '11px', color: '#fff', backgroundColor: '#353126', padding: { x: 5, y: 1 },
             }).setOrigin(1, 0).setDepth(COMBAT_UI_CONFIG.depths.ui).setInteractive({ useHandCursor: true })
                 .on('pointerdown', () => this.togglePile(pile))
+            bindAction(button, () => this.togglePile(pile), { label: `${label} pile` })
             this.buttons.push(button)
         }
         this.resizeHandler()
@@ -66,14 +68,17 @@ export class OverlayManager {
         const { width, height } = this.scene.scale
         const overlay = this.scene.add.container(0, 0).setDepth(COMBAT_UI_CONFIG.depths.overlay)
         this.overlay = overlay
+        access(this.scene).modal(overlay, () => this.close())
         overlay.add(this.scene.add.rectangle(0, 0, width, height, 0x111111, 0.98).setOrigin(0).setInteractive())
         overlay.add(this.scene.add.text(20, 20, pile === 'drawPile' && this.engine.run?.relics.includes('FROZEN_EYE') ? 'Draw Pile, next card first' : titles[pile], { resolution: 2, fontFamily: UI_FONT, fontSize: '16px', color: '#fff' }))
-        overlay.add(this.scene.add.text(width - 20, 16, 'Close', {
+        const close = this.scene.add.text(width - 20, 16, 'Close', {
             resolution: 2, fontFamily: UI_FONT, fontSize: '16px', color: '#fff', backgroundColor: '#493c29', padding: { x: 8, y: 6 },
-        }).setOrigin(1, 0).setInteractive({ useHandCursor: true }).on('pointerdown', () => this.close()))
+        }).setOrigin(1, 0).setInteractive({ useHandCursor: true }).on('pointerdown', () => this.close())
+        overlay.add(close)
+        bindAction(close, () => this.close(), { label: 'Close pile' })
         const cards = [...this.engine.state.player[pile]]
         if (pile === 'drawPile' && !this.engine.run?.relics.includes('FROZEN_EYE')) cards.sort((a, b) => resolveCard(a).name.localeCompare(resolveCard(b).name))
-        new CardGrid(this.scene, overlay, cards, 64, () => {})
+        new CardGrid(this.scene, overlay, cards, 64, undefined)
     }
 
     refreshOverlays(): void { if (this.pile) this.showPile(this.pile) }

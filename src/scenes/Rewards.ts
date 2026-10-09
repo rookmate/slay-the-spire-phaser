@@ -1,3 +1,4 @@
+import { actionButton } from '../ui/accessibility'
 import { UI_FONT, roomBackdrop } from '../ui/theme'
 import { addRunMenu } from '../ui/runMenu'
 import Phaser from 'phaser'
@@ -23,8 +24,8 @@ export class RewardsScene extends Phaser.Scene {
         this.run = data.run; this.rewards = data.rewards; this.message = ''; this.render()
     }
     private button(x: number, y: number, label: string, action: () => void): void {
-        this.add.text(x, y, label, { resolution: 2, fontFamily: UI_FONT, fontSize: '17px', color: '#fff', backgroundColor: '#353126', padding: { x: 10, y: 8 } })
-            .setInteractive({ useHandCursor: true }).on('pointerdown', action)
+        const button = this.add.text(x, y, label, { resolution: 2, fontFamily: UI_FONT, fontSize: '17px', color: '#fff', backgroundColor: '#353126', padding: { x: 10, y: 8 } })
+        actionButton(button, label, action)
     }
     private claim(index: number, selection?: RewardSelection): void {
         if (!claimReward(this.run, index, selection)) return
@@ -32,7 +33,7 @@ export class RewardsScene extends Phaser.Scene {
     }
     private render(): void {
         if (this.run.pendingAcquisitions?.length) { this.scene.start('RelicAcquisition', { run: this.run }); return }
-        this.children.removeAll(true)
+        for (const child of [...this.children.list]) child.destroy()
         roomBackdrop(this)
         addRunMenu(this, this.run); this.choiceCards = []; this.pendingCardReward = false; this.pendingPotionReward = undefined
         this.add.text(24, 24, `Rewards    ${this.run.gold} Gold`, { resolution: 2, fontFamily: UI_FONT, fontSize: '24px', color: '#fff' })
@@ -79,7 +80,7 @@ export class RewardsScene extends Phaser.Scene {
         const start = (this.scale.width - Card.CARD_WIDTH - (item.choices.length - 1) * spacing) / 2
         item.choices.forEach((id, i) => {
             const view = new Card(this, createCardInstance(id, item.upgrades?.[i] ?? 0), { x: start + i * spacing, y: 147, interactive: true })
-            view.on('pointerdown', () => {
+            actionButton(view, `Take ${view.accessLabel()}`, () => {
                 if (this.rewards.claimed?.includes(index)) return
                 this.claim(index, { cardId: id }); this.render()
             })

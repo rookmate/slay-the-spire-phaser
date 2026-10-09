@@ -1,3 +1,4 @@
+import { access, bindAction } from './accessibility'
 import { orbValues } from '../core/combat/orbs'
 import { characterTexture } from './portraits'
 import { UI_FONT } from './theme'
@@ -116,6 +117,7 @@ export class PlayerDisplay {
             padding: { x: 8, y: 7 },
             backgroundColor: COMBAT_UI_CONFIG.colors.discardBg,
         }).setOrigin(0, 1).setInteractive({ useHandCursor: true }).on('pointerdown', () => this.onOpenDeck?.())
+        bindAction(this.drawIcon, () => this.onOpenDeck?.(), { label: 'Draw pile' })
     }
 
     private createEndTurnButton(): void {
@@ -130,6 +132,7 @@ export class PlayerDisplay {
         this.endTurnButton.setInteractive({ useHandCursor: true }).on('pointerdown', () => this.onEndTurn?.())
             .on('pointerover', () => this.endTurnButton?.setBackgroundColor('#c37d4d'))
             .on('pointerout', () => this.endTurnButton?.setBackgroundColor(COMBAT_UI_CONFIG.colors.endTurnBg))
+        bindAction(this.endTurnButton, () => this.onEndTurn?.(), { label: 'End Turn', enabled: () => this.engine.canAcceptInput() })
     }
 
     private createPowerText(): void {
@@ -138,6 +141,7 @@ export class PlayerDisplay {
             fontSize: '10px',
             color: '#bbbbbb',
         }).setOrigin(0.5, 0).setInteractive({ useHandCursor: true }).on('pointerdown', () => this.onInspect?.())
+        bindAction(this.powerText, () => this.onInspect?.(), { label: 'Inspect player effects' })
     }
 
     private createRelicText(): void {
@@ -164,6 +168,7 @@ export class PlayerDisplay {
                 padding: { x: 6, y: 4 },
             }).setInteractive({ useHandCursor: true })
             text.on('pointerdown', () => this.openPotionMenu(index))
+            bindAction(text, () => this.openPotionMenu(index), { label: `Potion ${index + 1}: ${POTION_DEFS[potion].name}. ${POTION_DEFS[potion].description}`, enabled: () => this.engine.canAcceptInput() })
             this.potionTexts.push(text)
         })
     }
@@ -230,6 +235,7 @@ export class PlayerDisplay {
         this.closePotionMenu()
         const id = this.run.potions[index], def = POTION_DEFS[id]
         const menu = this.scene.add.container(0, 0).setDepth(12000); this.potionMenu = menu
+        access(this.scene).modal(menu, () => this.closePotionMenu())
         menu.add(this.scene.add.rectangle(0, 0, 800, 450, 0, 0.6).setOrigin(0).setInteractive())
         menu.add(this.scene.add.rectangle(200, 80, 400, 200, 0x222222).setOrigin(0).setStrokeStyle(1, 0x777777))
         menu.add(this.scene.add.text(218, 100, `${def.name}${potionMultiplier(this.run, id) === 2 ? ' ×2' : ''}\n\n${def.description}`, { resolution: 2, fontFamily: UI_FONT, fontSize: '16px', color: '#fff', wordWrap: { width: 365 } }))
@@ -244,6 +250,7 @@ export class PlayerDisplay {
             if (enabled) text.setInteractive({ useHandCursor: true }).on('pointerdown', action)
             else text.setAlpha(0.4)
             menu.add(text)
+            bindAction(text, action, { label, enabled: () => enabled })
         })
     }
     getPlayerSprite(): Phaser.GameObjects.Image | undefined {
