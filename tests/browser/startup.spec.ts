@@ -22,7 +22,7 @@ test('character portraits share atlas frames without copied canvas textures', as
     }
     expect(await page.evaluate(() => {
         const textures = window.__testGame.textures
-        return textures.getTextureKeys().filter(key => /^(art:|enemy:|player:)/.test(key)).reduce((sum, key) =>
+        return textures.getTextureKeys().filter(key => /^(art:|enemy:|player:|card-art:)/.test(key)).reduce((sum, key) =>
             sum + textures.get(key).source.reduce((bytes, source) => bytes + source.width * source.height * 4, 0), 0)
     })).toBeLessThanOrEqual(32 * 1024 * 1024)
     expect(errors).toEqual([])

@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { createNewRun } from '../../src/core/run'
-import { boot, clickText, expectScene } from './driver'
+import { boot, clickText, expectScene, inspect } from './driver'
 
 test('an unlocked idle menu performs no storage polling', async ({ page }) => {
     const errors = await boot(page)
@@ -35,6 +35,10 @@ test('repeated Continue cycles release combat views, listeners and animation obj
     const run = createNewRun({ seed: 'runtime-lifetime' }); run.neowCompleted = true
     run.pendingRoom = { scene: 'Combat', roomKind: 'boss' }
     const errors = await boot(page, run)
+    // The game-owned art cache survives scene changes; include its opening-hand
+    // textures in the baseline only after their asynchronous extraction finishes.
+    const openingHand = (await inspect(page)).state!.player.hand.map(card => card.defId)
+    await page.waitForFunction(ids => ids.every(id => window.__testGame.textures.exists(`card-art:${id}`)), openingHand)
     const counts = () => page.evaluate(() => {
         const game = window.__testGame, scene = game.scene.getScene('Combat')
         return {
