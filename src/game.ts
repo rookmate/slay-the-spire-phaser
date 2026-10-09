@@ -28,8 +28,8 @@ import { RunSummaryScene } from './scenes/RunSummary'
 import { DeckBuilderScene } from './scenes/DeckBuilder'
 import { NeowScene } from './scenes/Neow'
 import { BossRelicScene } from './scenes/BossRelic'
-import type { RunState } from './core/run'
-import { advanceRunClock, checkpointRunClock } from './core/runClock'
+import { attachRunClock } from './core/runClock'
+import { attachStorageSync } from './ui/storageSync'
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -59,15 +59,9 @@ export function createGame(): Phaser.Game {
   }
   const game = new Phaser.Game(config)
   attachPhoneLayout(game)
+  attachStorageSync(game)
   attachSound(game)
   attachNotifications(game)
-  let sinceSave = 0
-  game.events.on(Phaser.Core.Events.POST_STEP, (_time: number, delta: number) => {
-    const scene = game.scene.getScenes(true)[0] as Phaser.Scene & { run?: RunState }
-    if (!scene?.run || ['MainMenu', 'RunSummary', 'DeckBuilder'].includes(scene.scene.key) || document.hidden) return
-    advanceRunClock(scene.run, delta)
-    sinceSave += delta
-    if (sinceSave >= 1000) { checkpointRunClock(scene.run); sinceSave = 0 }
-  })
+  attachRunClock(game)
   return game
 }

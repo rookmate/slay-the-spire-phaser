@@ -3,7 +3,7 @@ import { ENEMIES } from '../core/enemies'
 import { ENEMY_ART } from './art/enemies'
 import { notesAt, trackForScene } from './music'
 import { SoundDirector } from './sound'
-import { loadSettings, saveSettings } from '../core/settings'
+import { invalidateSettings, loadSettings, saveSettings } from '../core/settings'
 
 class Gain {
     gain = { setTargetAtTime: vi.fn(), setValueAtTime: vi.fn(), linearRampToValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn() }
@@ -92,6 +92,7 @@ describe('sound lifecycle', () => {
     })
     it('migrates old settings and rejects invalid persisted values', () => {
         localStorage.setItem('sts_settings_v1', JSON.stringify({ sound: 'no', volume: 4, reducedMotion: true }))
+        invalidateSettings()
         expect(loadSettings()).toEqual({ sound: true, volume: 1, reducedMotion: true, music: true, musicVolume: 0.45, effectsVolume: 1 })
     })
 })

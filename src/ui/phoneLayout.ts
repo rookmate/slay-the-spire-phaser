@@ -17,27 +17,31 @@ export function attachPhoneLayout(game: Phaser.Game): void {
     prompt.append(title, detail)
     document.body.append(prompt)
     const paused = new Set<string>()
+    const pauseActiveScenes = () => {
+        for (const scene of game.scene.getScenes(true)) {
+            // Loading must finish before the first playable screen is paused.
+            if (scene.scene.key === 'Boot') continue
+            paused.add(scene.scene.key)
+            scene.scene.pause()
+        }
+    }
     const update = () => {
         const blocked = portrait.matches
         prompt.hidden = !blocked
         app.inert = blocked
+        game.events.off(Phaser.Core.Events.POST_STEP, pauseActiveScenes)
         if (blocked) {
-            for (const scene of game.scene.getScenes(true)) {
-                // Loading must finish before the first playable screen is paused.
-                if (scene.scene.key === 'Boot') continue
-                paused.add(scene.scene.key)
-                scene.scene.pause()
-            }
+            pauseActiveScenes()
+            game.events.on(Phaser.Core.Events.POST_STEP, pauseActiveScenes)
         } else {
             for (const key of paused) if (game.scene.isPaused(key)) game.scene.resume(key)
             paused.clear()
         }
     }
     portrait.addEventListener('change', update)
-    game.events.on(Phaser.Core.Events.POST_STEP, update)
     game.events.once(Phaser.Core.Events.DESTROY, () => {
         portrait.removeEventListener('change', update)
-        game.events.off(Phaser.Core.Events.POST_STEP, update)
+        game.events.off(Phaser.Core.Events.POST_STEP, pauseActiveScenes)
         app.inert = false
         prompt.remove()
     })

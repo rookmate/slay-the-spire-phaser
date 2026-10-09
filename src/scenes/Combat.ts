@@ -42,8 +42,14 @@ export class CombatScene extends Phaser.Scene {
         }
 
         this.ui = new CombatUI(this, this.engine, this.run)
-        this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.ui?.destroy())
-        this.events.once(Phaser.Scenes.Events.DESTROY, () => this.ui?.destroy())
+        const ui = this.ui
+        const cleanup = () => {
+            this.events.off(Phaser.Scenes.Events.SHUTDOWN, cleanup)
+            this.events.off(Phaser.Scenes.Events.DESTROY, cleanup)
+            ui.destroy()
+        }
+        this.events.once(Phaser.Scenes.Events.SHUTDOWN, cleanup)
+        this.events.once(Phaser.Scenes.Events.DESTROY, cleanup)
 
         this.ui.onOpenMenu(() => {
             this.ui.clearTransientInput()

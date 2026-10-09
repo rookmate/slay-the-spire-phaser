@@ -129,6 +129,8 @@ interaction measurements, not field INP; actual frame intervals and long tasks
 are reported separately. Software graphics, CPU throttling and automation do
 not establish physical-phone FPS, battery use or field Core Web Vitals compliance.
 
+Idle work is event-driven: settings are cached as independent snapshots and refresh on saves, imports, and cross-tab changes; notifications have no polling timer. The active run clock checkpoints every five seconds and flushes when paused, hidden, or leaving the page. A sudden process crash can lose up to five seconds of elapsed time. Clock checkpoints preserve the room-entry inventory, stop during profile recovery, and reject stale writers after a foreign replacement. Browser regressions check zero idle storage reads and stable view, texture, and listener counts across repeated combat entry.
+
 ## Remaining differences
 
 The original artwork and audio, official daily leaderboards, platform
