@@ -168,7 +168,7 @@ Presentation uses painted backgrounds, character portraits, and 372 distinct car
 
 Targeted cards stay lifted in the hand while a curved arrow marks the selected enemy. Keyboard selection uses the same aiming display. Release over an enemy to play, or press Escape to cancel. Untargeted cards follow your drag and show when they are ready to play. Reduced motion removes card travel, shakes, flashes, and impact motion.
 
-Hover a card, tap its `?`, or press Alt+1–0 in combat to read its complete rules. Escape closes hand inspection. The inspection button also works on locked cards and inside card-choice dialogs.
+Card titles and rules use measured font sizing to fit their available space without truncation. Rules use 10–12 px across the base and upgraded catalog; extreme combat values can shrink further. Hover a card, tap its `?`, or press Alt+1–0 in combat for a larger view of its complete rules. Escape closes hand inspection. The inspection button also works on locked cards and inside card-choice dialogs.
 
 Achievements are local to this browser profile. The 46-entry catalog is available from the main menu. Standard runs qualify; the Daily win achievement is the exception. Seeded and custom runs do not earn the other achievements. Combat milestones persist when earned, and unlock notices appear once. The achievement browser shows earned dates, filter counts, and explicit locked states. Run History includes the recorded date, mode, Ascension, cleared acts, exact play time, seed, upgraded deck, and relic descriptions. Existing run history is not used to infer old combat achievements. The catalog follows the [Steam achievement list](https://steamcommunity.com/stats/646570/achievements?l=english).
 
