@@ -10,7 +10,7 @@ for (const name of assets.filter(name => /\.(js|css)$/.test(name))) {
     const data = await readFile(`dist/assets/${name}`)
     compressedBytes += gzipSync(data).length; rawBytes += data.length
 }
-for (const name of ['characters', 'spire', 'battle', 'cards']) {
+for (const name of ['characters', 'spire', 'battle', 'cards-detailed']) {
     const bytes = (await readFile(`dist/art/${name}.webp`)).length
     compressedBytes += bytes; rawBytes += bytes
 }

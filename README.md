@@ -150,7 +150,7 @@ its background/focus throttling prevents a reliable desktop FPS claim.
 
 The original artwork and audio, official daily leaderboards, platform
 integrations, and cloud saves are not reproduced. Enemy portraits are simplified,
-and cards share a small illustration atlas. Scores, rare event eligibility, and modifier combinations
+and cards share an illustration atlas with 32 dedicated starter and signature-card paintings plus class/type fallbacks. Scores, rare event eligibility, and modifier combinations
 still need broader comparison with the original. The test suite covers many
 interactions, not every possible card/relic/enemy combination.
 
@@ -164,7 +164,7 @@ Rules were checked against original-game references for
 [potions](https://slaythespire.wiki.gg/wiki/Potions), and
 [custom modes](https://slaythespire.wiki.gg/wiki/Custom_Mode).
 
-Presentation uses painted backgrounds, character portraits, and shared card illustrations, with SVG portraits for all 68 enemy IDs. The map uses room symbols and a scrollable route. Barlow fonts ship as WOFF2, converted losslessly with `ttf2woff2@8.0.1`, under the SIL Open Font License in `public/fonts/OFL.txt`; generated artwork and its prompts are recorded in [`public/art/sources.json`](public/art/sources.json). Each act has a synthesized musical theme. Settings control master, music, and effects volume separately. Audio starts after a click or keypress and pauses in hidden tabs.
+Presentation uses painted backgrounds, character portraits, and a 32-frame card atlas (358,530 bytes and 4.5 MiB texture backing), with SVG portraits for all 68 enemy IDs. The map uses room symbols and a scrollable route. Barlow fonts ship as WOFF2, converted losslessly with `ttf2woff2@8.0.1`, under the SIL Open Font License in `public/fonts/OFL.txt`; generated artwork and its prompts are recorded in [`public/art/sources.json`](public/art/sources.json). Each act has a synthesized musical theme. Settings control master, music, and effects volume separately. Audio starts after a click or keypress and pauses in hidden tabs.
 
 Targeted cards stay lifted in the hand while a curved arrow marks the selected enemy. Keyboard selection uses the same aiming display. Release over an enemy to play, or press Escape to cancel. Untargeted cards follow your drag and show when they are ready to play. Reduced motion removes card travel, shakes, flashes, and impact motion.
 

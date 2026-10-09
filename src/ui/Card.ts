@@ -1,3 +1,4 @@
+import { cardArtFrame } from './art/cards'
 import { access, bindAction } from './accessibility'
 import { UI_FONT } from './theme'
 import { cardDescription } from '../core/cardText'
@@ -12,11 +13,6 @@ const colors = { ironclad: 0x693c30, silent: 0x37452b, defect: 0x345354, watcher
 
 function cardColor(def: ReturnType<typeof resolveCard>): number {
     return def.type === 'curse' ? 0x655068 : def.type === 'status' ? 0x646466 : colors[def.color ?? 'colorless']
-}
-function artFrame(card: CardInstance, def: ReturnType<typeof resolveCard>): number {
-    return /DEFEND|SURVIVOR|VIGILANCE|SHRUG|ARMAMENTS|IMPERVIOUS|ENTRENCH|METALLICIZE/.test(card.defId) ? 1
-        : def.color === 'silent' ? 2 : def.color === 'defect' ? 4 : def.color === 'watcher' ? 5
-            : def.type === 'attack' ? 0 : def.type === 'power' ? 3 : 1
 }
 
 export class Card extends Phaser.GameObjects.Container {
@@ -48,7 +44,7 @@ export class Card extends Phaser.GameObjects.Container {
         const bg = scene.add.rectangle(0, 0, w, h, 0x211e18).setOrigin(0)
         this.add(bg)
         if (scene.textures.exists('art:cards')) {
-            this.art = scene.add.image(w / 2, 67, 'art:cards', artFrame(card, def)).setDisplaySize(w - 8, w - 8)
+            this.art = scene.add.image(w / 2, 67, 'art:cards', cardArtFrame(card, def)).setDisplaySize(w - 8, w - 8)
             this.add(this.art)
         }
         const header = this.header = scene.add.rectangle(0, 0, w, 36, color).setOrigin(0)
@@ -90,8 +86,8 @@ export class Card extends Phaser.GameObjects.Container {
         this.typeText.setText(`${def.type}${def.rarity && def.rarity !== 'basic' ? ` · ${def.rarity}` : ''}`)
         const color = cardColor(def)
         if (this.header.fillColor !== color) this.header.setFillStyle(color)
-        const frame = artFrame(card, def)
-        if (this.art && String(this.art.frame.name) !== String(frame)) this.art.setFrame(frame)
+        const frame = cardArtFrame(card, def)
+        if (this.art && String(this.art.frame.name) !== String(frame)) this.art.setFrame(frame).setDisplaySize(Card.CARD_WIDTH - 8, Card.CARD_WIDTH - 8)
         this.borderColor = def.rarity === 'rare' ? 0xd3b36a : def.rarity === 'uncommon' ? 0x9dbaae : 0x8c7958
         this.setDescription(cardDescription(card, this.engine))
     }
