@@ -116,7 +116,9 @@ test('targeted potions focus the enemy and repeated menu renders dispose old con
     await activate(page, page.getByRole('button', { name: 'Main menu', exact: true }))
     for (let i = 0; i < 4; i++) {
         await activate(page, page.getByRole('button', { name: 'Seeded', exact: true }))
-        await activate(page, page.getByRole('button', { name: 'Standard', exact: true }))
+        await page.keyboard.press('Shift+Tab')
+        await expect(page.getByRole('button', { name: 'Standard', exact: true })).toBeFocused()
+        await page.keyboard.press('Enter')
         await expect(page.getByRole('button', { name: 'Help', exact: true })).toHaveCount(1)
         await expect(page.locator('.game-access')).toHaveCount(1)
     }
