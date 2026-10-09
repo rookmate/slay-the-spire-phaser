@@ -1,6 +1,6 @@
 import { CARD_DEFS, RANDOM_CURSE_IDS, canRemoveCard, canUpgradeCard, createCardInstance, createCardCopy } from '../cards'
 import { selectCardPool } from '../contentPools'
-import { changeMaxHp, gainGold, healRun } from '../health'
+import { changeMaxHp, gainGold, healRun, loseRunHp } from '../health'
 import type { MetaState } from '../meta'
 import { getCharacterProgress } from '../meta'
 import { applyRelicAcquisition, blocksPotionGain } from '../relics'
@@ -60,7 +60,7 @@ export function upgradeRandomCards(run: RunState, rng: RNG, count: number): void
 export function resolveAdditionalEvent(run: RunState, meta: MetaState, id: string, rng: RNG, result: EventResolution, selected?: CardInstance): boolean {
     const state = run.eventState!, notes = result.notes
     const worse = (a: number, b: number) => run.asc >= 15 ? b : a
-    const damage = (amount: number) => { run.player.hp = Math.max(0, run.player.hp - amount); notes.push(`Lost ${amount} HP.`) }
+    const damage = (amount: number) => { notes.push(`Lost ${loseRunHp(run, amount)} HP.`) }
     const relic = (id = drawRelic(rng, meta, run)) => { applyRelicAcquisition(run, id); notes.push(`Obtained ${id.toLowerCase().replaceAll('_', ' ')}.`) }
     const offerPotions = (count: number, resume = false) => {
         if (blocksPotionGain(run)) return

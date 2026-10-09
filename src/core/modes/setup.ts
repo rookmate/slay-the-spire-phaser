@@ -62,7 +62,7 @@ export function createProfileRun(meta: MetaState, options: NewRunOptions & { mod
         run.startingDraft = { kind: sealed ? 'sealed' : 'draft', remaining: sealed ? 10 : 15, picked: 0, choices: draftChoices(run, sealed ? 30 : 3, `${run.seed}-draft-0`) }
     }
     if (hasModifier(run, 'SPECIALIZED')) { const id = random(); for (let i = 0; i < 5; i++) obtainCard(run, id) }
-    if (hasModifier(run, 'ALL_STAR') && !run.startingDraft) {
+    if (hasModifier(run, 'ALL_STAR')) {
         const colorless = selectCardPool({ character, source: 'colorless' })
         for (let i = 0; i < 5; i++) obtainCard(run, random(colorless))
     }

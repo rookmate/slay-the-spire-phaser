@@ -1,6 +1,7 @@
 import type { Engine } from '../engine'
 import type { EnemyState, PlayerState } from '../state'
 import { powerAmount } from '../combatMath'
+import { reduceHpLoss } from '../health'
 
 export function hpLossAmount(engine: Engine, target: PlayerState | EnemyState, incoming: number, attack = false, bypassIntangible = false): number {
     let amount = Math.max(0, incoming)
@@ -12,7 +13,7 @@ export function hpLossAmount(engine: Engine, target: PlayerState | EnemyState, i
     if (target === engine.state.player) {
         const relics: readonly string[] = engine.run?.relics ?? []
         if (attack && amount > 0 && amount <= 5 && relics.includes('TORII')) amount = 1
-        if (relics.includes('TUNGSTEN_ROD')) amount = Math.max(0, amount - 1)
+        amount = reduceHpLoss(relics, amount)
     }
     if ('specId' in target && target.specId === 'CORRUPT_HEART')
         amount = Math.min(amount, Math.max(0, ((target.asc ?? 0) >= 19 ? 200 : 300) - Number(target.aiState?.damageThisTurn ?? 0)))

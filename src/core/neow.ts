@@ -1,7 +1,7 @@
 import { CARD_DEFS, RANDOM_CURSE_IDS, canRemoveCard, canUpgradeCard, getUnlockedCollectibleCards } from './cards'
 import { CHARACTERS } from './characters'
 import { transformCard } from './events'
-import { changeMaxHp, gainGold } from './health'
+import { changeMaxHp, gainGold, loseRunHp } from './health'
 import type { MetaState } from './meta'
 import { applyRelicAcquisition } from './relics'
 import { cardChoices, drawBossRelics, drawPotion, drawRelic } from './rewardPools'
@@ -54,7 +54,7 @@ export function applyNeowOption(run: RunState, meta: MetaState, selected: NeowOp
     const rng = new RNG(`${run.neowSeed}-${selected.id}`)
     if (selected.drawback === 'GOLD') run.gold = 0
     if (selected.drawback === 'MAX_HP') changeMaxHp(run, -Math.floor(run.player.maxHp * 0.1))
-    if (selected.drawback === 'DAMAGE') run.player.hp -= Math.floor(run.player.hp / 10) * 3
+    if (selected.drawback === 'DAMAGE') loseRunHp(run, Math.floor(run.player.hp / 10) * 3)
     if (selected.drawback === 'CURSE') {
         obtainCurse(run, RANDOM_CURSE_IDS[rng.int(0, RANDOM_CURSE_IDS.length - 1)])
     }

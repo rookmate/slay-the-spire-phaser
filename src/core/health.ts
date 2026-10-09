@@ -1,6 +1,17 @@
 import { hasMuzzle } from './modes/endless'
 import type { RunState } from './run'
 
+export function reduceHpLoss(relics: readonly string[], amount: number): number {
+    return Math.max(0, amount - (relics.includes('TUNGSTEN_ROD') ? 1 : 0))
+}
+
+/** Non-combat HP payments use the same relic reduction as combat HP loss. */
+export function loseRunHp(run: RunState, amount: number): number {
+    const lost = Math.min(run.player.hp, reduceHpLoss(run.relics, amount))
+    run.player.hp -= lost
+    return lost
+}
+
 export function healRun(run: RunState, amount: number): number {
     if (run.relics.includes('MARK_OF_THE_BLOOM') || run.player.hp <= 0) return 0
     const healed = Math.max(0, Math.min(Math.floor(amount * (hasMuzzle(run) ? 0.5 : 1)), run.player.maxHp - run.player.hp))
