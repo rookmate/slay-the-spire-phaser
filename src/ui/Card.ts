@@ -73,7 +73,9 @@ export class Card extends Phaser.GameObjects.Container {
         this.description = scene.add.text(10, 105, '', { resolution: 2, fontFamily: UI_FONT, fontSize: '12px', color: '#2d281f', wordWrap: { width: w - 20 }, lineSpacing: 0 }).setResolution(2)
         this.inspectHint = scene.add.text(9, h - 14, opts.locked ? 'Locked' : '', { resolution: 2, fontFamily: UI_FONT, fontSize: '9px', color: '#705531' }).setResolution(2)
         this.add([header, paper, title, costDisc, cost, type, this.description, this.inspectHint, this.border])
-        const inspect = scene.add.text(w - 23, h - 14, '?', { resolution: 2, fontFamily: UI_FONT, fontSize: '11px', fontStyle: 'bold', color: '#644923', padding: { x: 5, y: 0 } }).setResolution(2).setInteractive({ useHandCursor: true })
+        const inspect = scene.add.text(w - 23, h - 14, '?', { resolution: 2, fontFamily: UI_FONT, fontSize: '11px', fontStyle: 'bold', color: '#644923', padding: { x: 5, y: 0 } }).setResolution(2).setInteractive({
+            hitArea: new Phaser.Geom.Rectangle(-1, -10, 24, 24), hitAreaCallback: Phaser.Geom.Rectangle.Contains, useHandCursor: true,
+        })
         inspect.on('pointerdown', (_pointer: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => { event?.stopPropagation(); this.showDetails(!this.detail) })
         this.add(inspect)
         bindAction(inspect, () => this.showDetails(true, true), { id: `inspect:${card.instanceId}`, label: () => `Inspect ${this.accessLabel()}` })

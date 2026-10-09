@@ -78,8 +78,9 @@ test('refresh restores larger text and long cards remain inspectable at shop sca
     await page.setViewportSize({ width: 844, height: 390 })
     await page.screenshot({ path: 'test-results/card-text-phone.png' })
     const ui = await inspect(page), lesson = ui.cards.find(card => card.defId === 'LESSON_LEARNED')!
-    await page.touchscreen.tap(ui.canvas.x + (lesson.x + lesson.width * 110 / 120) * ui.canvas.scaleX,
-        ui.canvas.y + (lesson.y + lesson.height * 170 / 180) * ui.canvas.scaleY)
+    // Tap the corner's hit area, outside the smaller question-mark glyph.
+    await page.touchscreen.tap(ui.canvas.x + (lesson.x + lesson.width * 116 / 120) * ui.canvas.scaleX,
+        ui.canvas.y + (lesson.y + lesson.height * 160 / 180) * ui.canvas.scaleY)
     const detail = (await inspect(page)).texts.filter(text => text.depth === 5900)
     expect(detail.some(text => text.text.includes('permanently upgrade') && text.text.includes('Exhaust.'))).toBe(true)
     for (const text of detail) { expect(text.y).toBeGreaterThanOrEqual(0); expect(text.y + text.height).toBeLessThanOrEqual(450) }
