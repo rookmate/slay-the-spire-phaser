@@ -5,6 +5,7 @@ import { ProfileScene } from './scenes/Profile'
 import { recoverProfileImport } from './core/profile/storage'
 import { attachNotifications } from './ui/notifications'
 import { attachSound } from './ui/sound'
+import { attachPhoneLayout } from './ui/phoneLayout'
 import { ChestScene } from './scenes/Chest'
 import { InventoryScene } from './scenes/Inventory'
 import { SettingsScene } from './scenes/Settings'
@@ -51,8 +52,13 @@ const config: Phaser.Types.Core.GameConfig = {
 
 export function createGame(): Phaser.Game {
   try { recoverProfileImport() }
-  catch { return new Phaser.Game({ ...config, scene: [ProfileRecoveryScene] }) }
+  catch {
+    const game = new Phaser.Game({ ...config, scene: [ProfileRecoveryScene] })
+    attachPhoneLayout(game)
+    return game
+  }
   const game = new Phaser.Game(config)
+  attachPhoneLayout(game)
   attachSound(game)
   attachNotifications(game)
   let sinceSave = 0

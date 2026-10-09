@@ -3,8 +3,21 @@
 @font-face { font-family: 'Barlow Condensed'; src: url('/fonts/BarlowCondensed-SemiBold.ttf') format('truetype'); font-weight: 400 900; font-display: swap; }
 
 :root { color-scheme: dark; font-family: Barlow, sans-serif; color: #f0e7d3; background: #0c0d0b; }
-html, body, #app { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
-body { min-width: 280px; }
+html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
+body { min-width: 280px; overscroll-behavior: none; }
+#app {
+    position: fixed;
+    top: env(safe-area-inset-top, 0px);
+    left: env(safe-area-inset-left, 0px);
+    width: calc(100% - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px));
+    height: calc(100% - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+    height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+    overflow: hidden;
+}
+.rotate-prompt { position: fixed; inset: 0; z-index: 100; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 32px; background: #151512; text-align: center; }
+.rotate-prompt[hidden] { display: none; }
+.rotate-prompt h1 { margin: 0 0 16px; font: 600 36px 'Barlow Condensed', sans-serif; color: #dfbd7f; }
+.rotate-prompt p { max-width: 260px; margin: 0; font-size: 18px; line-height: 1.5; }
 canvas { display: block; touch-action: none; }
 input { box-sizing: border-box; font: 16px Barlow, sans-serif; color: #f0e7d3; background: #24231e; border: 1px solid #76613f; border-radius: 3px; padding: 8px 10px; }
 input:focus-visible { outline: 2px solid #dfbd7f; outline-offset: 2px; }
