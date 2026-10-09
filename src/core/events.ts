@@ -4,7 +4,7 @@ import { cardColors } from './modes/modifiers'
 import type { Act } from './acts'
 import { CARD_DEFS, RANDOM_CURSE_IDS, canRemoveCard, canUpgradeCard, createCardCopy } from './cards'
 import { ACT_BOSSES, bossEncounter } from './encounters'
-import { changeMaxHp, gainGold, healRun } from './health'
+import { changeMaxHp, gainGold, healRun, loseRunHp } from './health'
 import { getRunMap } from './map'
 import type { MetaState } from './meta'
 import { applyRelicAcquisition, getCardRewardChoiceCount, RELIC_DEFS } from './relics'
@@ -83,7 +83,7 @@ export function resolveEventChoice(run: RunState, meta: MetaState, eventId: Even
     const notes: string[] = []
     const result: EventResolution = { notes }
     const worse = (normal: number, high: number) => run.asc >= 15 ? high : normal
-    const damage = (amount: number) => { run.player.hp = Math.max(0, run.player.hp - amount); notes.push(`Lost ${amount} HP.`) }
+    const damage = (amount: number) => { notes.push(`Lost ${loseRunHp(run, amount)} HP.`) }
     const heal = (amount: number) => { notes.push(`Healed ${healRun(run, amount)} HP.`) }
     const gold = (amount: number) => { gainGold(run, amount); notes.push(`Gained ${amount} Gold.`) }
     const relic = (rare = false) => { const id = drawRelic(rng, meta, run, rare ? 'rare' : undefined); applyRelicAcquisition(run, id); notes.push(`Obtained ${RELIC_DEFS[id].name}.`) }
