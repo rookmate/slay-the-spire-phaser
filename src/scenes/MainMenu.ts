@@ -26,6 +26,9 @@ export class MainMenuScene extends Phaser.Scene {
         if (this.mode === 'custom' && !meta.customUnlocked) { this.mode = 'standard'; this.modifiers = [] }
         this.replaceConfirmed = false
         this.render()
+        if (!performance.getEntriesByName('spire:menu-ready').length) {
+            this.game.events.once(Phaser.Core.Events.POST_RENDER, () => performance.mark('spire:menu-ready'))
+        }
     }
     private render(): void {
         this.seedInput?.destroy(); this.seedInput = undefined

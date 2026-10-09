@@ -42,15 +42,24 @@ export class HandManager {
         this.onCardDrag = callback
     }
 
-    rebuildHand(): void {
+    refreshHand(): void {
         this.selectedCard = undefined
-        this.handCards.forEach(card => this.scene.tweens.killTweensOf(card))
-        this.handContainer.removeAll(true)
+        const previous = new Map(this.handCards.map(card => [card.getCardInstance().instanceId, card]))
         this.handCards = this.engine.state.player.hand.map(instance => {
-            const card = new Card(this.scene, instance, { x: 0, y: 0, engine: this.engine })
-            this.handContainer.add(card)
+            let card = previous.get(instance.instanceId)
+            if (card) {
+                previous.delete(instance.instanceId)
+                card.refresh(instance)
+            } else {
+                card = new Card(this.scene, instance, { x: 0, y: 0, engine: this.engine })
+                this.handContainer.add(card)
+            }
             return card
         })
+        for (const card of previous.values()) {
+            this.scene.tweens.killTweensOf(card)
+            this.handContainer.remove(card, true)
+        }
         const { hand } = combatLayout(this.scene.scale.width, this.scene.scale.height)
         this.handInputArea.setPosition(hand.x, hand.y - HAND_HOVER_LIFT)
             .setSize(hand.width, hand.height + HAND_HOVER_LIFT)
@@ -65,6 +74,7 @@ export class HandManager {
     private layoutHand(hovered: number | null, animate = true): void {
         this.currentHoverIndex = hovered
         const positions = handPositions(this.scene.scale.width, this.scene.scale.height, this.handCards.length, hovered)
+        const reducedMotion = loadSettings().reducedMotion
         this.handCards.forEach((card, index) => {
             this.scene.tweens.killTweensOf(card)
             card.showDetails(!this.selectedCard && index === hovered)
@@ -72,7 +82,7 @@ export class HandManager {
             card.setDimmed(!!this.selectedCard && card !== this.selectedCard)
             this.handContainer.bringToTop(card)
             card.setDepth(index === hovered ? COMBAT_UI_CONFIG.depths.handHover : index)
-            if (animate && !loadSettings().reducedMotion) this.scene.tweens.add({ targets: card, ...positions[index], duration: 150, ease: 'Cubic.Out' })
+            if (animate && !reducedMotion) this.scene.tweens.add({ targets: card, ...positions[index], duration: 150, ease: 'Cubic.Out' })
             else card.setPosition(positions[index].x, positions[index].y)
         })
         if (hovered !== null) this.handContainer.bringToTop(this.handCards[hovered])
