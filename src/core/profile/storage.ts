@@ -1,8 +1,9 @@
+import { emitStorageChange, META_CHANGED, PROFILE_REPLACED } from '../storageEvents'
 import { migrateEncounterState } from '../encounterState'
 import { z } from 'zod'
 import { createDefaultMeta, getCharacterProgress } from '../meta'
 import { CHARACTER_IDS } from '../characters'
-import { loadSettings, SETTINGS_CHANGED } from '../settings'
+import { invalidateSettings, loadSettings, SETTINGS_CHANGED } from '../settings'
 import { profileSchema, type Profile } from './schema'
 
 export const PROFILE_KEYS = ['sts_meta_v2', 'sts_run_v7', 'sts_settings_v1'] as const
@@ -61,12 +62,19 @@ function restore(storage: Storage, saved: Snapshot): void {
     for (const key of PROFILE_KEYS) storage.removeItem(key)
     for (const key of PROFILE_KEYS) if (saved[key] !== null) storage.setItem(key, saved[key])
 }
+function publishReplacement(): void {
+    invalidateSettings()
+    emitStorageChange(PROFILE_REPLACED)
+    emitStorageChange(SETTINGS_CHANGED)
+    emitStorageChange(META_CHANGED)
+}
 export function recoverProfileImport(storage: Storage = localStorage): void {
     const raw = storage.getItem(JOURNAL_KEY)
     if (!raw) return
     const saved = snapshotSchema.parse(JSON.parse(raw))
     restore(storage, saved)
     storage.removeItem(JOURNAL_KEY)
+    publishReplacement()
 }
 export function importProfile(profile: Profile, storage: Storage = localStorage): void {
     const validated = parseProfile(JSON.stringify(profile))
@@ -85,7 +93,8 @@ export function importProfile(profile: Profile, storage: Storage = localStorage)
     } catch {
         try { restore(storage, previous); storage.removeItem(JOURNAL_KEY) }
         catch { throw new Error('Import failed. The original profile is in the recovery journal; reload to retry recovery.') }
+        publishReplacement()
         throw new Error('Import failed. Your previous profile was restored. Check available browser storage.')
     }
-    if (typeof window !== 'undefined') window.dispatchEvent(new Event(SETTINGS_CHANGED))
+    publishReplacement()
 }

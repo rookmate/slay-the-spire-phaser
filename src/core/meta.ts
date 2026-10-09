@@ -1,3 +1,4 @@
+import { emitStorageChange, META_CHANGED } from './storageEvents'
 import { clampAscension, MAX_ASCENSION } from './ascension'
 import { CHARACTERS, CHARACTER_IDS, type CharacterId } from './characters'
 import type { CardInstance } from './state'
@@ -35,7 +36,7 @@ export interface MetaState {
     unlockedCardIds: string[]
     unlockedRelicIds: RelicId[]
 }
-const META_KEY = 'sts_meta_v2'
+export const META_KEY = 'sts_meta_v2'
 export function createDefaultMeta(): MetaState {
     return { version: 3, bestAscensionUnlocked: 0, totalWins: 0, totalRuns: 0, ironcladUnlockTier: 0, unlockedCardIds: [], unlockedRelicIds: [], history: [] }
 }
@@ -71,7 +72,10 @@ export function loadMeta(): MetaState {
         return meta
     } catch { return createDefaultMeta() }
 }
-export function saveMeta(meta: MetaState): void { localStorage.setItem(META_KEY, JSON.stringify(meta)) }
+export function saveMeta(meta: MetaState): void {
+    localStorage.setItem(META_KEY, JSON.stringify(meta))
+    emitStorageChange(META_CHANGED)
+}
 export function getSelectableAscensions(meta: MetaState, character: CharacterId = 'ironclad'): number[] {
     return Array.from({ length: getCharacterProgress(meta, character).ascension + 1 }, (_, index) => index)
 }

@@ -29,6 +29,7 @@ export class SoundDirector {
     private voices = new Map<OscillatorNode, 'music' | 'effect'>()
     private lastCue = new Map<SoundCue, number>()
     private disposed = false
+    private settings = loadSettings()
 
     unlock = (): void => {
         if (this.disposed || typeof AudioContext === 'undefined') return
@@ -40,14 +41,15 @@ export class SoundDirector {
                 this.effectsGain = this.context.createGain(); this.effectsGain.connect(this.master)
                 this.nextTime = this.context.currentTime + 0.03
                 this.timer = setInterval(this.schedule, 100)
+                this.applySettings()
             }
-            this.applySettings()
             if (!document.hidden && this.context.state === 'suspended') void this.context.resume().catch(() => {})
         } catch { /* Devices without audio still support gameplay. */ }
     }
     applySettings = (): void => {
+        this.settings = loadSettings()
         if (!this.context) return
-        const settings = loadSettings(), now = this.context.currentTime
+        const settings = this.settings, now = this.context.currentTime
         this.master!.gain.setTargetAtTime(settings.sound ? settings.volume : 0, now, 0.02)
         this.musicGain!.gain.setTargetAtTime(settings.music ? settings.musicVolume : 0, now, 0.02)
         this.effectsGain!.gain.setTargetAtTime(settings.effectsVolume, now, 0.02)
@@ -66,7 +68,7 @@ export class SoundDirector {
     }
     cue(kind: SoundCue): void {
         this.unlock()
-        const context = this.context, settings = loadSettings()
+        const context = this.context, settings = this.settings
         if (!context || context.state !== 'running' || document.hidden || !settings.sound || !settings.effectsVolume) return
         if (context.currentTime - (this.lastCue.get(kind) ?? -1) < 0.08) return
         this.lastCue.set(kind, context.currentTime)
@@ -74,7 +76,7 @@ export class SoundDirector {
         cue.pitches.forEach((pitch, i) => this.note(pitch, context.currentTime + i * cue.duration * 0.5, cue.duration, 0.09, cue.voice, 'effect'))
     }
     private schedule = (): void => {
-        const context = this.context, settings = loadSettings()
+        const context = this.context, settings = this.settings
         if (!context || context.state !== 'running' || document.hidden || !settings.sound || !settings.music || !settings.musicVolume) return
         if (this.nextTime < context.currentTime) this.nextTime = context.currentTime + 0.03
         const beat = beatDuration(this.track)
@@ -112,13 +114,15 @@ export function attachSound(game: Phaser.Game): void {
     document.addEventListener('keydown', sound.unlock)
     document.addEventListener('visibilitychange', sound.visibility)
     window.addEventListener(SETTINGS_CHANGED, sound.applySettings)
-    game.events.on('poststep', () => {
+    const updateTrack = () => {
         const scene = game.scene.getScenes(true)[0] as Phaser.Scene & { run?: RunState; roomKind?: string }
         if (scene) sound.setTrack(trackForScene(scene.scene.key, scene.run?.act, scene.roomKind === 'boss'))
-    })
+    }
+    game.events.on('poststep', updateTrack)
     game.events.once('destroy', () => {
         document.removeEventListener('pointerdown', sound.unlock); document.removeEventListener('keydown', sound.unlock)
         document.removeEventListener('visibilitychange', sound.visibility); window.removeEventListener(SETTINGS_CHANGED, sound.applySettings)
+        game.events.off('poststep', updateTrack)
         sound.destroy(); if (active === sound) active = undefined
     })
 }
