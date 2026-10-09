@@ -1,3 +1,5 @@
+import { openHelp } from '../scenes/Help'
+import { combatHelp } from './help/combat'
 import { UI_FONT } from './theme'
 import { combatLayout } from './layout'
 import type Phaser from 'phaser'
@@ -15,6 +17,7 @@ const titles: Record<Pile, string> = {
 
 export class OverlayManager {
     private overlay?: Phaser.GameObjects.Container
+    private helpOpen = false
     private pile?: Pile
     private buttons: Phaser.GameObjects.Text[] = []
     private onOpen?: () => void
@@ -38,6 +41,13 @@ export class OverlayManager {
         }
         this.resizeHandler()
         scene.scale.on('resize', this.resizeHandler)
+    }
+
+    openStatus(entityId?: string): void {
+        this.onOpen?.()
+        this.close()
+        this.helpOpen = true
+        openHelp(this.scene, combatHelp(this.engine, entityId), () => { this.helpOpen = false })
     }
 
     openDiscardOverlay(): void { this.togglePile('discardPile') }
@@ -67,7 +77,7 @@ export class OverlayManager {
     }
 
     refreshOverlays(): void { if (this.pile) this.showPile(this.pile) }
-    isOpen(): boolean { return !!this.overlay }
+    isOpen(): boolean { return !!this.overlay || this.helpOpen }
 
     close(): void {
         this.overlay?.destroy(true)

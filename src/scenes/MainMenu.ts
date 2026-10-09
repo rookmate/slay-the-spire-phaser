@@ -1,3 +1,4 @@
+import { openHelp } from './Help'
 import { characterTexture } from '../ui/portraits'
 import Phaser from 'phaser'
 import { createNewRun, loadRun, saveRun } from '../core/run'
@@ -100,6 +101,6 @@ export class MainMenuScene extends Phaser.Scene {
         this.add.rectangle(24, 410, 752, 1, palette.line).setOrigin(0)
         const links: [string, string][] = [['Card Library', 'DeckBuilder'], ['Run History', 'RunHistory'], ['Achievements', 'Achievements'], ['Settings', 'Settings']]
         links.forEach(([title, scene], i) => menuButton(this, 24 + i * 150, 414, title, () => this.scene.start(scene, scene === 'DeckBuilder' ? { run: saved ?? createNewRun() } : undefined), true, { quiet: true, width: 136 }).setFontSize(14))
-        this.add.text(775, 428, 'A fan recreation', { ...menuText, fontSize: '11px', color: '#998d77' }).setOrigin(1, 0.5).setResolution(2)
+        menuButton(this, 648, 414, 'Help', () => openHelp(this), true, { quiet: true, width: 104 }).setFontSize(14)
     }
 }

@@ -1,3 +1,4 @@
+import { orbValues } from '../core/combat/orbs'
 import { characterTexture } from './portraits'
 import { UI_FONT } from './theme'
 import { CHARACTERS } from '../core/characters'
@@ -29,6 +30,8 @@ export class PlayerDisplay {
     private potionKey = ''
     private potionTexts: Phaser.GameObjects.Text[] = []
 
+    private onInspect?: () => void
+    setOnInspect(callback: () => void): void { this.onInspect = callback }
     private onEndTurn?: () => void
     private onOpenDeck?: () => void
     private onUsePotion?: (index: number) => void
@@ -134,7 +137,7 @@ export class PlayerDisplay {
             resolution: 2, fontFamily: UI_FONT,
             fontSize: '10px',
             color: '#bbbbbb',
-        }).setOrigin(0.5, 0)
+        }).setOrigin(0.5, 0).setInteractive({ useHandCursor: true }).on('pointerdown', () => this.onInspect?.())
     }
 
     private createRelicText(): void {
@@ -185,8 +188,8 @@ export class PlayerDisplay {
     }
 
     private getPlayerPowers(): string {
-        if (this.engine.state.player.powers.length === 0) return ''
-        return summarizeEffects(this.engine.state.player.powers.map(power => `${power.id}:${power.stacks}`), 32)
+        if (this.engine.state.player.powers.length === 0) return 'Effects ?'
+        return `Effects ? ${summarizeEffects(this.engine.state.player.powers.filter(power => power.id !== 'COMBUST_HP_LOSS').map(power => `${power.id}:${power.stacks}`), 22)}`
     }
 
     private getPlayerDetails(): string {
@@ -213,8 +216,7 @@ export class PlayerDisplay {
         if (player.orbSlots) {
             const focus = powerAmount(player, 'FOCUS')
             lines.push(player.orbs.map(orb => {
-                const passive = orb.type === 'plasma' ? 1 : Math.max(0, (orb.type === 'frost' ? 2 : orb.type === 'dark' ? 6 : 3) + focus)
-                const evoke = orb.type === 'dark' ? orb.storedDamage : orb.type === 'plasma' ? 2 : Math.max(0, (orb.type === 'frost' ? 5 : 8) + focus)
+                const { passive, evoke } = orbValues(orb, focus)
                 return `${orb.type[0].toUpperCase()} ${passive}/${evoke}`
             }).concat(Array.from({ length: player.orbSlots - player.orbs.length }, () => '○')).join(' · '))
         }

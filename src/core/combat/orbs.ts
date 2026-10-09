@@ -2,6 +2,13 @@ import type { Engine } from '../engine'
 import { powerAmount } from '../combatMath'
 import type { OrbState, OrbType } from './resources'
 
+export function orbValues(orb: OrbState, focus: number): { passive: number; evoke: number } {
+    return {
+        passive: orb.type === 'plasma' ? 1 : Math.max(0, (orb.type === 'frost' ? 2 : orb.type === 'dark' ? 6 : 3) + focus),
+        evoke: orb.type === 'dark' ? orb.storedDamage : orb.type === 'plasma' ? 2 : Math.max(0, (orb.type === 'frost' ? 5 : 8) + focus),
+    }
+}
+
 export function channelOrb(engine: Engine, type: OrbType, storedDamage?: number): void {
     const player = engine.state.player
     if (player.orbSlots <= 0) return
@@ -24,12 +31,13 @@ export function triggerOrb(engine: Engine, orb: OrbState, mode: 'passive' | 'evo
     const player = engine.state.player
     const focus = powerAmount(player, 'FOCUS')
     const evoke = mode === 'evoke'
-    if (orb.type === 'plasma') { engine.enqueue({ kind: 'GainEnergy', amount: evoke ? 2 : 1 }); return }
-    if (orb.type === 'frost') { engine.enqueue({ kind: 'GainBlock', target: player.id, amount: Math.max(0, (evoke ? 5 : 2) + focus) }); return }
-    if (orb.type === 'dark' && !evoke) { orb.storedDamage += Math.max(0, 6 + focus); return }
+    const values = orbValues(orb, focus)
+    if (orb.type === 'plasma') { engine.enqueue({ kind: 'GainEnergy', amount: values[mode] }); return }
+    if (orb.type === 'frost') { engine.enqueue({ kind: 'GainBlock', target: player.id, amount: values[mode] }); return }
+    if (orb.type === 'dark' && !evoke) { orb.storedDamage += values.passive; return }
     const living = engine.state.enemies.filter(enemy => enemy.hp > 0)
     if (!living.length) return
-    const amount = orb.type === 'dark' ? orb.storedDamage : Math.max(0, (evoke ? 8 : 3) + focus)
+    const amount = values[mode]
     const targets = orb.type === 'dark' ? [living.reduce((lowest, enemy) => enemy.hp < lowest.hp ? enemy : lowest)]
         : powerAmount(player, 'ELECTRODYNAMICS') > 0 ? living : [living[engine.randomInt(0, living.length - 1)]]
     for (const target of targets) engine.enqueue({ kind: 'DealDamage', source: player.id, target: target.id,
