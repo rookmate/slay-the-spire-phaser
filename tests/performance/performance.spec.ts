@@ -15,10 +15,10 @@ async function saveSamples(testInfo: TestInfo, name: string, samples: unknown) {
     await testInfo.attach(name, { path, contentType: 'application/json' })
 }
 
-test('shipping build cold menu readiness under a defined mobile lab profile', async ({ browser }, testInfo) => {
+for (const delivery of ['gzip', 'identity'] as const) test(`shipping cold menu readiness with ${delivery} delivery`, async ({ browser }, testInfo) => {
     const runs = []
     for (let repeat = 0; repeat < 3; repeat++) {
-        const context = await browser.newContext({ viewport: { width: 844, height: 390 } }), page = await context.newPage()
+        const context = await browser.newContext({ viewport: { width: 844, height: 390 }, extraHTTPHeaders: { 'Accept-Encoding': delivery } }), page = await context.newPage()
         const cdp = await context.newCDPSession(page)
         await cdp.send('Network.enable')
         await cdp.send('Network.setCacheDisabled', { cacheDisabled: true })
@@ -30,12 +30,31 @@ test('shipping build cold menu readiness under a defined mobile lab profile', as
             resources: performance.getEntriesByType('resource').map(entry => { const r = entry as PerformanceResourceTiming; return { url: new URL(r.name).pathname, encodedBytes: r.encodedBodySize, decodedBytes: r.decodedBodySize } }) })))
         await context.close()
     }
-    await saveSamples(testInfo, 'cold-start.json', { browser: browser.version(), profile: 'Chromium, 4x CPU, 10Mbps down, 40ms latency, cold cache; local Vite preview does not gzip JS', runs })
-    console.log(JSON.stringify({ coldMenuReadyP75: percentile(runs.map(run => run.readyMs), 0.75) }))
+    const summary = {
+        coldMenuReadyP75: percentile(runs.map(run => run.readyMs), 0.75),
+        transferBytes: runs.map(run => run.resources.reduce((sum, resource) => sum + resource.encodedBytes, 0)),
+        fontBytes: runs.map(run => run.resources.filter(resource => resource.url.startsWith('/fonts/')).reduce((sum, resource) => sum + resource.encodedBytes, 0)),
+    }
+    await saveSamples(testInfo, 'cold-start.json', { browser: browser.version(), delivery, profile: 'Chromium, 4x CPU, 10Mbps down, 40ms latency, cold cache', summary, runs })
+    console.log(JSON.stringify({ delivery, ...summary }))
+    for (const run of runs) {
+        const scripts = run.resources.filter(resource => resource.url.endsWith('.js'))
+        expect(scripts.length).toBeGreaterThan(0)
+        for (const script of scripts) {
+            if (delivery === 'gzip') expect(script.encodedBytes).toBeLessThan(script.decodedBytes)
+            else expect(script.encodedBytes).toBe(script.decodedBytes)
+        }
+    }
+    if (!baseline) {
+        expect(Math.max(...summary.fontBytes)).toBeLessThanOrEqual(130_000)
+        expect(Math.max(...summary.transferBytes)).toBeLessThanOrEqual(delivery === 'gzip' ? 2_000_000 : 3_200_000)
+    }
+    if (enforceTiming && delivery === 'gzip') expect(summary.coldMenuReadyP75).toBeLessThanOrEqual(2500)
 })
 
 test('dense combat keeps surviving views and stays responsive in a minified fixture', async ({ browser }, testInfo) => {
     const runs: Samples[] = []
+    const artBytes: number[] = []
     for (let repeat = 0; repeat < 3; repeat++) {
         const context = await browser.newContext({ viewport: { width: 844, height: 390 } }), page = await context.newPage()
         const run = createNewRun({ seed: `performance-${repeat}`, character: 'silent' })
@@ -46,6 +65,11 @@ test('dense combat keeps surviving views and stays responsive in a minified fixt
         await context.addInitScript(saved => localStorage.setItem('sts_run_v7', JSON.stringify(saved)), run)
         await page.goto(fixtureUrl)
         await page.waitForFunction(() => window.__testGame?.scene.isActive('MainMenu'))
+        artBytes.push(await page.evaluate(() => {
+            const textures = window.__testGame.textures
+            return textures.getTextureKeys().filter(key => /^(art:|enemy:|player:)/.test(key)).reduce((sum, key) =>
+                sum + textures.get(key).source.reduce((bytes, source) => bytes + source.width * source.height * 4, 0), 0)
+        }))
         await clickText(page, 'Continue')
         const initial = await inspect(page)
         expect(initial.state!.player.hand).toHaveLength(10)
@@ -59,7 +83,7 @@ test('dense combat keeps surviving views and stays responsive in a minified fixt
         await context.close()
     }
     const summary = {
-        refreshes: runs.map(run => run.applies.length), replacements: runs.map(run => run.replacements),
+        artBytes, refreshes: runs.map(run => run.applies.length), replacements: runs.map(run => run.replacements),
         uiApplyP95: percentile(runs.flatMap(run => run.applies), 0.95), frameWorkP95: percentile(runs.flatMap(run => run.frameWork), 0.95),
         frameIntervalP95: percentile(runs.flatMap(run => run.frameIntervals), 0.95),
         observedInteractionP95: percentile(runs.flatMap(run => Object.values(run.interactions)), 0.95),
@@ -68,6 +92,7 @@ test('dense combat keeps surviving views and stays responsive in a minified fixt
     console.log(JSON.stringify(summary))
     await saveSamples(testInfo, 'combat-performance.json', { browser: browser.version(), profile: 'Minified fixture, Chromium, 844x390, 4x CPU; three ten-card/five-enemy fights', summary, runs })
     if (!baseline) {
+        expect(Math.max(...summary.artBytes)).toBeLessThanOrEqual(32 * 1024 * 1024)
         expect(summary.refreshes).toEqual([10, 10, 10])
         expect(summary.replacements).toEqual([0, 0, 0])
     }

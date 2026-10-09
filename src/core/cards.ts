@@ -1,3 +1,4 @@
+import { createIdentity } from './identity'
 import { EVENT_CARDS } from './cards/eventCards'
 import { WATCHER_ATTACKS } from './cards/watcherAttacks'
 import { WATCHER_SKILLS } from './cards/watcherSkills'
@@ -18,18 +19,9 @@ import { STATUS_CARDS } from './cards/status'
 import type { MetaState } from './meta'
 import type { CardDef, CardEngineApi, CardInstance } from './state'
 
-let fallbackCardInstanceId = 0
-
-function createInstanceId(defId: string): string {
-    const randomId = globalThis.crypto?.randomUUID?.()
-    if (randomId) return `${defId.toLowerCase()}-${randomId}`
-    fallbackCardInstanceId += 1
-    return `${defId.toLowerCase()}-${fallbackCardInstanceId}`
-}
-
 export function createCardInstance(defId: string, upgradeLevel = 0): CardInstance {
     return {
-        instanceId: createInstanceId(defId),
+        instanceId: `${defId.toLowerCase()}-${createIdentity()}`,
         defId,
         upgradeLevel,
     }

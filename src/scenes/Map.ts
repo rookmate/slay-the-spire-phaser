@@ -1,3 +1,4 @@
+import { characterTexture } from '../ui/portraits'
 import { addRunMenu } from '../ui/runMenu'
 import { canEnterMapNode } from '../core/relics/campaignRules'
 import Phaser from 'phaser'
@@ -44,7 +45,7 @@ export class MapScene extends Phaser.Scene {
     }
 
     private drawSidebar(): void {
-        this.add.image(55, 114, `player:${this.run.character}`).setDisplaySize(42, 50)
+        this.add.image(55, 114, ...characterTexture(this, this.run.character)).setDisplaySize(42, 50)
         this.add.text(87, 91, CHARACTERS[this.run.character].name, { ...headingText, fontSize: '23px' }).setResolution(2)
         this.add.text(87, 121, `${this.run.player.hp}/${this.run.player.maxHp} HP · ${this.run.gold} gold`, { ...bodyText, fontSize: '13px', color: palette.gold }).setResolution(2)
         this.add.text(24, 160, `Floor ${this.run.floor}`, { ...headingText, fontSize: '25px' }).setResolution(2)

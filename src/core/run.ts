@@ -1,3 +1,4 @@
+import { createIdentity } from './identity'
 import { migrateEncounterState } from './encounterState'
 import type { EncounterHistory } from './encounters'
 import type { AcquisitionStep } from './relics/acquisitions'
@@ -130,7 +131,7 @@ export function createNewRun(options: NewRunOptions = {}): RunState {
     if (normalizedAsc >= 10) deck.push(createCardInstance('ASCENDERS_BANE'))
     return {
         character, mode: options.mode ?? (seed === undefined ? 'standard' : 'seeded'),
-        runId: crypto.randomUUID(),
+        runId: createIdentity(),
         elapsedSeconds: 0, initialMaxHp: startingMaxHp, stats: {},
         keys: { ruby: false, emerald: false, sapphire: false },
         hallwayCount: 0,

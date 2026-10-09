@@ -1,3 +1,4 @@
+import { characterTexture } from './portraits'
 import { UI_FONT } from './theme'
 import { CHARACTERS } from '../core/characters'
 import { powerAmount } from '../core/combatMath'
@@ -67,7 +68,7 @@ export class PlayerDisplay {
     }
 
     private createPlayerSprite(): void {
-        this.playerSprite = this.scene.add.image(110, 111, `player:${this.run.character}`).setDisplaySize(77, 91)
+        this.playerSprite = this.scene.add.image(110, 111, ...characterTexture(this.scene, this.run.character)).setDisplaySize(77, 91)
     }
 
     private createPlayerHpText(): void {
