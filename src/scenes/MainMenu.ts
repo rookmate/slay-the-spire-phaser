@@ -7,7 +7,7 @@ import { createNewRun, loadRun } from '../core/run'
 import { getCharacterProgress, loadMeta } from '../core/meta'
 import { recordRunResult } from '../core/runResults'
 import { UNLOCK_XP } from '../core/unlocks'
-import { getRunDestination } from '../core/progression'
+import { completedRunResult, getRunDestination } from '../core/progression'
 import { CHARACTERS, CHARACTER_IDS, type CharacterId, type RunMode } from '../core/characters'
 import { createProfileRun, dailyConfiguration } from '../core/modes/setup'
 import { menuButton, menuText } from '../ui/menu'
@@ -85,12 +85,12 @@ export class MainMenuScene extends Phaser.Scene {
                 this.seedInput = this.add.dom(234, 315, input).setOrigin(0)
             } else this.add.text(434, 324, UNLOCK_XP[progress.unlockTier] ? `${progress.xp} / ${UNLOCK_XP[progress.unlockTier]} XP` : 'Relic progression complete', { ...menuText, fontSize: '13px', color: palette.muted }).setOrigin(1, 0).setResolution(2)
         }
-        const label = this.replaceConfirmed ? 'Abandon saved run and start' : 'New Run'
+        const label = this.replaceConfirmed ? saved && completedRunResult(saved) ? 'Finish saved run and start' : 'Abandon saved run and start' : 'New Run'
         menuButton(this, 34, 360, label, () => {
             if (this.mode === 'seeded' && !this.seed) return
             if (saved && !this.replaceConfirmed) { this.replaceConfirmed = true; this.render(); return }
             const currentMeta = loadMeta()
-            if (saved) recordRunResult(currentMeta, saved, 'defeat')
+            if (saved) recordRunResult(currentMeta, saved, completedRunResult(saved) ?? 'defeat')
             const run = createProfileRun(currentMeta, { character: this.character, mode: this.mode, ascension: this.ascension, seed: this.mode === 'seeded' || this.mode === 'custom' ? this.seed || undefined : undefined, modifiers: this.modifiers })
             saveCheckpoint(currentMeta, run)
             const next = getRunDestination(run); this.scene.start(next.scene, next.data)

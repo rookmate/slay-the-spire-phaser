@@ -121,3 +121,38 @@ for (const result of ['victory', 'defeat'] as const) test(`a failed ${result} ch
     expect(await page.evaluate(() => localStorage.getItem('sts_run_v7'))).toBeNull()
     expect(errors).toEqual([])
 })
+
+for (const next of ['Continue', 'New Run'] as const) test(`a failed boss achievement save preserves victory when choosing ${next} after retry`, async ({ page }) => {
+    const run = createNewRun({ seed: 'won-before-quota', mode: 'standard' })
+    run.neowCompleted = true; run.act = 3; run.actsCleared = [1, 2]; run.pendingRoom = { scene: 'Combat', roomKind: 'boss' }
+    const errors = await boot(page, run)
+    await page.evaluate(() => {
+        const set = Storage.prototype.setItem
+        let failed = false
+        Storage.prototype.setItem = function (key, value) {
+            if (key === 'sts_meta_v2' && !failed) { failed = true; throw new DOMException('Full storage', 'QuotaExceededError') }
+            set.call(this, key, value)
+        }
+        const scene = window.__testGame.scene.getScene('Combat') as import('phaser').Scene & {
+            engine: import('../../src/core/engine').Engine; checkOutcome(): void
+        }
+        scene.engine.state.enemies.forEach(enemy => { enemy.hp = 0 })
+        scene.engine.state.victory = true
+        try { scene.checkOutcome() } catch { /* Recovery listens to the actual scene's failed checkpoint. */ }
+    })
+    await expect(page.getByRole('dialog')).toContainText('could not be saved')
+    const pending = await downloadCheckpoint(page)
+    expect(pending.run.runFlags.victory).toBe(true)
+    expect(pending.meta.achievements.RUBY).toBeTruthy()
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('sts_run_v7')!).runFlags?.victory)).toBeUndefined()
+    await page.getByRole('button', { name: 'Retry save' }).click()
+    await page.waitForFunction(() => window.__testGame?.scene.isActive('MainMenu'))
+    await clickText(page, next)
+    if (next === 'New Run') { await clickText(page, 'Finish saved run and start'); await expectScene(page, 'Neow') }
+    else await expectScene(page, 'RunSummary')
+    const meta = await page.evaluate(() => JSON.parse(localStorage.getItem('sts_meta_v2')!))
+    expect(meta.totalRuns).toBe(1); expect(meta.totalWins).toBe(1)
+    expect(meta.history).toHaveLength(1); expect(meta.history[0]).toMatchObject({ id: run.runId, result: 'victory' })
+    expect(meta.characters.ironclad.ascension).toBe(1)
+    expect(errors).toEqual([])
+})
