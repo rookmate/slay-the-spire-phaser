@@ -1,25 +1,20 @@
 import { describe, expect, it } from 'vitest'
-import { CARD_DEFS, createCardInstance, resolveCard } from '../../core/cards'
-import { cardArtFrame, ILLUSTRATED_CARDS } from './cards'
+import { CARD_DEFS } from '../../core/cards'
+import { CARD_ART, CARD_ART_SHEETS } from './cardCatalog'
 
 describe('card illustrations', () => {
-    it('assigns a distinct frame to every illustrated card and retains it on upgrade', () => {
-        expect(ILLUSTRATED_CARDS).toHaveLength(32)
-        const frames = ILLUSTRATED_CARDS.map(id => {
-            expect(CARD_DEFS[id]).toBeDefined()
-            const base = createCardInstance(id), upgraded = createCardInstance(id, 1)
-            const frame = cardArtFrame(base, resolveCard(base))
-            expect(cardArtFrame(upgraded, resolveCard(upgraded))).toBe(frame)
-            return frame
-        })
-        expect(new Set(frames).size).toBe(32)
+    it('assigns every card its own source, including curses, statuses, and generated cards', () => {
+        expect(Object.keys(CARD_ART).sort()).toEqual(Object.keys(CARD_DEFS).sort())
+        const sources = Object.values(CARD_ART).map(source => `${source.file}:${source.x}:${source.y}`)
+        expect(new Set(sources).size).toBe(Object.keys(CARD_DEFS).length)
+        expect(CARD_ART_SHEETS.flatMap(sheet => [...sheet.cards]).length).toBe(Object.keys(CARD_DEFS).length)
     })
-    it('has a valid atlas frame for every card, including curses, statuses, and colorless cards', () => {
-        for (const id of Object.keys(CARD_DEFS)) {
-            const card = createCardInstance(id), frame = cardArtFrame(card, resolveCard(card))
-            expect(Number.isInteger(frame), id).toBe(true)
-            expect(frame, id).toBeGreaterThanOrEqual(0)
-            expect(frame, id).toBeLessThan(32)
+    it('keeps every crop inside its sheet with room for the edge inset', () => {
+        for (const source of Object.values(CARD_ART)) {
+            expect(source.x).toBeGreaterThan(0); expect(source.y).toBeGreaterThan(0)
+            expect(source.width).toBeGreaterThan(0); expect(source.height).toBeGreaterThan(0)
+            expect(source.x + source.width).toBeLessThan(1536)
+            expect(source.y + source.height).toBeLessThan(768)
         }
     })
 })

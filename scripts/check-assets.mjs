@@ -10,7 +10,7 @@ for (const name of assets.filter(name => /\.(js|css)$/.test(name))) {
     const data = await readFile(`dist/assets/${name}`)
     compressedBytes += gzipSync(data).length; rawBytes += data.length
 }
-for (const name of ['characters', 'spire', 'battle', 'cards-detailed']) {
+for (const name of ['characters', 'spire', 'battle']) {
     const bytes = (await readFile(`dist/art/${name}.webp`)).length
     compressedBytes += bytes; rawBytes += bytes
 }
@@ -20,3 +20,9 @@ assert(fontBytes <= 130_000, `Font budget exceeded: ${fontBytes}`)
 assert(compressedBytes <= 2_000_000, `Compressed asset budget exceeded: ${compressedBytes}`)
 assert(rawBytes <= 3_200_000, `Uncompressed asset budget exceeded: ${rawBytes}`)
 console.log('Built asset size budgets passed.')
+
+// Card sheets load on demand and are not part of the startup download.
+const cardSheets = (await readdir('dist/art')).filter(name => /^cards-.*\.webp$/.test(name))
+const cardBytes = (await Promise.all(cardSheets.map(name => readFile(`dist/art/${name}`)))).reduce((sum, data) => sum + data.length, 0)
+assert.equal(cardSheets.length, 12, 'Every card illustration sheet must ship')
+assert(cardBytes <= 6_000_000, `Complete card artwork budget exceeded: ${cardBytes}`)

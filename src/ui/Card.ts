@@ -1,4 +1,4 @@
-import { cardArtFrame } from './art/cards'
+import { acquireCardArt } from './art/cards'
 import { access, bindAction } from './accessibility'
 import { UI_FONT } from './theme'
 import { cardDescription } from '../core/cardText'
@@ -25,6 +25,8 @@ export class Card extends Phaser.GameObjects.Container {
     private typeText: Phaser.GameObjects.Text
     private header: Phaser.GameObjects.Rectangle
     private art?: Phaser.GameObjects.Image
+    private releaseArt?: () => void
+    private artId?: string
     private description: Phaser.GameObjects.Text
     private fullDescription = ''
     private inspectHint: Phaser.GameObjects.Text
@@ -43,10 +45,8 @@ export class Card extends Phaser.GameObjects.Container {
         const color = cardColor(def)
         const bg = scene.add.rectangle(0, 0, w, h, 0x211e18).setOrigin(0)
         this.add(bg)
-        if (scene.textures.exists('art:cards')) {
-            this.art = scene.add.image(w / 2, 67, 'art:cards', cardArtFrame(card, def)).setDisplaySize(w - 8, w - 8)
-            this.add(this.art)
-        }
+        this.updateArt(card.defId)
+        this.once(Phaser.GameObjects.Events.DESTROY, () => this.releaseArt?.())
         const header = this.header = scene.add.rectangle(0, 0, w, 36, color).setOrigin(0)
         const paper = scene.add.rectangle(4, 96, w - 8, h - 100, 0xe5d8b9).setOrigin(0)
         const rarityColor = def.rarity === 'rare' ? 0xd3b36a : def.rarity === 'uncommon' ? 0x9dbaae : 0x8c7958
@@ -86,10 +86,23 @@ export class Card extends Phaser.GameObjects.Container {
         this.typeText.setText(`${def.type}${def.rarity && def.rarity !== 'basic' ? ` · ${def.rarity}` : ''}`)
         const color = cardColor(def)
         if (this.header.fillColor !== color) this.header.setFillStyle(color)
-        const frame = cardArtFrame(card, def)
-        if (this.art && String(this.art.frame.name) !== String(frame)) this.art.setFrame(frame).setDisplaySize(Card.CARD_WIDTH - 8, Card.CARD_WIDTH - 8)
+        this.updateArt(card.defId)
         this.borderColor = def.rarity === 'rare' ? 0xd3b36a : def.rarity === 'uncommon' ? 0x9dbaae : 0x8c7958
         this.setDescription(cardDescription(card, this.engine))
+    }
+    private updateArt(id: string): void {
+        if (this.artId === id) return
+        this.releaseArt?.(); this.artId = id
+        this.art?.setVisible(false)
+        this.releaseArt = acquireCardArt(this.scene, id, texture => {
+            if (!this.scene || this.artId !== id) return
+            if (this.art) this.art.setTexture(texture).setVisible(true)
+            else {
+                this.art = this.scene.add.image(Card.CARD_WIDTH / 2, 67, texture)
+                this.addAt(this.art, 1)
+            }
+            this.art.setDisplaySize(Card.CARD_WIDTH - 8, Card.CARD_WIDTH - 8)
+        })
     }
     containsPoint(x: number, y: number): boolean {
         const local = this.getLocalPoint(x, y)

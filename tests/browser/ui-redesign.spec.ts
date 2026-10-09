@@ -63,7 +63,7 @@ test('the menu fits a small landscape screen and loads its local fonts and artwo
         const game = window.__testGame, bounds = game.canvas.getBoundingClientRect()
         return { left: bounds.left, right: bounds.right, top: bounds.top, bottom: bounds.bottom,
             fonts: document.fonts.check('400 16px Barlow') && document.fonts.check('600 32px "Barlow Condensed"'),
-            art: ['art:spire', 'art:battle', 'art:cards', 'art:characters'].every(key => game.textures.exists(key))
+            art: ['art:spire', 'art:battle', 'art:characters'].every(key => game.textures.exists(key))
                 && ['ironclad', 'silent', 'defect', 'watcher'].every(id => game.textures.get('art:characters').has(id)) }
     })
     expect(display.fonts && display.art).toBe(true)

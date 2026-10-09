@@ -150,7 +150,7 @@ its background/focus throttling prevents a reliable desktop FPS claim.
 
 The original artwork and audio, official daily leaderboards, platform
 integrations, and cloud saves are not reproduced. Enemy portraits are simplified,
-and cards share an illustration atlas with 32 dedicated starter and signature-card paintings plus class/type fallbacks. Scores, rare event eligibility, and modifier combinations
+and every one of the 372 card definitions has its own illustration. Upgrades retain their base card artwork. Scores, rare event eligibility, and modifier combinations
 still need broader comparison with the original. The test suite covers many
 interactions, not every possible card/relic/enemy combination.
 
@@ -164,7 +164,7 @@ Rules were checked against original-game references for
 [potions](https://slaythespire.wiki.gg/wiki/Potions), and
 [custom modes](https://slaythespire.wiki.gg/wiki/Custom_Mode).
 
-Presentation uses painted backgrounds, character portraits, and a 32-frame card atlas (358,530 bytes and 4.5 MiB texture backing), with SVG portraits for all 68 enemy IDs. The map uses room symbols and a scrollable route. Barlow fonts ship as WOFF2, converted losslessly with `ttf2woff2@8.0.1`, under the SIL Open Font License in `public/fonts/OFL.txt`; generated artwork and its prompts are recorded in [`public/art/sources.json`](public/art/sources.json). Each act has a synthesized musical theme. Settings control master, music, and effects volume separately. Audio starts after a click or keypress and pauses in hidden tabs.
+Presentation uses painted backgrounds, character portraits, and 372 distinct card illustrations loaded on demand, with SVG portraits for all 68 enemy IDs. The map uses room symbols and a scrollable route. Barlow fonts ship as WOFF2, converted losslessly with `ttf2woff2@8.0.1`, under the SIL Open Font License in `public/fonts/OFL.txt`; generated artwork and its prompts are recorded in [`public/art/sources.json`](public/art/sources.json). Each act has a synthesized musical theme. Settings control master, music, and effects volume separately. Audio starts after a click or keypress and pauses in hidden tabs.
 
 Targeted cards stay lifted in the hand while a curved arrow marks the selected enemy. Keyboard selection uses the same aiming display. Release over an enemy to play, or press Escape to cancel. Untargeted cards follow your drag and show when they are ready to play. Reduced motion removes card travel, shakes, flashes, and impact motion.
 
@@ -177,3 +177,5 @@ Settings → Profile backup exports a versioned JSON file containing progress, a
 Game guide: open Help from the main menu or a room, or Game guide from Settings or the combat pause menu. The searchable guide explains turns, piles, routes, character mechanics and status effects. Combatant Effects controls show current rules, orb values and boss counters without revealing hidden intents. Help pauses its calling scene and preserves pending choices.
 
 Keyboard and assistive controls: Tab or Shift+Tab moves between semantic actions, Enter/Space activates them, and the gold outline shows the focused game control. Selecting a targeted card or potion focuses an enemy. Card rules remain available for disabled choices; modal inspectors restore focus when closed. Screen readers receive room text, card rules, concealed-intent-aware targets and one combat update after resolution. Native seed and profile file inputs remain available. The semantic controls update on actions, scene changes and resize, without frame polling.
+
+Card artwork loads only when a card is displayed. Each definition maps to a unique painted cell, including colorless, generated, Curse, and Status cards. Concurrent requests share a sheet decode; the decoded bitmap closes after extraction. The cache targets 64 card textures at 128×128 (4 MiB), evicting unused cards while keeping every displayed card alive. Card names, rules, inspection, and play remain available if an image fails; later acquisitions can retry after a backoff. The existing 2 MB compressed startup and 32 MiB named-texture budgets remain. The complete optional card collection has a separate 6 MB asset-size budget; cumulative traffic can exceed that if evicted artwork needs another sheet fetch. Browser regression tests render every definition and reject duplicate pixels or excess cached textures.
