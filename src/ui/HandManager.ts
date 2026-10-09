@@ -100,6 +100,8 @@ export class HandManager {
         this.handCards.forEach((card, i) => card.showDetails(i === index))
     }
 
+    isInspecting(): boolean { return this.handCards.some(card => card.isShowingDetails()) }
+
     destroy(): void {
         this.handCards.forEach(card => this.scene.tweens.killTweensOf(card))
         this.handContainer.destroy(true)

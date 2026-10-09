@@ -16,6 +16,7 @@ import { RelicAcquisitionScene } from './scenes/RelicAcquisition'
 import Phaser from 'phaser'
 import { BootScene } from './scenes/Boot'
 import { CombatScene } from './scenes/Combat'
+import { CombatMenuScene } from './scenes/CombatMenu'
 import { MapScene } from './scenes/Map'
 import { EventScene } from './scenes/Event'
 import { CampfireScene } from './scenes/Campfire'
@@ -45,7 +46,7 @@ const config: Phaser.Types.Core.GameConfig = {
       height: 1080
     }
   },
-  scene: [BootScene, ProfileRecoveryScene, AchievementsScene, ProfileScene, ChestScene, InventoryScene, SettingsScene, RunHistoryScene, StartingDeckScene, BlightChestScene, CustomModifiersScene, RelicAcquisitionScene, MainMenuScene, NeowScene, MapScene, CombatScene, EventScene, CampfireScene, ShopScene, RewardsScene, BossRelicScene, RunSummaryScene, DeckBuilderScene],
+  scene: [BootScene, ProfileRecoveryScene, AchievementsScene, ProfileScene, ChestScene, InventoryScene, SettingsScene, RunHistoryScene, StartingDeckScene, BlightChestScene, CustomModifiersScene, RelicAcquisitionScene, MainMenuScene, NeowScene, MapScene, CombatScene, CombatMenuScene, EventScene, CampfireScene, ShopScene, RewardsScene, BossRelicScene, RunSummaryScene, DeckBuilderScene],
 }
 
 export function createGame(): Phaser.Game {

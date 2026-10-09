@@ -1,4 +1,5 @@
 import { UI_FONT } from './theme'
+import { menuButton } from './menu'
 import { resolveCard } from '../core/cards'
 import { playCue } from './sound'
 import Phaser from 'phaser'
@@ -34,6 +35,7 @@ export class CombatUI {
     private onPlay?: (card: CardInstance, targets: string[]) => void
     private onPotion?: (potionIndex: number, targets: string[]) => void
     private onEnd?: () => void
+    private onMenu?: () => void
     private onSubmitChoice?: (instanceIds: string[]) => void
     private onCancelChoice?: () => void
     private pointerMoveHandler?: (pointer: Phaser.Input.Pointer) => void
@@ -54,6 +56,7 @@ export class CombatUI {
         this.choiceOverlay = new CombatChoiceOverlay(scene, engine)
         this.setupEventHandlers()
         this.handManager.rebuildHand()
+        menuButton(scene, 624, 8, 'Menu', () => this.onMenu?.()).setDepth(13000)
     }
 
     onPlayCard(callback: (card: CardInstance, targets: string[]) => void): void {
@@ -66,6 +69,16 @@ export class CombatUI {
 
     onEndTurn(callback: () => void): void {
         this.onEnd = callback
+    }
+
+    onOpenMenu(callback: () => void): void { this.onMenu = callback }
+
+    clearTransientInput(): void {
+        this.clearTargeting()
+        this.handManager.inspectCard(-1)
+        this.playerDisplay.closePotionMenu()
+        this.overlayManager.close()
+        this.choiceOverlay.dismissInspection()
     }
 
     onSubmitPendingChoice(callback: (instanceIds: string[]) => void): void {
@@ -160,9 +173,12 @@ export class CombatUI {
         this.keyHandler = (event: KeyboardEvent) => {
             if (event.repeat) return
             if (event.key === 'Escape') {
-                this.handManager.inspectCard(-1)
-                this.clearTargeting()
-                this.playerDisplay.closePotionMenu(); this.overlayManager.close(); return
+                if (this.choiceOverlay.dismissInspection()) return
+                const dismiss = this.dragSystem.isTargeting() || this.pendingPotionIndex !== null || this.handManager.isInspecting()
+                    || this.playerDisplay.isPotionMenuOpen() || this.overlayManager.isOpen()
+                if (dismiss) this.clearTransientInput()
+                else this.onMenu?.()
+                return
             }
             if (this.dragSystem.isCurrentlyDragging() || !this.engine.canAcceptInput() || this.overlayManager.isOpen() || this.playerDisplay.isPotionMenuOpen()) return
             if (event.key.toLowerCase() === 'e') { this.clearTargeting(); this.onEnd?.(); return }

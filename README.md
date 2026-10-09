@@ -39,6 +39,10 @@ npm run build
 
 Drag cards upward or onto an enemy. Keys 1–0 select cards, E ends the turn, and
 Escape cancels targeting. Targeted cards and potions require an enemy selection.
+In combat, Menu or Escape with no open overlay pauses the fight. Resume keeps
+the current turn and any card choice; Settings returns to the paused fight.
+Leaving to the main menu preserves the room-entry save, so Continue restarts
+that fight. The run timer stops while the menu or its settings are open.
 Use **Bag** between fights to inspect your deck and relics, discard potions, or
 use potions that work outside combat.
 
