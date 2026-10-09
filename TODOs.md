@@ -1,22 +1,12 @@
-Gameplay items:
-- review card effects:
-    - ~~add targetting as not all of them have it~~
-    - add definition if it's use once per combat card
-    - add power effects to card, like effects to apply and what values to apply
-- add exhaust pile for exhaust effect cards
-- show statuses below player and enemies health text
-- test each card with effects to ensure they happen as expected
+# Remaining validation
 
+Shops, potions, relics, events, elites, bosses, the starter room, exhaust piles,
+and combat status displays from this file's original checklist are implemented.
 
+Track release checks in [docs/release-validation.md](docs/release-validation.md).
+Physical-device, screen-reader and hosted-site checks remain separate from the
+Chromium, Firefox and WebKit production-build smoke tests.
 
-
-
-Long term items:
-- add shop
-- add potions
-- add relics
-- add different events: treasure room, shop, rest area, events for relics, cards, etc
-- add elite room
-- add boss room
-- add starter room
-- add theme specific sprites
+Broader original-game comparisons remain useful for scoring, rare-event
+eligibility, and untested card/relic/modifier combinations. Existing catalog and
+campaign tests do not establish complete parity with the commercial game.

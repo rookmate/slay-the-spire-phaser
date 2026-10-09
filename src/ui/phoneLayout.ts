@@ -22,7 +22,8 @@ export function attachPhoneLayout(game: Phaser.Game): void {
             // Loading must finish before the first playable screen is paused.
             if (['Boot', 'ProfileRecovery'].includes(scene.scene.key)) continue
             paused.add(scene.scene.key)
-            scene.scene.pause()
+            // Match the immediate resume below; a queued pause can outlive a rotation.
+            game.scene.pause(scene.scene.key)
         }
     }
     const update = () => {

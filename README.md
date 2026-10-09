@@ -113,6 +113,20 @@ prepare local-storage fixtures before Continue; subsequent gameplay uses the UI.
 GitHub Actions runs core tests, the build, and browser checks on PRs and pushes to
 master. Failed checks upload screenshots, traces, and an HTML report.
 
+## Production browser checks
+
+```bash
+npx playwright install --with-deps chromium firefox webkit
+npm run test:release
+```
+
+This command builds the app and tests the shipped entry in all three engines.
+CI runs each engine separately. It covers character setup, combat and reloads,
+keyboard guide navigation, profile export/import, touch rotation and audio
+unlock. The suite uses public UI and saved profiles, without the development
+game bridge. See [release validation](docs/release-validation.md) for scope,
+artifacts, and the remaining physical-device and deployment checks.
+
 ## Performance checks
 
 `npm run test:performance` builds the shipping app and a separate minified combat
