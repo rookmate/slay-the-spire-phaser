@@ -46,6 +46,11 @@ that fight. The run timer stops while the menu or its settings are open.
 Use **Bag** between fights to inspect your deck and relics, discard potions, or
 use potions that work outside combat.
 
+On phones, play in landscape. Portrait mode shows a rotate prompt and pauses
+the current screen, including the run timer and any pending card choice.
+Rotating back resumes that screen; it does not dismiss an open combat menu.
+The canvas leaves room for device safe areas and adapts to the browser's visible height.
+
 ## Saves and progression
 
 Runs are saved at room entry and completion. Continue restarts an unfinished
