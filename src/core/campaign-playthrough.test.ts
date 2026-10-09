@@ -3,9 +3,9 @@ import { simulateCampaign } from '../../tests/support/campaign'
 
 it.each([
     ['ironclad', 'available-ironclad-177'],
-    ['silent', 'available-silent-525'],
-    ['defect', 'available-defect-354'],
-    ['watcher', 'available-watcher-2274'],
+    ['silent', 'encounter-silent-1342'],
+    ['defect', 'encounter-defect-154'],
+    ['watcher', 'encounter-watcher-1783'],
 ] as const)('plays a legal %s starter deck through three acts and checkpoint recovery', (character, seed) => {
     const { run, scene, history } = simulateCampaign(seed, character, true)
     expect(scene, history.slice(-5).join('\n')).toBe('RunSummary')

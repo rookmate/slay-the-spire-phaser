@@ -1,3 +1,4 @@
+import type { Encounter } from './encounters'
 import { getRunMap } from './map'
 import type { PotionId } from './potions'
 import type { RewardBundle } from './rewards'
@@ -19,7 +20,7 @@ export interface ShopInventory {
 
 export type PendingRoom =
     | { scene: 'Chest'; rewardSeed: string }
-    | { scene: 'Combat'; roomKind: 'monster' | 'elite' | 'boss' }
+    | { scene: 'Combat'; roomKind: 'monster' | 'elite' | 'boss'; encounter?: Encounter }
     | { scene: 'Rewards'; rewards: RewardBundle }
     | { scene: 'Shop'; inventory?: ShopInventory }
     | { scene: 'Campfire' | 'Event' }

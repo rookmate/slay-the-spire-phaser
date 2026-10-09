@@ -1,3 +1,5 @@
+import { migrateEncounterState } from './encounterState'
+import type { EncounterHistory } from './encounters'
 import type { AcquisitionStep } from './relics/acquisitions'
 import { changeMaxHp, gainGold } from './health'
 import { CHARACTERS, type CharacterId, type RunMode } from './characters'
@@ -74,6 +76,7 @@ export interface RunState {
     keys: { ruby: boolean; emerald: boolean; sapphire: boolean }
     burningEliteActive?: boolean
     secondBoss?: boolean
+    encounterHistory?: EncounterHistory
     hallwayCount?: number
     mapRows?: number
     seed: string
@@ -131,6 +134,7 @@ export function createNewRun(options: NewRunOptions = {}): RunState {
         elapsedSeconds: 0, initialMaxHp: startingMaxHp, stats: {},
         keys: { ruby: false, emerald: false, sapphire: false },
         hallwayCount: 0,
+        encounterHistory: { hallway: [] },
         mapRows: 16,
         seed: s,
         act: 1,
@@ -208,6 +212,7 @@ export function loadRun(): RunState | undefined {
         run.mapRows ??= 15
         run.asc = clampAscensionLevel(run.asc)
         run.hallwayCount ??= run.combatCount ?? 0
+        migrateEncounterState(run)
         return run
     } catch {
         return undefined

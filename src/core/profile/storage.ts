@@ -1,3 +1,4 @@
+import { migrateEncounterState } from '../encounterState'
 import { z } from 'zod'
 import { createDefaultMeta, getCharacterProgress } from '../meta'
 import { CHARACTER_IDS } from '../characters'
@@ -29,6 +30,7 @@ export function parseProfile(json: string): Profile {
         throw new Error(`Invalid profile at ${issue.path.join('.') || 'file'}: ${issue.message}`)
     }
     const profile = parsed.data
+    if (profile.run) migrateEncounterState(profile.run)
     for (const character of CHARACTER_IDS) getCharacterProgress(profile.meta, character)
     profile.meta.version = 3
     return profile

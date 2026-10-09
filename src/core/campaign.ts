@@ -26,6 +26,7 @@ export function advanceAct(run: RunState): void {
     run.eventState = undefined
     run.combatCount = 0
     run.hallwayCount = 0
+    run.encounterHistory = { hallway: [] }
     run.potionChance = 0.4
     run.secondBoss = false
     run.bossRelicChoicePending = undefined

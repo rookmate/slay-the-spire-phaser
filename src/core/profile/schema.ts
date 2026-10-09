@@ -9,7 +9,7 @@ import { BLIGHTS } from '../modes/endless'
 import { getRunMap } from '../map'
 import type { RunState, RelicId } from '../run'
 import type { PotionId } from '../potions'
-import type { EnemyKey } from '../encounters'
+import { ENCOUNTERS, type EnemyKey, type EncounterId } from '../encounters'
 import type { EventId } from '../events/model'
 import type { ModifierId } from '../modes/modifiers'
 import type { BlightId } from '../modes/endless'
@@ -22,6 +22,8 @@ const finite = z.number().finite(), flag = z.boolean(), date = z.iso.datetime()
 const list = <T extends z.ZodType>(item: T) => z.array(item).max(10000)
 const known = <T extends string>(registry: object) => id.refine(value => Object.hasOwn(registry, value), 'Unknown content ID').transform(value => value as T)
 const cardId = known<string>(CARD_DEFS), relicId = known<RelicId>(RELIC_DEFS), potionId = known<PotionId>(POTION_DEFS)
+const encounterId = known<EncounterId>(ENCOUNTERS)
+const encounter = z.strictObject({ id: encounterId, enemies: z.array(known<EnemyKey>(ENEMIES)).min(1).max(10) })
 const achievementId = known<AchievementId>(ACHIEVEMENTS)
 const character = z.enum(['ironclad', 'silent', 'defect', 'watcher']), mode = z.enum(['standard', 'seeded', 'daily', 'custom'])
 const ascension = count.max(20), act = z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)])
@@ -43,7 +45,7 @@ const shop = z.strictObject({ cards: list(cardId), version: z.literal(2).optiona
         && (!stock.relicPrices || stock.relicPrices.length === (stock.relics?.length ?? 0)) && (stock.saleIndex === undefined || stock.saleIndex < stock.cards.length), 'Invalid shop prices or sale')
 const room = z.discriminatedUnion('scene', [
     z.strictObject({ scene: z.literal('Chest'), rewardSeed: text }),
-    z.strictObject({ scene: z.literal('Combat'), roomKind: z.enum(['monster', 'elite', 'boss']) }),
+    z.strictObject({ scene: z.literal('Combat'), roomKind: z.enum(['monster', 'elite', 'boss']), encounter: encounter.optional() }),
     z.strictObject({ scene: z.literal('Rewards'), rewards }), z.strictObject({ scene: z.literal('Shop'), inventory: shop.optional() }),
     z.strictObject({ scene: z.enum(['Campfire', 'Event']) }),
 ])
@@ -72,6 +74,7 @@ export const runSchema: z.ZodType<RunState> = z.strictObject({
     startingDraft: z.strictObject({ kind: z.enum(['draft', 'sealed']), remaining: count.max(15), picked: count.max(15), choices: list(card) }).optional(),
     character: character.default('ironclad'), mode: mode.default('standard'), runId: id.optional(), rareCardOffset: finite.optional(), potionChance: finite.min(0).max(1).optional(),
     elapsedSeconds: finite.nonnegative().optional(), keys: z.strictObject({ ruby: flag, emerald: flag, sapphire: flag }).default({ ruby: false, emerald: false, sapphire: false }),
+    encounterHistory: z.strictObject({ hallway: z.array(encounterId).max(2), elite: encounterId.optional() }).optional(),
     burningEliteActive: flag.optional(), secondBoss: flag.optional(), hallwayCount: count.optional(), mapRows: z.union([z.literal(15), z.literal(16)]).default(15),
     seed: id, act, floor: count.positive(), gold: count,
     player: z.strictObject({ maxHp: count.positive(), hp: count }).refine(player => player.hp <= player.maxHp, 'HP exceeds maximum'),
@@ -87,6 +90,14 @@ export const runSchema: z.ZodType<RunState> = z.strictObject({
     rewardReturnRoom: room.optional(), pendingRoom: room.optional(), combatCount: count.optional(),
 }).superRefine((run, ctx) => {
     const fail = (message: string) => ctx.addIssue({ code: 'custom', message })
+    for (const id of run.encounterHistory?.hallway ?? []) if (ENCOUNTERS[id]?.act !== run.act || ENCOUNTERS[id]?.tier !== 'hallway') fail('Invalid hallway encounter history')
+    const elite = run.encounterHistory?.elite
+    if (elite && (ENCOUNTERS[elite]?.act !== run.act || ENCOUNTERS[elite]?.tier !== 'elite')) fail('Invalid elite encounter history')
+    for (const room of [run.pendingRoom, run.rewardReturnRoom]) {
+        if (room?.scene !== 'Combat' || !room.encounter) continue
+        const entry = ENCOUNTERS[room.encounter.id]
+        if (entry?.act !== run.act || entry?.tier !== (room.roomKind === 'monster' ? 'hallway' : room.roomKind)) fail('Invalid room encounter')
+    }
     const event = run.eventState
     if (event?.id === 'THE_LIBRARY' && event.cards?.some(id => !Object.hasOwn(CARD_DEFS, id))) fail('Unknown event card')
     if (event?.id === 'DEAD_ADVENTURER' && event.cards?.some(id => !['gold', 'relic', 'nothing'].includes(id))) fail('Invalid adventurer reward')
