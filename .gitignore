@@ -28,3 +28,6 @@ dist-ssr
 
 /dist-performance/
 /performance-results/
+
+/release-report/
+/release-results/
