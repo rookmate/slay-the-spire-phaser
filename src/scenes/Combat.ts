@@ -10,6 +10,7 @@ import { loadMeta, saveMeta } from '../core/meta'
 import type { RunState } from '../core/run'
 import { saveRun } from '../core/run'
 import { CombatUI } from '../ui/CombatUI'
+import { checkpointRunClock } from '../core/runClock'
 import type { RoomKind } from '../core/map'
 
 export class CombatScene extends Phaser.Scene {
@@ -43,6 +44,13 @@ export class CombatScene extends Phaser.Scene {
         this.ui = new CombatUI(this, this.engine, this.run)
         this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.ui?.destroy())
         this.events.once(Phaser.Scenes.Events.DESTROY, () => this.ui?.destroy())
+
+        this.ui.onOpenMenu(() => {
+            this.ui.clearTransientInput()
+            checkpointRunClock(this.run)
+            this.scene.launch('CombatMenu')
+            this.scene.pause()
+        })
 
         this.ui.onPlayCard((card, targets) => {
             this.ui.apply(this.engine.playCard(card, targets))

@@ -84,6 +84,8 @@ export class Card extends Phaser.GameObjects.Container {
         }
         this.inspectHint.setText(this.locked ? 'Locked' : 'Full rules →')
     }
+    isShowingDetails(): boolean { return !!this.detail }
+
     showDetails(show: boolean): void {
         this.detail?.destroy(true); this.detail = undefined
         if (!show || !this.scene) return

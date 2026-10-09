@@ -36,6 +36,12 @@ export class CardGrid {
         this.refresh()
     }
 
+    dismissInspection(): boolean {
+        const inspected = this.container.list.filter((view): view is Card => view instanceof Card && view.isShowingDetails())
+        inspected.forEach(view => view.showDetails(false))
+        return inspected.length > 0
+    }
+
     refresh(): void {
         this.container.removeAll(true)
         const layout = cardGridLayout(this.scene.scale.width, this.scene.scale.height, this.top)

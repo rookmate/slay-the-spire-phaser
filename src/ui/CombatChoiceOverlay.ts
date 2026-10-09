@@ -27,6 +27,8 @@ export class CombatChoiceOverlay {
         this.onCancel = callback
     }
 
+    dismissInspection(): boolean { return this.grid?.dismissInspection() ?? false }
+
     refresh(choice?: PendingChoiceView): void {
         const nextKey = choice?.id
         const currentKey = this.currentChoice?.id
