@@ -19,7 +19,17 @@ test('touch combat, rotation, audio unlock and profile export work in the built 
     await expect(page.getByRole('dialog', { name: 'Rotate to play' })).toBeHidden()
     await expect(scene(page, 'MainMenu')).toBeVisible()
     await tap(page, 'Settings'); await expect(scene(page, 'Settings')).toBeVisible()
-    await expect.poll(() => page.evaluate(() => window.__releaseAudio?.some(context => context.state === 'running') ?? false)).toBe(true)
+    try {
+        await expect.poll(() => page.evaluate(() => window.__releaseAudio?.some(context => context.state === 'running') ?? false)).toBe(true)
+    } finally {
+        await info.attach('audio-unlock', {
+            body: JSON.stringify(await page.evaluate(() => ({
+                hidden: document.hidden,
+                contexts: window.__releaseAudio?.map(context => ({ state: context.state, currentTime: context.currentTime })),
+            }))),
+            contentType: 'application/json',
+        })
+    }
     await tap(page, 'Reduced motion: off'); await expect(button(page, 'Reduced motion: on')).toBeEnabled()
     await tap(page, 'Profile backup'); await expect(scene(page, 'Profile')).toBeVisible()
     const exported = await downloadProfile(page, true)

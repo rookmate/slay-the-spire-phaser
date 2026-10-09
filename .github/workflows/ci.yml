@@ -54,6 +54,15 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps ${{ matrix.browser }}
+      - name: Start Firefox audio output
+        if: matrix.browser == 'firefox'
+        run: |
+          sudo apt-get install -y pulseaudio pulseaudio-utils
+          pulseaudio --start --exit-idle-time=-1
+          pactl load-module module-null-sink sink_name=release_test
+          pactl set-default-sink release_test
+          pactl info
+          pactl list short sinks
       - run: npm run test:release -- --project=${{ matrix.browser }}
       - name: Upload release browser details
         if: always()

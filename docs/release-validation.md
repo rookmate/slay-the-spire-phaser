@@ -16,6 +16,11 @@ npm run test:release
 Each CI engine runs in its own job, with no retries. Reports and screenshots
 are uploaded as `release-<browser>` artifacts for seven days.
 
+Headless Firefox needs an audio backend for the unlock check. Its CI job starts
+PulseAudio with a virtual output sink and records the server/sink details.
+Each touch test attaches native context states and audio times for diagnosis.
+The virtual output does not verify audible sound on a physical device.
+
 ## Automated checks
 
 - All four characters start a seeded run through Neow and the map, play a card,
