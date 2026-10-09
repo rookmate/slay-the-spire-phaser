@@ -53,20 +53,17 @@ export class CombatScene extends Phaser.Scene {
         })
 
         this.ui.onPlayCard((card, targets) => {
-            this.ui.apply(this.engine.playCard(card, targets))
-            this.ui.apply(this.engine.runUntilIdle())
+            this.ui.apply([...this.engine.playCard(card, targets), ...this.engine.runUntilIdle()])
             this.checkOutcome()
         })
 
         this.ui.onSubmitPendingChoice((instanceIds) => {
-            this.ui.apply(this.engine.submitPendingChoice(instanceIds))
-            this.ui.apply(this.engine.runUntilIdle())
+            this.ui.apply([...this.engine.submitPendingChoice(instanceIds), ...this.engine.runUntilIdle()])
             this.checkOutcome()
         })
 
         this.ui.onCancelPendingChoice(() => {
-            this.ui.apply(this.engine.cancelPendingChoice())
-            this.ui.apply(this.engine.runUntilIdle())
+            this.ui.apply([...this.engine.cancelPendingChoice(), ...this.engine.runUntilIdle()])
             this.checkOutcome()
         })
 
@@ -75,7 +72,6 @@ export class CombatScene extends Phaser.Scene {
             if (!potionId) return
             const events = this.engine.usePotionAtIndex(potionIndex, targets)
             this.ui.apply(events)
-            this.ui.refreshRunData(this.run)
             this.checkOutcome()
         })
 

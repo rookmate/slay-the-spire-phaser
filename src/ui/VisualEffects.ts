@@ -34,7 +34,7 @@ export class VisualEffects {
             damageText = this.scene.add.text(0, 0, '', {
                 resolution: 2, fontFamily: COMBAT_UI_CONFIG.styles.fontFamily,
                 fontSize: '24px',
-                color: isHealing ? '#00ff00' : '#ff4444',
+                color: isHealing ? '#b8e994' : '#ff7766',
                 stroke: '#000000',
                 strokeThickness: 2
             })
@@ -42,7 +42,9 @@ export class VisualEffects {
         }
 
         // Configure the damage number
-        damageText.setText(amount.toString()).setColor(isHealing ? '#b8e994' : '#ff7766')
+        damageText.setText(amount.toString())
+        const color = isHealing ? '#b8e994' : '#ff7766'
+        if (damageText.style.color !== color) damageText.setColor(color)
         damageText.setPosition(x, y)
         damageText.setAlpha(1)
         damageText.setScale(1)

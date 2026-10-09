@@ -104,6 +104,31 @@ prepare local-storage fixtures before Continue; subsequent gameplay uses the UI.
 GitHub Actions runs core tests, the build, and browser checks on PRs and pushes to
 master. Failed checks upload screenshots, traces, and an HTML report.
 
+## Performance checks
+
+`npm run test:performance` builds the shipping app and a separate minified combat
+fixture, then serves both with Vite preview. It records three cold starts at
+10 Mbps download, 40 ms latency and 4× CPU slowdown, and three ten-card fights
+against five enemies at 844×390. Preview serves JavaScript without gzip, so its
+transfer measurements must not be presented as compressed deployment sizes.
+
+CI requires one final UI refresh per card play and no replacement of unchanged
+hand views. It uploads timing samples to the `performance-results` artifact.
+`PERFORMANCE_TIMING=1 npm run test:performance` also enforces p95 interaction
+samples ≤200 ms, p95 application frame work ≤10 ms, and p95 discrete UI refresh
+work ≤50 ms. Run timing comparisons on the same idle machine; shared CI runner
+speeds vary. The reference host is an Intel Core i7-12700H running Chromium with
+4× CPU throttling. `PERFORMANCE_BASELINE=1` records the pre-optimization allocation
+counts without enforcing the new allocation limits.
+
+The interaction and frame targets follow [Web Vitals](https://web.dev/articles/vitals)
+and [rendering guidance](https://web.dev/articles/rendering-performance). The
+`spire:menu-ready` mark records the first rendered menu in the shipping build.
+It is a custom canvas readiness metric, not LCP. Event Timing samples are lab
+interaction measurements, not field INP; actual frame intervals and long tasks
+are reported separately. Software graphics, CPU throttling and automation do
+not establish physical-phone FPS, battery use or field Core Web Vitals compliance.
+
 ## Remaining differences
 
 The original artwork and audio, official daily leaderboards, platform

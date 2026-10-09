@@ -55,7 +55,7 @@ export class CombatUI {
         this.visualEffects = new VisualEffects(scene)
         this.choiceOverlay = new CombatChoiceOverlay(scene, engine)
         this.setupEventHandlers()
-        this.handManager.rebuildHand()
+        this.handManager.refreshHand()
         menuButton(scene, 624, 8, 'Menu', () => this.onMenu?.()).setDepth(13000)
     }
 
@@ -87,11 +87,6 @@ export class CombatUI {
 
     onCancelPendingChoice(callback: () => void): void {
         this.onCancelChoice = callback
-    }
-
-    refreshRunData(run: RunState): void {
-        this.run = run
-        this.playerDisplay.setRun(run)
     }
 
     apply(events: EmittedEvent[]): void {
@@ -128,7 +123,7 @@ export class CombatUI {
 
     update(): void {
         this.dragSystem.cancelDrag()
-        this.handManager.rebuildHand()
+        this.handManager.refreshHand()
         this.enemyDisplay.update()
         this.playerDisplay.update()
         this.overlayManager.refreshOverlays()
@@ -268,7 +263,7 @@ export class CombatUI {
         this.resizeHandler = () => {
             this.dragSystem.cancelDrag()
             this.enemyDisplay.handleScreenResize()
-            this.handManager.rebuildHand()
+            this.handManager.refreshHand()
             this.playerDisplay.update()
         }
         this.scene.scale.on('resize', this.resizeHandler)

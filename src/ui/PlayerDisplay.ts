@@ -25,6 +25,7 @@ export class PlayerDisplay {
     private relicText?: Phaser.GameObjects.Text
     private resourceText?: Phaser.GameObjects.Text
     private potionMenu?: Phaser.GameObjects.Container
+    private potionKey = ''
     private potionTexts: Phaser.GameObjects.Text[] = []
 
     private onEndTurn?: () => void
@@ -49,12 +50,6 @@ export class PlayerDisplay {
 
     setOnUsePotion(callback: (index: number) => void): void {
         this.onUsePotion = callback
-    }
-
-    setRun(run: RunState): void {
-        this.run = run
-        this.rebuildPotions()
-        this.update()
     }
 
     private build(): void {
@@ -151,6 +146,7 @@ export class PlayerDisplay {
     }
 
     private rebuildPotions(): void {
+        this.potionKey = this.run.potions.join(',')
         this.potionTexts.forEach(text => text.destroy())
         this.potionTexts = []
         const startX = 180
@@ -201,6 +197,7 @@ export class PlayerDisplay {
     }
 
     update(): void {
+        if (this.potionKey !== this.run.potions.join(',')) this.rebuildPotions()
         this.resourceText?.setText(this.getResourceText())
         this.playerHpText?.setText(this.getPlayerHpLabel())
         this.energyText?.setText(this.getPlayerStatsText())

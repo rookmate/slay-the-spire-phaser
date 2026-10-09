@@ -9,11 +9,25 @@ import { CARD_SIZE } from './layout'
 export interface CardOptions { engine?: Engine; x: number; y: number; scale?: number; interactive?: boolean; locked?: boolean }
 const colors = { ironclad: 0x693c30, silent: 0x37452b, defect: 0x345354, watcher: 0x4c3b55, colorless: 0x59513e }
 
+function cardColor(def: ReturnType<typeof resolveCard>): number {
+    return def.type === 'curse' ? 0x655068 : def.type === 'status' ? 0x646466 : colors[def.color ?? 'colorless']
+}
+function artFrame(card: CardInstance, def: ReturnType<typeof resolveCard>): number {
+    return /DEFEND|SURVIVOR|VIGILANCE|SHRUG|ARMAMENTS|IMPERVIOUS|ENTRENCH|METALLICIZE/.test(card.defId) ? 1
+        : def.color === 'silent' ? 2 : def.color === 'defect' ? 4 : def.color === 'watcher' ? 5
+            : def.type === 'attack' ? 0 : def.type === 'power' ? 3 : 1
+}
+
 export class Card extends Phaser.GameObjects.Container {
     private card: CardInstance
     private engine?: Engine
     private border: Phaser.GameObjects.Rectangle
     private borderColor: number
+    private title: Phaser.GameObjects.Text
+    private costText: Phaser.GameObjects.Text
+    private typeText: Phaser.GameObjects.Text
+    private header: Phaser.GameObjects.Rectangle
+    private art?: Phaser.GameObjects.Image
     private description: Phaser.GameObjects.Text
     private fullDescription = ''
     private inspectHint: Phaser.GameObjects.Text
@@ -28,24 +42,22 @@ export class Card extends Phaser.GameObjects.Container {
         this.card = card; this.engine = opts.engine
         this.locked = !!opts.locked
         const def = resolveCard(card), w = Card.CARD_WIDTH, h = Card.CARD_HEIGHT
-        const color = def.type === 'curse' ? 0x655068 : def.type === 'status' ? 0x646466 : colors[def.color ?? 'colorless']
+        const color = cardColor(def)
         const bg = scene.add.rectangle(0, 0, w, h, 0x211e18).setOrigin(0)
         this.add(bg)
         if (scene.textures.exists('art:cards')) {
-            const frame = /DEFEND|SURVIVOR|VIGILANCE|SHRUG|ARMAMENTS|IMPERVIOUS|ENTRENCH|METALLICIZE/.test(card.defId) ? 1
-                : def.color === 'silent' ? 2 : def.color === 'defect' ? 4 : def.color === 'watcher' ? 5
-                    : def.type === 'attack' ? 0 : def.type === 'power' ? 3 : 1
-            this.add(scene.add.image(w / 2, 67, 'art:cards', frame).setDisplaySize(w - 8, w - 8))
+            this.art = scene.add.image(w / 2, 67, 'art:cards', artFrame(card, def)).setDisplaySize(w - 8, w - 8)
+            this.add(this.art)
         }
-        const header = scene.add.rectangle(0, 0, w, 36, color).setOrigin(0)
+        const header = this.header = scene.add.rectangle(0, 0, w, 36, color).setOrigin(0)
         const paper = scene.add.rectangle(4, 96, w - 8, h - 100, 0xe5d8b9).setOrigin(0)
         const rarityColor = def.rarity === 'rare' ? 0xd3b36a : def.rarity === 'uncommon' ? 0x9dbaae : 0x8c7958
         this.borderColor = rarityColor
         this.border = scene.add.rectangle(0, 0, w, h, 0, 0).setOrigin(0).setStrokeStyle(1, rarityColor)
-        const title = scene.add.text(8, 5, def.name, { resolution: 2, fontFamily: UI_FONT, fontSize: '13px', fontStyle: 'bold', color: card.upgradeLevel ? '#e2edb6' : '#fff0d5', wordWrap: { width: w - 38, useAdvancedWrap: true }, lineSpacing: 0 }).setResolution(2)
+        const title = this.title = scene.add.text(8, 5, def.name, { resolution: 2, fontFamily: UI_FONT, fontSize: '13px', fontStyle: 'bold', color: card.upgradeLevel ? '#e2edb6' : '#fff0d5', wordWrap: { width: w - 38, useAdvancedWrap: true }, lineSpacing: 0 }).setResolution(2)
         const costDisc = scene.add.circle(w - 17, 17, 12, 0x201d16).setStrokeStyle(1, 0xc6a66b)
-        const cost = scene.add.text(w - 17, 16, def.xCost ? 'X' : String(opts.engine?.getCardCost(card) ?? def.cost), { resolution: 2, fontFamily: UI_FONT, fontSize: '17px', fontStyle: 'bold', color: '#f5d78a' }).setOrigin(0.5).setResolution(2)
-        const type = scene.add.text(w / 2, 100, `${def.type}${def.rarity && def.rarity !== 'basic' ? ` · ${def.rarity}` : ''}`, { resolution: 2, fontFamily: UI_FONT, fontSize: '9px', color: '#6b5033' }).setOrigin(0.5, 0).setResolution(2)
+        const cost = this.costText = scene.add.text(w - 17, 16, def.xCost ? 'X' : String(opts.engine?.getCardCost(card) ?? def.cost), { resolution: 2, fontFamily: UI_FONT, fontSize: '17px', fontStyle: 'bold', color: '#f5d78a' }).setOrigin(0.5).setResolution(2)
+        const type = this.typeText = scene.add.text(w / 2, 100, `${def.type}${def.rarity && def.rarity !== 'basic' ? ` · ${def.rarity}` : ''}`, { resolution: 2, fontFamily: UI_FONT, fontSize: '9px', color: '#6b5033' }).setOrigin(0.5, 0).setResolution(2)
         this.description = scene.add.text(10, 115, '', { resolution: 2, fontFamily: UI_FONT, fontSize: '12px', color: '#2d281f', wordWrap: { width: w - 20 }, lineSpacing: 1 }).setResolution(2)
         this.inspectHint = scene.add.text(9, h - 14, opts.locked ? 'Locked' : '', { resolution: 2, fontFamily: UI_FONT, fontSize: '9px', color: '#705531' }).setResolution(2)
         this.add([header, paper, title, costDisc, cost, type, this.description, this.inspectHint, this.border])
@@ -64,6 +76,22 @@ export class Card extends Phaser.GameObjects.Container {
             this.on('pointerdown', () => this.showDetails(false))
         }
     }
+    /** Rendered values can change even when the engine mutates the same instance. */
+    refresh(card: CardInstance): void {
+        this.card = card
+        const def = resolveCard(card)
+        this.title.setText(def.name)
+        const titleColor = card.upgradeLevel ? '#e2edb6' : '#fff0d5'
+        if (this.title.style.color !== titleColor) this.title.setColor(titleColor)
+        this.costText.setText(def.xCost ? 'X' : String(this.engine?.getCardCost(card) ?? def.cost))
+        this.typeText.setText(`${def.type}${def.rarity && def.rarity !== 'basic' ? ` · ${def.rarity}` : ''}`)
+        const color = cardColor(def)
+        if (this.header.fillColor !== color) this.header.setFillStyle(color)
+        const frame = artFrame(card, def)
+        if (this.art && String(this.art.frame.name) !== String(frame)) this.art.setFrame(frame)
+        this.borderColor = def.rarity === 'rare' ? 0xd3b36a : def.rarity === 'uncommon' ? 0x9dbaae : 0x8c7958
+        this.setDescription(cardDescription(card, this.engine))
+    }
     containsPoint(x: number, y: number): boolean {
         const local = this.getLocalPoint(x, y)
         return local.x >= 0 && local.x <= Card.CARD_WIDTH && local.y >= 0 && local.y <= Card.CARD_HEIGHT
@@ -72,6 +100,8 @@ export class Card extends Phaser.GameObjects.Container {
     setDimmed(dimmed: boolean): void { this.shade.setVisible(dimmed) }
     setCombatPreview(engine: Engine, targetId?: string): void { this.setDescription(cardDescription(this.card, engine, targetId)) }
     private setDescription(text: string): void {
+        if (text === this.fullDescription) return
+        this.showDetails(false)
         this.fullDescription = text
         this.inspectHint.setText(this.locked ? 'Locked' : '')
         this.description.setText(text)
@@ -87,6 +117,7 @@ export class Card extends Phaser.GameObjects.Container {
     isShowingDetails(): boolean { return !!this.detail }
 
     showDetails(show: boolean): void {
+        if (show === !!this.detail) return
         this.detail?.destroy(true); this.detail = undefined
         if (!show || !this.scene) return
         const def = resolveCard(this.card), width = 224
