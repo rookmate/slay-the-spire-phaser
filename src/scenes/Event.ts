@@ -1,3 +1,4 @@
+import { saveCheckpoint } from '../core/checkpoint'
 import { actionButton } from '../ui/accessibility'
 import { UI_FONT, roomBackdrop } from '../ui/theme'
 import { addRunMenu } from '../ui/runMenu'
@@ -6,7 +7,7 @@ import { CARD_DEFS } from '../core/cards'
 import Phaser from 'phaser'
 import { canRemoveCard, canUpgradeCard, createCardInstance } from '../core/cards'
 import { EVENT_DEFS, eventSeed, getEventChoices, initializeEvent, resolveEventChoice, type EventChoiceDef, type EventId } from '../core/events'
-import { loadMeta, saveMeta, type MetaState } from '../core/meta'
+import { loadMeta, type MetaState } from '../core/meta'
 import { completeRoom } from '../core/progression'
 import { saveRun, type RunState } from '../core/run'
 import { DeckSelectionOverlay } from '../ui/DeckSelectionOverlay'
@@ -63,8 +64,9 @@ export class EventScene extends Phaser.Scene {
         } else this.applyChoice(choice.id)
     }
     private applyChoice(choiceId: string, selection?: { cardInstanceId?: string; cardId?: string }): void {
+        this.meta = loadMeta()
         const result = resolveEventChoice(this.run, this.meta, this.eventId, choiceId, eventSeed(this.run), selection)
-        saveRun(this.run); saveMeta(this.meta)
+        saveCheckpoint(this.meta, this.run)
         if (result.nextScene === 'RunSummary') this.scene.start('RunSummary', { run: this.run, result: 'defeat' })
         else if (result.nextScene === 'Combat' && this.run.pendingRoom?.scene === 'Combat') this.scene.start('Combat', { run: this.run, roomKind: this.run.pendingRoom.roomKind })
         else if (result.nextScene === 'Rewards' && this.run.pendingRoom?.scene === 'Rewards') this.scene.start('Rewards', { run: this.run, rewards: this.run.pendingRoom.rewards })

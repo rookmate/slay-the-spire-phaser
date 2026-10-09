@@ -6,6 +6,7 @@ import { loadSettings, saveSettings, SETTINGS_CHANGED, SETTINGS_KEY } from './se
 import { createDefaultMeta, loadMeta, saveMeta } from './meta'
 import { createNewRun, loadRun, saveRun } from './run'
 import { attachRunClock, checkpointRunClock } from './runClock'
+import { persistence } from './persistence'
 import { importProfile, JOURNAL_KEY, recoverProfileImport } from './profile/storage'
 import type { Profile } from './profile/schema'
 import { attachStorageSync } from '../ui/storageSync'
@@ -47,6 +48,7 @@ it('reads settings once, returns independent copies, and publishes only successf
     storage.setItem.mockImplementationOnce(() => { throw new Error('quota') })
     expect(() => saveSettings({ ...original, volume: 0.1 })).toThrow('quota')
     expect(loadSettings().volume).toBe(0.8); expect(changes).toHaveBeenCalledTimes(1)
+    persistence().retry()
     saveMeta(createDefaultMeta()); const meta = loadMeta(); meta.totalWins = 99
     expect(loadMeta().totalWins).toBe(0)
 })
@@ -110,17 +112,17 @@ it('follows OS reduced motion changes until an explicit preference is saved', ()
     motion.matches = true; motion.dispatchEvent(new Event('change'))
     expect(loadSettings().reducedMotion).toBe(false)
 })
-it('bounds periodic retries after quota failures while still flushing at page boundaries', () => {
+it('stops clock writes and elapsed time after a save failure until the checkpoint is retried', () => {
     const run = createNewRun(); saveRun(run); scenes = [{ scene: { key: 'Combat' }, run }]; attachRunClock(game)
     storage.setItem.mockClear(); storage.setItem.mockImplementation(() => { throw new Error('quota') })
     for (let i = 0; i < 360; i++) events.emit('poststep', i * 1000 / 60, 1000 / 60)
     expect(storage.setItem).toHaveBeenCalledTimes(1)
-    window.dispatchEvent(new Event('pagehide')); expect(storage.setItem).toHaveBeenCalledTimes(2)
+    const stopped = run.elapsedSeconds
+    window.dispatchEvent(new Event('pagehide'))
     for (let i = 0; i < 240; i++) events.emit('poststep', i * 1000 / 60, 1000 / 60)
-    expect(storage.setItem).toHaveBeenCalledTimes(3)
-    expect(run.elapsedSeconds).toBeCloseTo(10)
+    expect(storage.setItem).toHaveBeenCalledTimes(1); expect(run.elapsedSeconds).toBe(stopped)
     storage.setItem.mockImplementation((key, value) => { storage.values.set(key, value) })
-    window.dispatchEvent(new Event('pagehide')); expect(loadRun()!.elapsedSeconds).toBeCloseTo(10)
+    persistence().retry(); expect(loadRun()!.elapsedSeconds).toBeCloseTo(stopped!)
 })
 
 it('withholds partial import settings when the OS motion preference changes', () => {

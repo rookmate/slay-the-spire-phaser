@@ -2,6 +2,7 @@ import { JOURNAL_KEY } from '../core/profile/storage'
 import type Phaser from 'phaser'
 import { loadMeta, saveMeta } from '../core/meta'
 import { META_CHANGED } from '../core/storageEvents'
+import { persistence } from '../core/persistence'
 
 /** A non-interactive live region wakes only when its queue or visibility changes. */
 export function attachNotifications(game: Phaser.Game): void {
@@ -12,7 +13,7 @@ export function attachNotifications(game: Phaser.Game): void {
     let timer: ReturnType<typeof setTimeout> | undefined
     let consuming = false
     const update = () => {
-        if (consuming) return
+        if (consuming || persistence().error) return
         if (localStorage.getItem(JOURNAL_KEY)) {
             clearTimeout(timer); timer = undefined; notice.style.display = 'none'; return
         }

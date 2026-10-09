@@ -1,9 +1,10 @@
+import { saveCheckpoint } from '../core/checkpoint'
 import { roomBackdrop } from '../ui/theme'
 import Phaser from 'phaser'
 import { CHARACTERS } from '../core/characters'
-import { getCharacterProgress, loadMeta, saveMeta } from '../core/meta'
+import { getCharacterProgress, loadMeta } from '../core/meta'
 import { recordRunResult } from '../core/runResults'
-import { clearSavedRun, type RunState } from '../core/run'
+import { type RunState } from '../core/run'
 import { calculateScore } from '../core/score'
 import { UNLOCK_XP } from '../core/unlocks'
 import { menuButton, menuText } from '../ui/menu'
@@ -13,7 +14,7 @@ export class RunSummaryScene extends Phaser.Scene {
         roomBackdrop(this)
         const meta = loadMeta(), run = data.run
         const result = recordRunResult(meta, run, data.result), progress = getCharacterProgress(meta, run.character)
-        saveMeta(meta); clearSavedRun()
+        saveCheckpoint(meta)
         this.add.text(24, 20, `${CHARACTERS[run.character].name} · ${data.result.toUpperCase()}`, { ...menuText, fontSize: '26px' })
         this.add.text(24, 66, `${run.mode} · Ascension ${run.asc} · Floor ${run.floor}`, menuText)
         this.add.text(24, 100, `Score ${result.score}`, { ...menuText, fontSize: '25px', color: '#dbc5a3' })

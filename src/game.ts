@@ -3,9 +3,6 @@ import { ProfileRecoveryScene } from './scenes/ProfileRecovery'
 import './style.css'
 import { AchievementsScene } from './scenes/Achievements'
 import { ProfileScene } from './scenes/Profile'
-import { recoverProfileImport } from './core/profile/storage'
-import { attachNotifications } from './ui/notifications'
-import { attachSound } from './ui/sound'
 import { attachPhoneLayout } from './ui/phoneLayout'
 import { ChestScene } from './scenes/Chest'
 import { InventoryScene } from './scenes/Inventory'
@@ -29,8 +26,6 @@ import { RunSummaryScene } from './scenes/RunSummary'
 import { DeckBuilderScene } from './scenes/DeckBuilder'
 import { NeowScene } from './scenes/Neow'
 import { BossRelicScene } from './scenes/BossRelic'
-import { attachRunClock } from './core/runClock'
-import { attachStorageSync } from './ui/storageSync'
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -48,21 +43,11 @@ const config: Phaser.Types.Core.GameConfig = {
       height: 1080
     }
   },
-  scene: [BootScene, HelpScene, ProfileRecoveryScene, AchievementsScene, ProfileScene, ChestScene, InventoryScene, SettingsScene, RunHistoryScene, StartingDeckScene, BlightChestScene, CustomModifiersScene, RelicAcquisitionScene, MainMenuScene, NeowScene, MapScene, CombatScene, CombatMenuScene, EventScene, CampfireScene, ShopScene, RewardsScene, BossRelicScene, RunSummaryScene, DeckBuilderScene],
+  scene: [ProfileRecoveryScene, BootScene, HelpScene, AchievementsScene, ProfileScene, ChestScene, InventoryScene, SettingsScene, RunHistoryScene, StartingDeckScene, BlightChestScene, CustomModifiersScene, RelicAcquisitionScene, MainMenuScene, NeowScene, MapScene, CombatScene, CombatMenuScene, EventScene, CampfireScene, ShopScene, RewardsScene, BossRelicScene, RunSummaryScene, DeckBuilderScene],
 }
 
 export function createGame(): Phaser.Game {
-  try { recoverProfileImport() }
-  catch {
-    const game = new Phaser.Game({ ...config, scene: [ProfileRecoveryScene] })
-    attachPhoneLayout(game)
-    return game
-  }
   const game = new Phaser.Game(config)
   attachPhoneLayout(game)
-  attachStorageSync(game)
-  attachSound(game)
-  attachNotifications(game)
-  attachRunClock(game)
   return game
 }

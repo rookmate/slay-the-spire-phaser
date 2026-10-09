@@ -1,4 +1,5 @@
 import { commitAchievements } from '../core/achievements/progress'
+import { saveCheckpoint } from '../core/checkpoint'
 import { drawBattlefield } from '../ui/Battlefield'
 import { playCue } from '../ui/sound'
 import { finishCombat } from '../core/rooms'
@@ -6,9 +7,8 @@ import { getRunDestination } from '../core/progression'
 import Phaser from 'phaser'
 import { createCombatEngine } from '../core/combat'
 import type { Engine } from '../core/engine'
-import { loadMeta, saveMeta } from '../core/meta'
+import { loadMeta, saveMeta, type MetaState } from '../core/meta'
 import type { RunState } from '../core/run'
-import { saveRun } from '../core/run'
 import { CombatUI } from '../ui/CombatUI'
 import { checkpointRunClock } from '../core/runClock'
 import type { RoomKind } from '../core/map'
@@ -18,7 +18,7 @@ export class CombatScene extends Phaser.Scene {
     private ui!: CombatUI
     private run!: RunState
     private roomKind: RoomKind = 'monster'
-    private meta = loadMeta()
+    private meta!: MetaState
 
     constructor() {
         super('Combat')
@@ -94,16 +94,16 @@ export class CombatScene extends Phaser.Scene {
     }
 
     private checkOutcome(): void {
-        this.flushAchievements()
-        if (this.engine.state.victory) this.handleOutcome()
-        else if (this.engine.state.defeat) this.handleOutcome()
+        if (this.engine.state.victory || this.engine.state.defeat) this.handleOutcome()
+        else this.flushAchievements()
     }
 
     private handleOutcome(): void {
         playCue(this.engine.state.defeat ? 'defeat' : 'victory')
+        this.meta = loadMeta()
         const result = finishCombat(this.run, this.engine, this.roomKind, this.meta)
-        this.flushAchievements()
-        saveRun(this.run)
+        commitAchievements(this.meta, this.run)
+        saveCheckpoint(this.meta, this.run)
         if (result) this.scene.start('RunSummary', { run: this.run, result })
         else { const next = getRunDestination(this.run); this.scene.start(next.scene, next.data) }
     }

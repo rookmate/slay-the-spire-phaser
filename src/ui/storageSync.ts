@@ -1,4 +1,5 @@
 import type Phaser from 'phaser'
+import { persistence } from '../core/persistence'
 import { META_KEY } from '../core/meta'
 import { JOURNAL_KEY } from '../core/profile/storage'
 import { invalidateSettings, SETTINGS_CHANGED, SETTINGS_KEY } from '../core/settings'
@@ -7,6 +8,7 @@ import { emitStorageChange, META_CHANGED, PROFILE_REPLACED } from '../core/stora
 /** Publish settled foreign writes; an import journal hides partial replacements. */
 export function attachStorageSync(game: Phaser.Game): void {
     const changed = (event: StorageEvent) => {
+        if (persistence().error) return
         if (event.storageArea && event.storageArea !== localStorage) return
         const all = event.key === null || event.key === JOURNAL_KEY
         if (all || event.key === 'sts_run_v7') emitStorageChange(PROFILE_REPLACED)
@@ -16,6 +18,7 @@ export function attachStorageSync(game: Phaser.Game): void {
     }
     const motion = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : undefined
     const motionChanged = () => {
+        if (persistence().error) return
         if (localStorage.getItem(JOURNAL_KEY)) return
         invalidateSettings(); emitStorageChange(SETTINGS_CHANGED)
     }

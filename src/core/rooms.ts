@@ -61,6 +61,7 @@ export function finishCombat(run: RunState, engine: Engine, room: RoomKind, meta
         const finished = finishBossCombat(run, meta) === 'RunSummary'
         if (clearedAct === 3) campaignAchievements(run)
         if (clearedAct === 4) endingAchievements(run)
+        if (finished) { run.runFlags ??= {}; run.runFlags.victory = true }
         return finished ? 'victory' : undefined
     }
     const nodeId = run.mapProgress?.currentNodeId ?? `floor-${run.floor}`

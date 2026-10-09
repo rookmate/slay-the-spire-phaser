@@ -25,7 +25,13 @@ export type PendingRoom =
     | { scene: 'Shop'; inventory?: ShopInventory }
     | { scene: 'Campfire' | 'Event' }
 
+export function completedRunResult(run: RunState): 'victory' | 'defeat' | undefined {
+    return run.player.hp <= 0 ? 'defeat' : run.runFlags?.victory ? 'victory' : undefined
+}
+
 export function getRunDestination(run: RunState) {
+    const result = completedRunResult(run)
+    if (result) return { scene: 'RunSummary', data: { run, result } }
     if (run.pendingAcquisitions?.length) return { scene: 'RelicAcquisition', data: { run } }
     if (run.pendingBlights?.length) return { scene: 'BlightChest', data: { run } }
     if (run.startingDraft) return { scene: 'StartingDeck', data: { run } }

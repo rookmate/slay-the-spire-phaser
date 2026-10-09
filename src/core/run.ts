@@ -1,4 +1,5 @@
 import { createIdentity } from './identity'
+import { persistence, RUN_KEY } from './persistence'
 import { migrateEncounterState } from './encounterState'
 import type { EncounterHistory } from './encounters'
 import type { AcquisitionStep } from './relics/acquisitions'
@@ -164,7 +165,6 @@ export function createNewRun(options: NewRunOptions = {}): RunState {
     }
 }
 
-const STORAGE_KEY = 'sts_run_v7'
 
 export function obtainCard(run: RunState, defId: string, destination: 'deck' = 'deck', upgradeLevel = 0): CardInstance {
     const card = createCardInstance(defId, upgradeLevel)
@@ -193,11 +193,11 @@ export function getCurseCards(run: RunState): CardInstance[] {
 }
 
 export function saveRun(run: RunState): void {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(run))
+    persistence().commit({ [RUN_KEY]: JSON.stringify(run) })
 }
 
 export function loadRun(): RunState | undefined {
-    const s = localStorage.getItem(STORAGE_KEY)
+    const s = persistence().read(RUN_KEY)
     if (!s) return undefined
     try {
         const parsed: unknown = JSON.parse(s)
@@ -221,7 +221,7 @@ export function loadRun(): RunState | undefined {
 }
 
 export function clearSavedRun(): void {
-    localStorage.removeItem(STORAGE_KEY)
+    persistence().commit({ [RUN_KEY]: null })
 }
 
 export function obtainCardInstance(run: RunState, card: CardInstance): CardInstance {

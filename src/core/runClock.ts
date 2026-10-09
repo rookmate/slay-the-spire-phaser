@@ -2,6 +2,7 @@ import type Phaser from 'phaser'
 import { loadRun, saveRun, type RunState } from './run'
 import { JOURNAL_KEY } from './profile/storage'
 import { PROFILE_REPLACED } from './storageEvents'
+import { persistence } from './persistence'
 
 const staleRuns = new WeakSet<RunState>()
 const checkpointInterval = 5000
@@ -13,7 +14,7 @@ export function advanceRunClock(run: RunState, deltaMs: number): void {
 
 /** Preserve room-entry inventory and never overwrite a foreign profile replacement. */
 export function checkpointRunClock(run: RunState): boolean {
-    if (staleRuns.has(run) || localStorage.getItem(JOURNAL_KEY)) return false
+    if (persistence().error || staleRuns.has(run) || localStorage.getItem(JOURNAL_KEY)) return false
     const saved = loadRun()
     if (!saved || (saved.runId ?? saved.seed) !== (run.runId ?? run.seed)) return false
     saved.elapsedSeconds = Math.max(saved.elapsedSeconds ?? 0, run.elapsedSeconds ?? 0)
@@ -32,6 +33,7 @@ export function attachRunClock(game: Phaser.Game): void {
         catch { /* Retry later if browser storage is temporarily unavailable. */ }
     }
     const step = (_time: number, delta: number) => {
+        if (persistence().error) return
         const scene = game.scene.getScenes(true)[0] as Phaser.Scene & { run?: RunState }
         const run = scene && !['MainMenu', 'RunSummary', 'DeckBuilder'].includes(scene.scene.key) ? scene.run : undefined
         if (run !== current) { flush(); current = run; sinceSave = 0; dirty = false }
