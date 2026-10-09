@@ -1,3 +1,4 @@
+import { openHelp } from './Help'
 import Phaser from 'phaser'
 import { menuButton, menuText } from '../ui/menu'
 import { headingText, palette } from '../ui/theme'
@@ -12,11 +13,12 @@ export class CombatMenuScene extends Phaser.Scene {
         this.add.text(400, 76, 'Paused', headingText).setOrigin(0.5)
         menuButton(this, 290, 126, 'Resume', () => this.resumeCombat(), true, { primary: true, width: 220 })
         menuButton(this, 290, 182, 'Settings', () => this.scene.start('Settings', { returnTo: 'CombatMenu' }), true, { width: 220 })
-        menuButton(this, 290, 238, 'Main menu', () => {
+        menuButton(this, 290, 238, 'Game guide', () => openHelp(this), true, { width: 220 })
+        menuButton(this, 290, 294, 'Main menu', () => {
             this.scene.stop('Combat')
             this.scene.start('MainMenu')
         }, true, { width: 220 })
-        this.add.text(400, 310, 'Resume keeps your current turn.\nLeaving to the main menu will restart this fight on Continue.', {
+        this.add.text(400, 358, 'Resume keeps your current turn.\nLeaving to the main menu will restart this fight on Continue.', {
             ...menuText, fontSize: '14px', color: palette.muted, align: 'center', lineSpacing: 8,
         }).setOrigin(0.5, 0)
         const escape = (event: KeyboardEvent) => { if (!event.repeat) this.resumeCombat() }

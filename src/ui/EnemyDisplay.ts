@@ -1,3 +1,4 @@
+import { enemyEffects, enemyIntent } from './help/combat'
 import { loadSettings } from '../core/settings'
 import type Phaser from 'phaser'
 import type { Engine } from '../core/engine'
@@ -18,6 +19,8 @@ export class EnemyDisplay {
     private enemyIds: string[] = []
     private healthBars: Phaser.GameObjects.Rectangle[] = []
     private healthTracks: Phaser.GameObjects.Rectangle[] = []
+    private onInspect?: (enemyId: string) => void
+    setOnInspect(callback: (enemyId: string) => void): void { this.onInspect = callback }
     private onEnemyClick?: (enemyIndex: number) => void
 
     constructor(scene: Phaser.Scene, engine: Engine) {
@@ -63,7 +66,7 @@ export class EnemyDisplay {
             }).setOrigin(0.5, 0).setAlpha(0).setDepth(6000)
             const powers = this.scene.add.text(slot.x, slot.y + 129, this.getEnemySummary(enemy, slot.width), {
                 fontFamily: style.fontFamily, fontSize: '10px', color: '#ccbfa5',
-            }).setOrigin(0.5, 0)
+            }).setOrigin(0.5, 0).setInteractive({ useHandCursor: true }).on('pointerdown', () => this.onInspect?.(enemy.id))
 
             sprite.on('pointerover', () => name.setAlpha(1))
             sprite.on('pointerout', () => name.setAlpha(0))
@@ -94,14 +97,7 @@ export class EnemyDisplay {
     }
 
     private getEnemyText(enemy: EnemyState): string {
-        if (this.engine.run?.relics.includes('RUNIC_DOME')) return '?'
-        if (enemy.intent?.kind === 'attack') return `Attack ${this.engine.previewEnemyAttack(enemy)}`
-        if (enemy.intent?.kind === 'multi_attack') return `Attack ${this.engine.previewEnemyAttack(enemy)}×${enemy.intent.hits}`
-        if (enemy.intent?.kind === 'block') return `Block ${enemy.intent.amount}`
-        if (enemy.intent?.kind === 'debuff') return `${enemy.intent.debuff} ↓`
-        if (enemy.intent?.kind === 'status') return `${enemy.intent.createdDefId} x${enemy.intent.count}`
-        if (enemy.intent?.kind === 'summon') return `Summon`
-        return enemy.intent?.desc ?? 'Buff'
+        return this.engine.run?.relics.includes('RUNIC_DOME') ? '?' : enemyIntent(this.engine, enemy)
     }
 
     private getEnemyHpLabel(enemy: EnemyState): string {
@@ -109,17 +105,7 @@ export class EnemyDisplay {
     }
 
     private getEnemyPowers(enemy: EnemyState): string[] {
-        const parts = enemy.powers.map(power => `${power.id}:${power.stacks}`)
-        if (enemy.specId === 'BYRD') {
-            if (enemy.aiState?.flying) parts.push(`FLYING:${Math.max(0, ((enemy.asc ?? 0) >= 17 ? 4 : 3) - Number(enemy.aiState?.hitsTaken ?? 0))}`)
-            if (enemy.aiState?.downed) parts.push('DOWNED')
-        }
-        if (enemy.specId === 'TIME_EATER') parts.unshift(`TIME WARP:${enemy.aiState?.cards ?? 0}/12`)
-        if (enemy.specId === 'CORRUPT_HEART') parts.unshift(`INVINCIBLE:${Math.max(0, ((enemy.asc ?? 0) >= 19 ? 200 : 300) - Number(enemy.aiState?.damageThisTurn ?? 0))}`, `BEAT:${((enemy.asc ?? 0) >= 19 ? 2 : 1) + (Number(enemy.aiState?.buffs ?? 0) >= 2 ? 1 : 0)}`)
-        if (enemy.specId === 'GIANT_HEAD') parts.unshift(`SLOW:${enemy.aiState?.slow ?? 0}`)
-        if (this.engine.state.enemies.filter(e => e.hp > 0 && ['SPIRE_SHIELD', 'SPIRE_SPEAR'].includes(e.specId ?? '')).length === 2) parts.unshift(enemy.id === (this.engine.state.facingEnemyId ?? this.engine.state.enemies[0].id) ? 'FACING' : 'BEHIND:+50%')
-        if (enemy.halfDead) parts.unshift('REVIVING')
-        return parts
+        return enemyEffects(this.engine, enemy).map(effect => effect.title)
     }
 
     private getEnemyDetails(enemy: EnemyState): string {
@@ -127,7 +113,7 @@ export class EnemyDisplay {
     }
 
     private getEnemySummary(enemy: EnemyState, width: number): string {
-        return summarizeEffects(this.getEnemyPowers(enemy), Math.floor(width / 6.1))
+        return `Effects ? ${summarizeEffects(this.getEnemyPowers(enemy), Math.max(0, Math.floor(width / 6.1) - 10))}`
     }
 
     update(): void {

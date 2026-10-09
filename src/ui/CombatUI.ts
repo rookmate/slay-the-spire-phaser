@@ -244,6 +244,8 @@ export class CombatUI {
             this.onEnd?.()
         })
         this.overlayManager.setOnOpen(() => { this.clearTargeting(); this.handManager.inspectCard(-1) })
+        this.playerDisplay.setOnInspect(() => this.overlayManager.openStatus(this.engine.state.player.id))
+        this.enemyDisplay.setOnInspect(id => this.overlayManager.openStatus(id))
         this.playerDisplay.setOnOpenDeck(() => this.overlayManager.openDeckOverlay())
         this.choiceOverlay.setOnSubmit((instanceIds) => this.onSubmitChoice?.(instanceIds))
         this.choiceOverlay.setOnCancel(() => this.onCancelChoice?.())
