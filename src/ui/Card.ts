@@ -15,6 +15,19 @@ function cardColor(def: ReturnType<typeof resolveCard>): number {
     return def.type === 'curse' ? 0x655068 : def.type === 'status' ? 0x646466 : colors[def.color ?? 'colorless']
 }
 
+/** Measure actual wrapped glyphs, retaining the largest size that fits. This runs
+ * only when the wording changes, never during the scene's frame update. */
+function fitText(label: Phaser.GameObjects.Text, text: string, width: number, height: number, preferred: number, minimum: number): void {
+    label.setScale(1).setText(text)
+    for (let size = preferred; size >= minimum; size -= 0.5) {
+        label.setFontSize(size)
+        if (label.width <= width && label.height <= height) return
+    }
+    // Extreme combat values can outgrow the catalog's normal wording. Preserve
+    // the complete text and its proportions; inspection remains full-size.
+    label.setScale(Math.min(1, width / label.width, height / label.height))
+}
+
 export class Card extends Phaser.GameObjects.Container {
     private card: CardInstance
     private engine?: Engine
@@ -48,18 +61,19 @@ export class Card extends Phaser.GameObjects.Container {
         this.updateArt(card.defId)
         this.once(Phaser.GameObjects.Events.DESTROY, () => this.releaseArt?.())
         const header = this.header = scene.add.rectangle(0, 0, w, 36, color).setOrigin(0)
-        const paper = scene.add.rectangle(4, 96, w - 8, h - 100, 0xe5d8b9).setOrigin(0)
+        const paper = scene.add.rectangle(4, 88, w - 8, h - 92, 0xe5d8b9).setOrigin(0)
         const rarityColor = def.rarity === 'rare' ? 0xd3b36a : def.rarity === 'uncommon' ? 0x9dbaae : 0x8c7958
         this.borderColor = rarityColor
         this.border = scene.add.rectangle(0, 0, w, h, 0, 0).setOrigin(0).setStrokeStyle(1, rarityColor)
-        const title = this.title = scene.add.text(8, 5, def.name, { resolution: 2, fontFamily: UI_FONT, fontSize: '13px', fontStyle: 'bold', color: card.upgradeLevel ? '#e2edb6' : '#fff0d5', wordWrap: { width: w - 38, useAdvancedWrap: true }, lineSpacing: 0 }).setResolution(2)
+        const title = this.title = scene.add.text(8, 5, '', { resolution: 2, fontFamily: UI_FONT, fontSize: '13px', fontStyle: 'bold', color: card.upgradeLevel ? '#e2edb6' : '#fff0d5', wordWrap: { width: w - 38 }, lineSpacing: 0 }).setResolution(2)
+        this.setTitle(def.name)
         const costDisc = scene.add.circle(w - 17, 17, 12, 0x201d16).setStrokeStyle(1, 0xc6a66b)
         const cost = this.costText = scene.add.text(w - 17, 16, def.xCost ? 'X' : String(opts.engine?.getCardCost(card) ?? def.cost), { resolution: 2, fontFamily: UI_FONT, fontSize: '17px', fontStyle: 'bold', color: '#f5d78a' }).setOrigin(0.5).setResolution(2)
-        const type = this.typeText = scene.add.text(w / 2, 100, `${def.type}${def.rarity && def.rarity !== 'basic' ? ` · ${def.rarity}` : ''}`, { resolution: 2, fontFamily: UI_FONT, fontSize: '9px', color: '#6b5033' }).setOrigin(0.5, 0).setResolution(2)
-        this.description = scene.add.text(10, 115, '', { resolution: 2, fontFamily: UI_FONT, fontSize: '12px', color: '#2d281f', wordWrap: { width: w - 20 }, lineSpacing: 1 }).setResolution(2)
+        const type = this.typeText = scene.add.text(w / 2, 92, `${def.type}${def.rarity && def.rarity !== 'basic' ? ` · ${def.rarity}` : ''}`, { resolution: 2, fontFamily: UI_FONT, fontSize: '9px', color: '#6b5033' }).setOrigin(0.5, 0).setResolution(2)
+        this.description = scene.add.text(10, 105, '', { resolution: 2, fontFamily: UI_FONT, fontSize: '12px', color: '#2d281f', wordWrap: { width: w - 20 }, lineSpacing: 0 }).setResolution(2)
         this.inspectHint = scene.add.text(9, h - 14, opts.locked ? 'Locked' : '', { resolution: 2, fontFamily: UI_FONT, fontSize: '9px', color: '#705531' }).setResolution(2)
         this.add([header, paper, title, costDisc, cost, type, this.description, this.inspectHint, this.border])
-        const inspect = scene.add.text(w - 23, h - 21, '?', { resolution: 2, fontFamily: UI_FONT, fontSize: '14px', fontStyle: 'bold', color: '#644923', padding: { x: 5, y: 1 } }).setResolution(2).setInteractive({ useHandCursor: true })
+        const inspect = scene.add.text(w - 23, h - 14, '?', { resolution: 2, fontFamily: UI_FONT, fontSize: '11px', fontStyle: 'bold', color: '#644923', padding: { x: 5, y: 0 } }).setResolution(2).setInteractive({ useHandCursor: true })
         inspect.on('pointerdown', (_pointer: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => { event?.stopPropagation(); this.showDetails(!this.detail) })
         this.add(inspect)
         bindAction(inspect, () => this.showDetails(true, true), { id: `inspect:${card.instanceId}`, label: () => `Inspect ${this.accessLabel()}` })
@@ -79,7 +93,7 @@ export class Card extends Phaser.GameObjects.Container {
     refresh(card: CardInstance): void {
         this.card = card
         const def = resolveCard(card)
-        this.title.setText(def.name)
+        this.setTitle(def.name)
         const titleColor = card.upgradeLevel ? '#e2edb6' : '#fff0d5'
         if (this.title.style.color !== titleColor) this.title.setColor(titleColor)
         this.costText.setText(def.xCost ? 'X' : String(this.engine?.getCardCost(card) ?? def.cost))
@@ -111,20 +125,17 @@ export class Card extends Phaser.GameObjects.Container {
     setSelected(selected: boolean): void { this.border.setStrokeStyle(selected ? 3 : 1, selected ? 0xf4d58a : this.borderColor) }
     setDimmed(dimmed: boolean): void { this.shade.setVisible(dimmed) }
     setCombatPreview(engine: Engine, targetId?: string): void { this.setDescription(cardDescription(this.card, engine, targetId)) }
+    private setTitle(name: string): void {
+        if (this.title.text === name) return
+        fitText(this.title, name, Card.CARD_WIDTH - 38, 28, 13, 10)
+        this.title.y = (36 - this.title.displayHeight) / 2
+    }
     private setDescription(text: string): void {
         if (text === this.fullDescription) return
         this.showDetails(false)
         this.fullDescription = text
         this.inspectHint.setText(this.locked ? 'Locked' : '')
-        this.description.setText(text)
-        const maxHeight = Card.CARD_HEIGHT - 134
-        if (this.description.height <= maxHeight) return
-        let shortened = text
-        while (this.description.height > maxHeight && shortened.length) {
-            shortened = shortened.replace(/\s*\S+\s*$/, '')
-            this.description.setText(`${shortened}…`)
-        }
-        this.inspectHint.setText(this.locked ? 'Locked' : 'Full rules →')
+        fitText(this.description, text.replace(/\n/g, ' '), Card.CARD_WIDTH - 20, 60, 12, 10)
     }
     isShowingDetails(): boolean { return !!this.detail }
 
