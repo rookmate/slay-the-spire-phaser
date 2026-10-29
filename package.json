@@ -11,6 +11,7 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "vitest run src",
+    "test:interactions": "vitest run src/core/interaction-campaign.test.ts src/core/interaction-regressions.test.ts src/core/interaction-scoring.test.ts",
     "test:browser": "tsc -p tsconfig.browser.json && playwright test",
     "check:assets": "node scripts/check-assets.mjs",
     "build:performance": "vite build --config vite.performance.config.ts",

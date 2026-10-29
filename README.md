@@ -87,6 +87,12 @@ Every room checkpoint is serialized and restored; tests check legal actions,
 unique card ownership, score statistics, and finite progress. The strategies
 live in `tests/support` and are deliberately limited test players.
 
+`npm run test:interactions` runs a separate bounded, seeded interaction campaign
+for mixed card/relic decks, rare-event branches, scoring, and custom modifiers.
+Failures include replay seeds and action traces. See [interaction campaign](docs/interaction-campaign.md)
+for bounds, expanded seed runs, and reduced regressions. These are internal
+consistency checks, not evidence of original-game parity.
+
 ## Browser checks
 
 ```bash

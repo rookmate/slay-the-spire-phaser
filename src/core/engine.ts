@@ -668,7 +668,7 @@ export class Engine {
                 }
             }
             if (this.run) this.afterQueuedEffects(() => triggerRelicCardResolved(this.getRelicContext(), limbo.card))
-            if (resolved.type === 'attack') this.setPowerStacks(this.state.player, 'WREATH_OF_FLAME', 0)
+            if (resolved.type === 'attack') this.afterQueuedEffects(() => this.setPowerStacks(this.state.player, 'WREATH_OF_FLAME', 0))
             for (const enemy of this.state.enemies) onPlayerCardPlayed(this, enemy, resolved.type)
             this.resolvingCardInstanceId = undefined
             checkCombatAchievements(this)

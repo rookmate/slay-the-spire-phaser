@@ -209,7 +209,9 @@ export const IRONCLAD_SKILLS: Record<string, CardDef> = {
         targeting: { type: 'none' },
         upgrade: { cost: 1 },
         onPlay: ({ engine }) => {
-            if (engine.state.player.block > 0) engine.enqueue({ kind: 'GainBlock', blockSource: 'effect', target: 'player', amount: engine.state.player.block })
+            engine.afterQueuedEffects(() => {
+                if (engine.state.player.block > 0) engine.enqueue({ kind: 'GainBlock', blockSource: 'effect', target: 'player', amount: engine.state.player.block })
+            })
         },
     },
     FLAME_BARRIER: {

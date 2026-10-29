@@ -53,7 +53,7 @@ export function getEventChoices(run: RunState): EventChoiceDef[] {
     if (!run.eventState || run.eventState.resolved) return []
     return EVENT_DEFS[run.eventState.id].choices(run)
 }
-export function transformCard(run: RunState, meta: MetaState, instanceId: string, seed: string): CardInstance | undefined {
+export function transformCard(run: RunState, meta: MetaState, instanceId: string, seed: string, upgrade = false): CardInstance | undefined {
     const original = run.deck.find(card => card.instanceId === instanceId)
     if (!original || !canRemoveCard(original)) return undefined
     const def = CARD_DEFS[original.defId]
@@ -63,7 +63,7 @@ export function transformCard(run: RunState, meta: MetaState, instanceId: string
     if (!pool.length || !removeCardByInstanceId(run, instanceId)) return undefined
     const id = pool[new RNG(seed).int(0, pool.length - 1)]
     if (def.type === 'curse') return obtainCurse(run, id)
-    return obtainCard(run, id)
+    return obtainCard(run, id, 'deck', upgrade ? 1 : 0)
 }
 
 export function resolveEventChoice(run: RunState, meta: MetaState, eventId: EventId, choiceId: string, seed: string, selection?: { cardInstanceId?: string; cardId?: string }): EventResolution {

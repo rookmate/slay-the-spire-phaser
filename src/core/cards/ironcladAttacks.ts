@@ -109,9 +109,9 @@ export const IRONCLAD_ATTACKS: Record<string, CardDef> = {
         upgrade: { cost: 0 },
         onPlay: ({ engine, source, targets, card }) => {
             const target = targets[0]
-            {
-                engine.enqueue({ kind: 'DealDamage', source, target, amount: attackAmount(engine, card, engine.state.player.block) })
-            }
+            engine.afterQueuedEffects(() => {
+                engine.enqueue({ kind: 'DealDamage', source, target, amount: attackAmount(engine, card, engine.state.player.block), sourceCardInstanceId: card.instanceId })
+            })
         },
     },
     IRON_WAVE: {
