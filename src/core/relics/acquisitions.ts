@@ -1,4 +1,4 @@
-import { canRemoveCard, canUpgradeCard, createCardCopy, resolveCard } from '../cards'
+import { canRemoveCard, createCardCopy, resolveCard } from '../cards'
 import { transformCard } from '../events'
 import { changeMaxHp } from '../health'
 import type { MetaState } from '../meta'
@@ -67,8 +67,7 @@ function resolveSelection(run: RunState, meta: MetaState, step: { source: RelicI
         if (step.operation === 'copy') obtainCardInstance(run, createCardCopy(card))
         if (step.operation === 'bottle') card.bottled = step.source
         if (step.operation === 'transform') {
-            const transformed = transformCard(run, meta, id, `${run.seed}-${step.source}-${step.sequence}-${index}`)
-            if (transformed && step.upgrade && canUpgradeCard(transformed)) transformed.upgradeLevel++
+            transformCard(run, meta, id, `${run.seed}-${step.source}-${step.sequence}-${index}`, step.upgrade)
         }
     }
 }
